@@ -1,0 +1,13 @@
+
+Cadaver and konqueror have been used for testing under linux, and both work well with alaya.
+A windows webdav client that seems to work well with alaya is http://rei.to/carotdav_en.html
+
+The default webdav clients for MacOSX and Windows suffer from a wide range of issues. 
+
+Mac 'Finder' will only treat a webdav store as read-only unless locking (webdav level 2) is available (which alaya doesn't support... yet). 
+
+Windows 'netfolders' has issues surrounding authentication. It will only support digest authentication in  http, and although basic authentication is supported in https, it seems to be broken in some versions of windows.
+
+Read more here http://en.wikipedia.org/wiki/WebDAV
+
+Safari seems to have some problems with the 'Logout' type of VPath, where it won't logout sent to the 'logout' URL. Using it in 'private browsing mode' solves this.

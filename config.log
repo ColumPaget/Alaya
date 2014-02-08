@@ -1,0 +1,17 @@
+This file contains any messages produced by compilers while
+running configure, to aid debugging if configure makes a mistake.
+
+configure:560: checking for gcc
+configure:673: checking whether the C compiler (gcc  ) works
+configure:689: gcc -o conftest    conftest.c  1>&5
+configure:715: checking whether the C compiler (gcc  ) is a cross-compiler
+configure:720: checking whether we are using GNU C
+configure:748: checking whether gcc accepts -g
+configure:787: checking whether make sets ${MAKE}
+configure:825: checking for a BSD compatible install
+configure:878: checking how to run the C preprocessor
+configure:958: checking for ANSI C header files
+configure:1063: checking for deflate in -lz
+configure:1146: checking for pam_start in -lpam
+configure:1299: checking for crypt in -lcrypt
+configure:1349: checking for shadow.h

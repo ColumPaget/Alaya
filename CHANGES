@@ -1,0 +1,43 @@
+1.1.0 Very many bugfixes. Proxy support working again. CGI interface improved. 'UserAgentSettings' added. Digest Authentication added (READ THE 'README'!). Ability to log out of HTTP session by going to a fake url. 
+
+1.0.4 Support for custom headers to be added from config-file. 'AuthDelay' system completely removed on realization that it can never work perfectly in a stateless protocol. Added 'LookupClientHost' option to allow turning client hostname lookups on/off. Various bugfixes and performance improvements. 
+
+1.0.1
+Some memory leaks fixed. Anti-cross-site-scripting system added.
+
+1.0.0
+Numerous minor bugfixes, 
+
+0.0.11 
+Authentication segfault fixed. Added security hash for cgi scripts. Added specifiable interpreters for scripting languages. Added 'AuthDelay' to punish failed logins and prevent brute-force password attacks. Added support for 'chained' certificates bundled in a .pem format file.
+
+0.0.10 
+Many bugfixes, webdav 'COPY' implemented
+
+0.0.9 
+Lots of changes, enhanced directory listings added.
+
+0.0.8
+Proxy functions improved, proxy POST added. Various bugfixes.
+
+0.0.7
+Gzip compression added for downloads. Major bugfix for 'native' authentication. Proxy GET performance bugfix
+
+0.0.6
+Ongoing bugfixes. Authentication 'realm' now set to hostname and overridable via commandline/config file options. Makefile fixes for systems with old SSL libraries.
+
+0.0.5
+Mo' bugfixes. Rudimentary proxy server support added ('CONNECT' method and proxy 'GET' method). 
+
+0.0.4
+Fixes to PROPFIND to work with cyberduck
+-allowed and -denied switches added to command-line-args
+
+0.0.3
+Changes to compile and run under MacOSX
+
+0.0.2 
+First bugfix, wasn't working with clients that don't specify a 'Depth' header. Logging improved.
+
+0.0.1 
+Initial Release
