@@ -26,7 +26,7 @@ Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>
 	-f:		Path to config file, defaults to /etc/alaya.conf, but alaya can be configured by command-line args only.
 	-O:		Open, don't require authentication.
 	-h:		'ChHome mode', switch to users home dir and chroot.
-	-i:		Set interface listen on, allows running separate servers on the same port on different interfaces/network cards.
+	-i:		Set interface listen on, allows running separate servers on the same port on different interfaces/network cards. For IPv4 either the interface name or address can be used (i.e. -i eth0 or -i 192.168.8.44) for IPv6 the IPv6 address must be used, (e.g. -i fe80::201:7ff6:ca5a:226b%wlan0)
 	-l:		Path to log file, default is to use 'syslog' instead.
 	-m:		HTTP Methods (GET, PUT, DELETE, PROPFIND) that are allowed.
 Comma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for readonly DAV.
@@ -319,6 +319,10 @@ HTTPS can be turned on (if compiled in) by using the -key and -cert command-line
 
 Some certificates need supporting 'intermediate' or 'chain' certificates. These can be bundled together in one pem format file by simply 'cat'-ing the certificates, in .pem format, into one file and supplying that file to alaya with the -cert command-line option or the SSLCert config-file entry.
 
+
+IPv6
+
+Currently IPv6 is only supported for server-side, alaya will not proxy for IPv6 hosts. If specifying that an interface should be bound to in IPv6 mode the IPv6 address must be used (not the interface name), meaning that IPv4 will not be served (run without being bound to an address, alaya can service both IPv6 and IPv4 connections). If the IPv6 address being bound to is a link-local address then an interface identifier must be supplied (e.g. fe80::201:7ff6:ca5a:226b%eth0  Note the '%eth0').
 
 
 PROXY SUPPORT

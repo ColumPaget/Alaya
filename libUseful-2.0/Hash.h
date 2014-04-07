@@ -20,18 +20,22 @@ typedef int (*HASH_FINISH)(THash *Hash, int Encoding, char **RetStr);
 struct t_hash
 {
 char *Type;
+char *Key1;
+unsigned int Key1Len;
+char *Key2;
+unsigned int Key2Len;
 void *Ctx;
 HASH_UPDATE Update;
 HASH_FINISH Finish;
 };
 
 THash *HashInit(char *Type);
+void HMACSetKey(THash *HMAC, char *Key, int Len);
 void HashDestroy(THash *Hash);
 char *EncodeBase64(char *Return, char *Text, int len);
 char *DecodeBase64(char *Return, int *len, char *Text);
 int HashBytes(char **Return, char *Type, char *text, int len, int Encoding);
 int HashFile(char **Return, char *Type, char *Path, int Encoding);
-int HMAC(char **Return, char *Algo, char *iKey, int iKeyLen, char *iText, int iTextLen);
 
 #ifdef __cplusplus
 }

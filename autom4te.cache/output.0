@@ -582,7 +582,8 @@ PACKAGE_STRING=
 PACKAGE_BUGREPORT=
 PACKAGE_URL=
 
-ac_unique_file="defines.h"
+ac_unique_file="main.c"
+enable_option_checking=no
 # Factoring default headers for most tests.
 ac_includes_default="\
 #include <stdio.h>
@@ -624,6 +625,9 @@ LIB@&t@OBJS
 EGREP
 GREP
 CPP
+INSTALL_DATA
+INSTALL_SCRIPT
+INSTALL_PROGRAM
 SET_MAKE
 OBJEXT
 EXEEXT
@@ -632,6 +636,7 @@ CPPFLAGS
 LDFLAGS
 CFLAGS
 CC
+subdirs
 VERSION
 target_alias
 host_alias
@@ -675,11 +680,11 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 enable_sendfile
-enable_largefiles
-enable_ip6
+enable_capabilities
 enable_ssl
-enable_z
-enable_oss
+enable_ip6
+enable_largefiles
+enable_pam
 '
       ac_precious_vars='build_alias
 host_alias
@@ -690,7 +695,7 @@ LDFLAGS
 LIBS
 CPPFLAGS
 CPP'
-
+ac_subdirs_all='libUseful-2.0'
 
 # Initialize some variables set by options.
 ac_init_help=
@@ -1297,12 +1302,12 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --enable-sendfile       enable sendfile support
-  --enable-largefiles       enable largefile support
-  --enable-ip6       enable IPv6 support
-  --enable-ssl       use Secure Sockets Layer
-  --enable-zlib       use ZLib Compression
-  --enable-oss       use Open Sound System
+  --enable-sendfile       enable sendfile support (default=yes)
+  --enable-capabilities       enable linux capabilities support
+  --enable-ssl		use Secure Sockets Layer (default=no)
+  --enable-ip6		use IPv6 (default=no)
+  --enable-largefiles		enable largefile support (default=no)
+  --enable-pam		enable Pluggable Authentication Modules (default=autodetect) 
 
 Some influential environment variables:
   CC          C compiler command
@@ -1511,6 +1516,52 @@ fi
 
 } @%:@ ac_fn_c_try_run
 
+@%:@ ac_fn_c_try_link LINENO
+@%:@ -----------------------
+@%:@ Try to link conftest.@S|@ac_ext, and return whether this succeeded.
+ac_fn_c_try_link ()
+{
+  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
+  rm -f conftest.$ac_objext conftest$ac_exeext
+  if { { ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:${as_lineno-$LINENO}: $ac_try_echo\""
+$as_echo "$ac_try_echo"; } >&5
+  (eval "$ac_link") 2>conftest.err
+  ac_status=$?
+  if test -s conftest.err; then
+    grep -v '^ *+' conftest.err >conftest.er1
+    cat conftest.er1 >&5
+    mv -f conftest.er1 conftest.err
+  fi
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext && {
+	 test "$cross_compiling" = yes ||
+	 test -x conftest$ac_exeext
+       }; then :
+  ac_retval=0
+else
+  $as_echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_retval=1
+fi
+  # Delete the IPA/IPO (Inter Procedural Analysis/Optimization) information
+  # created by the PGI compiler (conftest_ipa8_conftest.oo), as it would
+  # interfere with the next link command; also delete a directory that is
+  # left behind by Apple's compiler.  We do this before executing the actions.
+  rm -rf conftest.dSYM conftest_ipa8_conftest.oo
+  eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
+  as_fn_set_status $ac_retval
+
+} @%:@ ac_fn_c_try_link
+
 @%:@ ac_fn_c_check_header_mongrel LINENO HEADER VAR INCLUDES
 @%:@ -------------------------------------------------------
 @%:@ Tests whether HEADER exists, giving a warning if it cannot be compiled using
@@ -1628,119 +1679,6 @@ $as_echo "$ac_res" >&6; }
   eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
 
 } @%:@ ac_fn_c_check_header_compile
-
-@%:@ ac_fn_c_try_link LINENO
-@%:@ -----------------------
-@%:@ Try to link conftest.@S|@ac_ext, and return whether this succeeded.
-ac_fn_c_try_link ()
-{
-  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
-  rm -f conftest.$ac_objext conftest$ac_exeext
-  if { { ac_try="$ac_link"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:${as_lineno-$LINENO}: $ac_try_echo\""
-$as_echo "$ac_try_echo"; } >&5
-  (eval "$ac_link") 2>conftest.err
-  ac_status=$?
-  if test -s conftest.err; then
-    grep -v '^ *+' conftest.err >conftest.er1
-    cat conftest.er1 >&5
-    mv -f conftest.er1 conftest.err
-  fi
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; } && {
-	 test -z "$ac_c_werror_flag" ||
-	 test ! -s conftest.err
-       } && test -s conftest$ac_exeext && {
-	 test "$cross_compiling" = yes ||
-	 test -x conftest$ac_exeext
-       }; then :
-  ac_retval=0
-else
-  $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-	ac_retval=1
-fi
-  # Delete the IPA/IPO (Inter Procedural Analysis/Optimization) information
-  # created by the PGI compiler (conftest_ipa8_conftest.oo), as it would
-  # interfere with the next link command; also delete a directory that is
-  # left behind by Apple's compiler.  We do this before executing the actions.
-  rm -rf conftest.dSYM conftest_ipa8_conftest.oo
-  eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
-  as_fn_set_status $ac_retval
-
-} @%:@ ac_fn_c_try_link
-
-@%:@ ac_fn_c_check_func LINENO FUNC VAR
-@%:@ ----------------------------------
-@%:@ Tests whether FUNC exists, setting the cache variable VAR accordingly
-ac_fn_c_check_func ()
-{
-  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $2" >&5
-$as_echo_n "checking for $2... " >&6; }
-if eval \${$3+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-/* Define $2 to an innocuous variant, in case <limits.h> declares $2.
-   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
-#define $2 innocuous_$2
-
-/* System header to define __stub macros and hopefully few prototypes,
-    which can conflict with char $2 (); below.
-    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
-    <limits.h> exists even on freestanding compilers.  */
-
-#ifdef __STDC__
-# include <limits.h>
-#else
-# include <assert.h>
-#endif
-
-#undef $2
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char $2 ();
-/* The GNU C library defines this for functions which it implements
-    to always fail with ENOSYS.  Some functions are actually named
-    something starting with __ and the normal name is an alias.  */
-#if defined __stub_$2 || defined __stub___$2
-choke me
-#endif
-
-int
-main ()
-{
-return $2 ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  eval "$3=yes"
-else
-  eval "$3=no"
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-fi
-eval ac_res=\$$3
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-  eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
-
-} @%:@ ac_fn_c_check_func
 cat >config.log <<_ACEOF
 This file contains any messages produced by compilers while
 running configure, to aid debugging if configure makes a mistake.
@@ -2094,8 +2032,42 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-VERSION="0.0.1" 
+VERSION="1.1.2" 
  
+
+ac_aux_dir=
+for ac_dir in "$srcdir" "$srcdir/.." "$srcdir/../.."; do
+  if test -f "$ac_dir/install-sh"; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/install-sh -c"
+    break
+  elif test -f "$ac_dir/install.sh"; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/install.sh -c"
+    break
+  elif test -f "$ac_dir/shtool"; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/shtool install -c"
+    break
+  fi
+done
+if test -z "$ac_aux_dir"; then
+  as_fn_error $? "cannot find install-sh, install.sh, or shtool in \"$srcdir\" \"$srcdir/..\" \"$srcdir/../..\"" "$LINENO" 5
+fi
+
+# These three variables are undocumented and unsupported,
+# and are intended to be withdrawn in a future Autoconf release.
+# They can cause serious problems if a builder's source tree is in a directory
+# whose full name contains unusual characters.
+ac_config_guess="$SHELL $ac_aux_dir/config.guess"  # Please don't use this var.
+ac_config_sub="$SHELL $ac_aux_dir/config.sub"  # Please don't use this var.
+ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
+
+
+
+
+subdirs="$subdirs libUseful-2.0"
+
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -2923,6 +2895,99 @@ $as_echo "no" >&6; }
   SET_MAKE="MAKE=${MAKE-make}"
 fi
  
+# Find a good install program.  We prefer a C program (faster),
+# so one script is as good as another.  But avoid the broken or
+# incompatible versions:
+# SysV /etc/install, /usr/sbin/install
+# SunOS /usr/etc/install
+# IRIX /sbin/install
+# AIX /bin/install
+# AmigaOS /C/install, which installs bootblocks on floppy discs
+# AIX 4 /usr/bin/installbsd, which doesn't work without a -g flag
+# AFS /usr/afsws/bin/install, which mishandles nonexistent args
+# SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
+# OS/2's system install, which has a completely different semantic
+# ./install, which can be erroneously created by make from ./install.sh.
+# Reject install programs that cannot install multiple files.
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for a BSD-compatible install" >&5
+$as_echo_n "checking for a BSD-compatible install... " >&6; }
+if test -z "$INSTALL"; then
+if ${ac_cv_path_install+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    # Account for people who put trailing slashes in PATH elements.
+case $as_dir/ in @%:@((
+  ./ | .// | /[cC]/* | \
+  /etc/* | /usr/sbin/* | /usr/etc/* | /sbin/* | /usr/afsws/bin/* | \
+  ?:[\\/]os2[\\/]install[\\/]* | ?:[\\/]OS2[\\/]INSTALL[\\/]* | \
+  /usr/ucb/* ) ;;
+  *)
+    # OSF1 and SCO ODT 3.0 have their own names for install.
+    # Don't use installbsd from OSF since it installs stuff as root
+    # by default.
+    for ac_prog in ginstall scoinst install; do
+      for ac_exec_ext in '' $ac_executable_extensions; do
+	if as_fn_executable_p "$as_dir/$ac_prog$ac_exec_ext"; then
+	  if test $ac_prog = install &&
+	    grep dspmsg "$as_dir/$ac_prog$ac_exec_ext" >/dev/null 2>&1; then
+	    # AIX install.  It has an incompatible calling convention.
+	    :
+	  elif test $ac_prog = install &&
+	    grep pwplus "$as_dir/$ac_prog$ac_exec_ext" >/dev/null 2>&1; then
+	    # program-specific install script used by HP pwplus--don't use.
+	    :
+	  else
+	    rm -rf conftest.one conftest.two conftest.dir
+	    echo one > conftest.one
+	    echo two > conftest.two
+	    mkdir conftest.dir
+	    if "$as_dir/$ac_prog$ac_exec_ext" -c conftest.one conftest.two "`pwd`/conftest.dir" &&
+	      test -s conftest.one && test -s conftest.two &&
+	      test -s conftest.dir/conftest.one &&
+	      test -s conftest.dir/conftest.two
+	    then
+	      ac_cv_path_install="$as_dir/$ac_prog$ac_exec_ext -c"
+	      break 3
+	    fi
+	  fi
+	fi
+      done
+    done
+    ;;
+esac
+
+  done
+IFS=$as_save_IFS
+
+rm -rf conftest.one conftest.two conftest.dir
+
+fi
+  if test "${ac_cv_path_install+set}" = set; then
+    INSTALL=$ac_cv_path_install
+  else
+    # As a last resort, use the slow shell script.  Don't cache a
+    # value for INSTALL within a source directory, because that will
+    # break other packages using the cache if that directory is
+    # removed, or if the value is a relative name.
+    INSTALL=$ac_install_sh
+  fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $INSTALL" >&5
+$as_echo "$INSTALL" >&6; }
+
+# Use test -z because SunOS4 sh mishandles braces in ${var-val}.
+# It thinks the first close brace ends the variable substitution.
+test -z "$INSTALL_PROGRAM" && INSTALL_PROGRAM='${INSTALL}'
+
+test -z "$INSTALL_SCRIPT" && INSTALL_SCRIPT='${INSTALL}'
+
+test -z "$INSTALL_DATA" && INSTALL_DATA='${INSTALL} -m 644'
+ 
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -3305,20 +3370,68 @@ $as_echo "@%:@define STDC_HEADERS 1" >>confdefs.h
 fi
  
 
-cf_have_libssl=no
-cf_have_libcrypto=no
-cf_have_libz=yes
-cf_have_oss=no
-cf_have_libesd=no
-cf_have_sendfile=no
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for deflate in -lz" >&5
+$as_echo_n "checking for deflate in -lz... " >&6; }
+if ${ac_cv_lib_z_deflate+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lz  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char deflate ();
+int
+main ()
+{
+return deflate ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_z_deflate=yes
+else
+  ac_cv_lib_z_deflate=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_z_deflate" >&5
+$as_echo "$ac_cv_lib_z_deflate" >&6; }
+if test "x$ac_cv_lib_z_deflate" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+@%:@define HAVE_LIBZ 1
+_ACEOF
+
+  LIBS="-lz $LIBS"
+
+fi
+
+cf_have_libz=$ac_cv_lib_z_deflate
+
+cf_have_capabilities=no
+cf_use_sendfile=yes
 
 @%:@ Check whether --enable-sendfile was given.
 if test "${enable_sendfile+set}" = set; then :
   enableval=$enable_sendfile; cf_use_sendfile=$enableval 
 fi
 
+@%:@ Check whether --enable-capabilities was given.
+if test "${enable_capabilities+set}" = set; then :
+  enableval=$enable_capabilities; cf_use_capabilities=$enableval 
+fi
 
-if test "$cf_use_sendfile" != "no"
+
+if test "$cf_use_capabilities" != "no"
 then
 # On IRIX 5.3, sys/types and inttypes.h are conflicting.
 for ac_header in sys/types.h sys/stat.h stdlib.h string.h memory.h strings.h \
@@ -3337,27 +3450,86 @@ fi
 done
 
 
-ac_fn_c_check_header_mongrel "$LINENO" "sys/sendfile.h" "ac_cv_header_sys_sendfile_h" "$ac_includes_default"
-if test "x$ac_cv_header_sys_sendfile_h" = xyes; then :
-  cf_have_sendfile=yes
+ac_fn_c_check_header_mongrel "$LINENO" "sys/capability.h" "ac_cv_header_sys_capability_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_capability_h" = xyes; then :
+  cf_have_capabilities=yes
 else
-  cf_have_sendfile=no
+  cf_have_capabilities=no
 fi
 
 
-fi 
+fi
 
-if test "$cf_have_sendfile" = "yes"
+if test "$cf_have_capabilities" = "yes"
 then
-$as_echo "@%:@define USE_SENDFILE 1" >>confdefs.h
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for cap_init in -lcap" >&5
+$as_echo_n "checking for cap_init in -lcap... " >&6; }
+if ${ac_cv_lib_cap_cap_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcap  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char cap_init ();
+int
+main ()
+{
+return cap_init ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_cap_cap_init=yes
+else
+  ac_cv_lib_cap_cap_init=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_cap_cap_init" >&5
+$as_echo "$ac_cv_lib_cap_cap_init" >&6; }
+if test "x$ac_cv_lib_cap_cap_init" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+@%:@define HAVE_LIBCAP 1
+_ACEOF
+
+  LIBS="-lcap $LIBS"
+
+fi
+
+$as_echo "@%:@define USE_LINUX_CAPABILITIES 1" >>confdefs.h
 
 fi
 
 
+@%:@ Check whether --enable-ssl was given.
+if test "${enable_ssl+set}" = set; then :
+  enableval=$enable_ssl; cf_use_ssl=$enableval 
+fi
+
+@%:@ Check whether --enable-ip6 was given.
+if test "${enable_ip6+set}" = set; then :
+  enableval=$enable_ip6; cf_use_ip6=$enableval 
+fi
 
 @%:@ Check whether --enable-largefiles was given.
 if test "${enable_largefiles+set}" = set; then :
   enableval=$enable_largefiles; cf_use_largefiles=$enableval 
+fi
+
+@%:@ Check whether --enable-pam was given.
+if test "${enable_pam+set}" = set; then :
+  enableval=$enable_pam; cf_use_pam=$enableval 
 fi
 
 
@@ -3370,26 +3542,59 @@ $as_echo "@%:@define _FILE_OFFSET_BITS 64" >>confdefs.h
 fi
 
 
-@%:@ Check whether --enable-ip6 was given.
-if test "${enable_ip6+set}" = set; then :
-  enableval=$enable_ip6; cf_use_ip6=$enableval 
-fi
-
-
-if test "$cf_use_ip6" = "yes"
+if test "$cf_use_pam" != "no"
 then
-$as_echo "@%:@define USE_INET6 1" >>confdefs.h
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for pam_start in -lpam" >&5
+$as_echo_n "checking for pam_start in -lpam... " >&6; }
+if ${ac_cv_lib_pam_pam_start+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpam  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char pam_start ();
+int
+main ()
+{
+return pam_start ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_pam_pam_start=yes
+else
+  ac_cv_lib_pam_pam_start=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pam_pam_start" >&5
+$as_echo "$ac_cv_lib_pam_pam_start" >&6; }
+if test "x$ac_cv_lib_pam_pam_start" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+@%:@define HAVE_LIBPAM 1
+_ACEOF
+
+  LIBS="-lpam $LIBS"
 
 fi
 
-
-@%:@ Check whether --enable-ssl was given.
-if test "${enable_ssl+set}" = set; then :
-  enableval=$enable_ssl; cf_use_ssl=$enableval 
+cf_have_libpam=$ac_cv_lib_pam_pam_start
 fi
 
 
-if test "$cf_use_ssl" = "yes"
+
+if test "$cf_use_ssl" = "yes" 
 then
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for SSL_library_init in -lssl" >&5
 $as_echo_n "checking for SSL_library_init in -lssl... " >&6; }
@@ -3484,69 +3689,15 @@ _ACEOF
 fi
 
 cf_have_libcrypto=$ac_cv_lib_crypto_EVP_CIPHER_CTX_init
-
-for ac_func in OpenSSL_add_all_algorithms EVP_bf_cbc EVP_rc2_cbc EVP_rc4 EVP_rc5_32_12_16_cbc EVP_des_cbc EVP_desx_cbc EVP_cast5_cbc EVP_idea_cbc EVP_aes_128_cbc EVP_aes_256_cbc
-do :
-  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
-ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
-if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
-  cat >>confdefs.h <<_ACEOF
-@%:@define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
-_ACEOF
- 
-fi
-done
-
-
- { $as_echo "$as_me:${as_lineno-$LINENO}: checking that OpenSSL Library is at least version 0.9.7" >&5
-$as_echo_n "checking that OpenSSL Library is at least version 0.9.7... " >&6; }   
- cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-		#include <openssl/evp.h>
-		#if SSLEAY_VERSION_NUMBER >= 0x00907000L
-		yes        
-		#endif
-	
-_ACEOF
-if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
-  $EGREP "yes" >/dev/null 2>&1; then :
-  
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-    
-$as_echo "@%:@define USE_OPENSSL_ADD_ALL_ALGORITHMS 1" >>confdefs.h
- 
-	
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-rm -f conftest*
-
 fi
 
-if test "cf_have_libssl" = "yes"
-then
-cf_use_zlib=yes
-fi
-
-
-@%:@ Check whether --enable-z was given.
-if test "${enable_z+set}" = set; then :
-  enableval=$enable_z; cf_use_zlib=$enableval 
-fi
-
-
-if test "$cf_use_zlib" = "yes"
-then
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for deflate in -lz" >&5
-$as_echo_n "checking for deflate in -lz... " >&6; }
-if ${ac_cv_lib_z_deflate+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for crypt in -lcrypt" >&5
+$as_echo_n "checking for crypt in -lcrypt... " >&6; }
+if ${ac_cv_lib_crypt_crypt+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_check_lib_save_LIBS=$LIBS
-LIBS="-lz  $LIBS"
+LIBS="-lcrypt  $LIBS"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -3556,112 +3707,43 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char deflate ();
+char crypt ();
 int
 main ()
 {
-return deflate ();
+return crypt ();
   ;
   return 0;
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_z_deflate=yes
+  ac_cv_lib_crypt_crypt=yes
 else
-  ac_cv_lib_z_deflate=no
+  ac_cv_lib_crypt_crypt=no
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
 LIBS=$ac_check_lib_save_LIBS
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_z_deflate" >&5
-$as_echo "$ac_cv_lib_z_deflate" >&6; }
-if test "x$ac_cv_lib_z_deflate" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_crypt_crypt" >&5
+$as_echo "$ac_cv_lib_crypt_crypt" >&6; }
+if test "x$ac_cv_lib_crypt_crypt" = xyes; then :
   cat >>confdefs.h <<_ACEOF
-@%:@define HAVE_LIBZ 1
+@%:@define HAVE_LIBCRYPT 1
 _ACEOF
 
-  LIBS="-lz $LIBS"
+  LIBS="-lcrypt $LIBS"
 
 fi
 
-cf_have_libz=$ac_cv_lib_z_deflate
-fi
+cf_have_libcrypt=$ac_cv_lib_crypt_crypt
 
-
-@%:@ Check whether --enable-oss was given.
-if test "${enable_oss+set}" = set; then :
-  enableval=$enable_oss; cf_use_oss=$enableval 
-fi
-
-
-cf_use_oss=yes
-
-if test "$cf_use_oss" = "yes"
-then
-ac_fn_c_check_header_mongrel "$LINENO" "sys/soundcard.h" "ac_cv_header_sys_soundcard_h" "$ac_includes_default"
-if test "x$ac_cv_header_sys_soundcard_h" = xyes; then :
-  $as_echo "@%:@define HAVE_OSS 1" >>confdefs.h
-
-else
-  cf_have_oss=no
-fi
-
+ac_fn_c_check_header_mongrel "$LINENO" "shadow.h" "ac_cv_header_shadow_h" "$ac_includes_default"
+if test "x$ac_cv_header_shadow_h" = xyes; then :
+  $as_echo "@%:@define HAVE_SHADOW_H 1" >>confdefs.h
 
 fi
 
-
-#AC_ARG_ENABLE(esd, [  --enable-esd       use ESound], cf_use_esd=$enableval )
-
-if test "$cf_use_esd" = "yes"
-then
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for esd_open_sound in -lesd" >&5
-$as_echo_n "checking for esd_open_sound in -lesd... " >&6; }
-if ${ac_cv_lib_esd_esd_open_sound+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lesd  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char esd_open_sound ();
-int
-main ()
-{
-return esd_open_sound ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_esd_esd_open_sound=yes
-else
-  ac_cv_lib_esd_esd_open_sound=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_esd_esd_open_sound" >&5
-$as_echo "$ac_cv_lib_esd_esd_open_sound" >&6; }
-if test "x$ac_cv_lib_esd_esd_open_sound" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-@%:@define HAVE_LIBESD 1
-_ACEOF
-
-  LIBS="-lesd $LIBS"
-
-fi
-
-cf_have_libesd=$ac_cv_lib_esd_esd_open_sound
-fi
 
 
 ac_config_files="$ac_config_files Makefile"
@@ -4271,6 +4353,7 @@ gives unlimited permission to copy, distribute and modify it."
 
 ac_pwd='$ac_pwd'
 srcdir='$srcdir'
+INSTALL='$INSTALL'
 test -n "\$AWK" || AWK=awk
 _ACEOF
 
@@ -4706,6 +4789,10 @@ ac_abs_srcdir=$ac_abs_top_srcdir$ac_dir_suffix
   # CONFIG_FILE
   #
 
+  case $INSTALL in
+  [\\/$]* | ?:[\\/]* ) ac_INSTALL=$INSTALL ;;
+  *) ac_INSTALL=$ac_top_build_prefix$INSTALL ;;
+  esac
 _ACEOF
 
 cat >>$CONFIG_STATUS <<\_ACEOF || ac_write_fail=1
@@ -4759,6 +4846,7 @@ s&@abs_top_srcdir@&$ac_abs_top_srcdir&;t t
 s&@builddir@&$ac_builddir&;t t
 s&@abs_builddir@&$ac_abs_builddir&;t t
 s&@abs_top_builddir@&$ac_abs_top_builddir&;t t
+s&@INSTALL@&$ac_INSTALL&;t t
 $ac_datarootdir_hack
 "
 eval sed \"\$ac_sed_extra\" "$ac_file_inputs" | $AWK -f "$ac_tmp/subs.awk" \
@@ -4816,8 +4904,213 @@ if test "$no_create" != yes; then
   # would make configure fail if this is the last instruction.
   $ac_cs_success || as_fn_exit 1
 fi
+
+#
+# CONFIG_SUBDIRS section.
+#
+if test "$no_recursion" != yes; then
+
+  # Remove --cache-file, --srcdir, and --disable-option-checking arguments
+  # so they do not pile up.
+  ac_sub_configure_args=
+  ac_prev=
+  eval "set x $ac_configure_args"
+  shift
+  for ac_arg
+  do
+    if test -n "$ac_prev"; then
+      ac_prev=
+      continue
+    fi
+    case $ac_arg in
+    -cache-file | --cache-file | --cache-fil | --cache-fi \
+    | --cache-f | --cache- | --cache | --cach | --cac | --ca | --c)
+      ac_prev=cache_file ;;
+    -cache-file=* | --cache-file=* | --cache-fil=* | --cache-fi=* \
+    | --cache-f=* | --cache-=* | --cache=* | --cach=* | --cac=* | --ca=* \
+    | --c=*)
+      ;;
+    --config-cache | -C)
+      ;;
+    -srcdir | --srcdir | --srcdi | --srcd | --src | --sr)
+      ac_prev=srcdir ;;
+    -srcdir=* | --srcdir=* | --srcdi=* | --srcd=* | --src=* | --sr=*)
+      ;;
+    -prefix | --prefix | --prefi | --pref | --pre | --pr | --p)
+      ac_prev=prefix ;;
+    -prefix=* | --prefix=* | --prefi=* | --pref=* | --pre=* | --pr=* | --p=*)
+      ;;
+    --disable-option-checking)
+      ;;
+    *)
+      case $ac_arg in
+      *\'*) ac_arg=`$as_echo "$ac_arg" | sed "s/'/'\\\\\\\\''/g"` ;;
+      esac
+      as_fn_append ac_sub_configure_args " '$ac_arg'" ;;
+    esac
+  done
+
+  # Always prepend --prefix to ensure using the same prefix
+  # in subdir configurations.
+  ac_arg="--prefix=$prefix"
+  case $ac_arg in
+  *\'*) ac_arg=`$as_echo "$ac_arg" | sed "s/'/'\\\\\\\\''/g"` ;;
+  esac
+  ac_sub_configure_args="'$ac_arg' $ac_sub_configure_args"
+
+  # Pass --silent
+  if test "$silent" = yes; then
+    ac_sub_configure_args="--silent $ac_sub_configure_args"
+  fi
+
+  # Always prepend --disable-option-checking to silence warnings, since
+  # different subdirs can have different --enable and --with options.
+  ac_sub_configure_args="--disable-option-checking $ac_sub_configure_args"
+
+  ac_popdir=`pwd`
+  for ac_dir in : $subdirs; do test "x$ac_dir" = x: && continue
+
+    # Do not complain, so a configure script can configure whichever
+    # parts of a large source tree are present.
+    test -d "$srcdir/$ac_dir" || continue
+
+    ac_msg="=== configuring in $ac_dir (`pwd`/$ac_dir)"
+    $as_echo "$as_me:${as_lineno-$LINENO}: $ac_msg" >&5
+    $as_echo "$ac_msg" >&6
+    as_dir="$ac_dir"; as_fn_mkdir_p
+    ac_builddir=.
+
+case "$ac_dir" in
+.) ac_dir_suffix= ac_top_builddir_sub=. ac_top_build_prefix= ;;
+*)
+  ac_dir_suffix=/`$as_echo "$ac_dir" | sed 's|^\.[\\/]||'`
+  # A ".." for each directory in $ac_dir_suffix.
+  ac_top_builddir_sub=`$as_echo "$ac_dir_suffix" | sed 's|/[^\\/]*|/..|g;s|/||'`
+  case $ac_top_builddir_sub in
+  "") ac_top_builddir_sub=. ac_top_build_prefix= ;;
+  *)  ac_top_build_prefix=$ac_top_builddir_sub/ ;;
+  esac ;;
+esac
+ac_abs_top_builddir=$ac_pwd
+ac_abs_builddir=$ac_pwd$ac_dir_suffix
+# for backward compatibility:
+ac_top_builddir=$ac_top_build_prefix
+
+case $srcdir in
+  .)  # We are building in place.
+    ac_srcdir=.
+    ac_top_srcdir=$ac_top_builddir_sub
+    ac_abs_top_srcdir=$ac_pwd ;;
+  [\\/]* | ?:[\\/]* )  # Absolute name.
+    ac_srcdir=$srcdir$ac_dir_suffix;
+    ac_top_srcdir=$srcdir
+    ac_abs_top_srcdir=$srcdir ;;
+  *) # Relative name.
+    ac_srcdir=$ac_top_build_prefix$srcdir$ac_dir_suffix
+    ac_top_srcdir=$ac_top_build_prefix$srcdir
+    ac_abs_top_srcdir=$ac_pwd/$srcdir ;;
+esac
+ac_abs_srcdir=$ac_abs_top_srcdir$ac_dir_suffix
+
+
+    cd "$ac_dir"
+
+    # Check for guested configure; otherwise get Cygnus style configure.
+    if test -f "$ac_srcdir/configure.gnu"; then
+      ac_sub_configure=$ac_srcdir/configure.gnu
+    elif test -f "$ac_srcdir/configure"; then
+      ac_sub_configure=$ac_srcdir/configure
+    elif test -f "$ac_srcdir/configure.in"; then
+      # This should be Cygnus configure.
+      ac_sub_configure=$ac_aux_dir/configure
+    else
+      { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: no configuration information is in $ac_dir" >&5
+$as_echo "$as_me: WARNING: no configuration information is in $ac_dir" >&2;}
+      ac_sub_configure=
+    fi
+
+    # The recursion is here.
+    if test -n "$ac_sub_configure"; then
+      # Make the cache file name correct relative to the subdirectory.
+      case $cache_file in
+      [\\/]* | ?:[\\/]* ) ac_sub_cache_file=$cache_file ;;
+      *) # Relative name.
+	ac_sub_cache_file=$ac_top_build_prefix$cache_file ;;
+      esac
+
+      { $as_echo "$as_me:${as_lineno-$LINENO}: running $SHELL $ac_sub_configure $ac_sub_configure_args --cache-file=$ac_sub_cache_file --srcdir=$ac_srcdir" >&5
+$as_echo "$as_me: running $SHELL $ac_sub_configure $ac_sub_configure_args --cache-file=$ac_sub_cache_file --srcdir=$ac_srcdir" >&6;}
+      # The eval makes quoting arguments work.
+      eval "\$SHELL \"\$ac_sub_configure\" $ac_sub_configure_args \
+	   --cache-file=\"\$ac_sub_cache_file\" --srcdir=\"\$ac_srcdir\"" ||
+	as_fn_error $? "$ac_sub_configure failed for $ac_dir" "$LINENO" 5
+    fi
+
+    cd "$ac_popdir"
+  done
+fi
 if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
+
+
+echo
+echo "********** Alaya Compile Settings *********"
+if test	"$cf_have_libssl" != "yes" 
+then
+echo "SSL/https NOT enabled"
+else
+echo "SSL and https enabled"
+fi
+
+if test	"$cf_have_libpam" != "yes" 
+then
+echo "PAM authentication NOT enabled"
+else
+echo "PAM authentication enabled"
+fi
+
+if test	"$cf_have_libcrypt" != "yes" 
+then
+echo "LIBCRYPT authentication NOT enabled"
+else
+echo "LIBCRYPT authentication enabled"
+fi
+
+if test	"$ac_cv_header_shadow_h" != "yes" 
+then
+echo "/etc/shadow authentication NOT enabled"
+else
+echo "/etc/shadow authentication enabled"
+fi
+
+if test "$cf_use_largefiles" != "yes"
+then
+echo "Largefiles ( > 2GB ) NOT enabled"
+else
+echo "Largefiles ( > 2GB ) enabled"
+fi
+
+if test "$cf_have_capabilities" != "yes"
+then
+echo "Linux capabilties NOT enabled"
+else
+echo "Linux capabilties enabled"
+fi
+
+if test "$cf_use_ip6" != "yes"
+then
+echo "IPv6 NOT enabled"
+else
+echo "IPv6 enabled"
+fi
+
+if test "$cf_use_sendfile" != "yes"
+then
+echo "sendfile NOT enabled"
+else
+echo "sendfile enabled"
+fi
+
 

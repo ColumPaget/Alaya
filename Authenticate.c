@@ -162,25 +162,32 @@ return(FALSE);
 
 int AuthAccessToken(HTTPSession *Session)
 {
-char *URL=NULL, *Tempstr=NULL;
+char *URL=NULL, *Token=NULL, *Token2=NULL;
 int result=FALSE;
 
 //if (! (Session->Flags & FLAG_ACCESS_TOKEN)) return(FALSE);
 URL=FormatURL(URL,Session,Session->Path);
 
 //Salt value for access token is stored in UserSettings
-Tempstr=MakeAccessToken(Tempstr, Session->UserSettings, Session->Method, Session->ClientIP, URL);
+Token=MakeAccessToken(Token, Session->UserSettings, Session->Method, Session->ClientIP, URL);
+if (strncmp(Session->ClientIP,"::ffff:",7)==0) Token2=MakeAccessToken(Token2, Session->UserSettings, Session->Method, Session->ClientIP+7, URL);
 
-if (Session->Password && (strcmp(Tempstr,Session->Password)==0))
+if (Session->Password && 
+		(
+			(strcmp(Token,Session->Password)==0) ||
+			(strcmp(Token2,Session->Password)==0)
+		)
+	)
 { 
 	result=TRUE; 
 	LogToFile(Settings.LogPath,"Client Authenticated with AccessToken for %s", Session->UserName);
 }
-else LogToFile(Settings.LogPath,"AccessToken Failed for %s", Session->UserName);
+else LogToFile(Settings.LogPath,"AccessToken Failed for %s@%s", Session->UserName,Session->ClientIP);
 
 AuthenticationsTried=CatStr(AuthenticationsTried,"accesstoken ");
 
-DestroyString(Tempstr);
+DestroyString(Token2);
+DestroyString(Token);
 DestroyString(URL);
 
 return(result);

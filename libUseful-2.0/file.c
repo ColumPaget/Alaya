@@ -12,6 +12,7 @@
 #endif
 
 
+
 int FDSelect(int fd, int Flags, struct timeval *tv)
 {
 fd_set *readset=NULL, *writeset=NULL;
@@ -123,10 +124,23 @@ void STREAMResizeBuffer(STREAM *Stream, int size)
 
 int STREAMCheckForBytes(STREAM *S)
 {
-  if (! S) return(0);
-	if (S->State & SS_EMBARGOED) return(0);
-  if (S->InEnd > S->InStart) return(1);
-  if (S->in_fd==-1) return(0);
+off_t pos;
+struct stat Stat;
+
+  if (! S) return(FALSE);
+	if (S->State & SS_EMBARGOED) return(FALSE);
+  if (S->InEnd > S->InStart) return(TRUE);
+  if (S->in_fd==-1) return(FALSE);
+
+	if (S->Flags & SF_FOLLOW) 
+	{
+		while (1)
+		{
+			pos=STREAMTell(S);
+			fstat(S->in_fd,&Stat);		
+			if (Stat.st_size > pos) return(TRUE);			
+		}
+	}
   return(FDCheckForBytes(S->in_fd));
 }
 
@@ -316,6 +330,7 @@ while (Curr)
 	if (Mod->Read) 
 	{
 		len=Mod->Read(Mod,InBuff,len,&OutputBuff,&olen,FALSE);
+
 		if (len != EOF) state=0;
 
 		if (len > 0)
@@ -1109,4 +1124,50 @@ if (! S->Items) S->Items=ListCreate();
 Curr=ListFindNamedItem(S->Items,Name);
 if (Curr) Curr->Item=Value;
 else ListAddNamedItem(S->Items,Name,Value);
+}
+
+
+off_t STREAMSendFile(STREAM *In, STREAM *Out, off_t Max)
+{
+char *Buffer=NULL;
+int BuffSize=BUFSIZ;
+off_t val, result;
+
+#ifdef USE_SENDFILE
+
+//if we are not using ssl and not using processor modules, we can use 
+//kernel-level copy!
+
+#include <sys/sendfile.h>
+
+val=In->Flags | Out->Flags;
+if ((! (val & SF_SSL)) && (ListSize(In->ProcessingModules)==0) && (ListSize(Out->ProcessingModules)==0))
+{
+	val=0;
+	STREAMFlush(Out);
+	result=sendfile(Out->out_fd, In->in_fd,0,BUFSIZ);
+	while (result > 0)
+	{
+		val+=result;
+		if ((Max > 0) && (val >= Max)) break;
+	result=sendfile(Out->out_fd, In->in_fd,0,BUFSIZ);
+	}
+}
+else
+#endif
+{
+	val=0;
+	Buffer=SetStrLen(Buffer,BuffSize);
+	result=STREAMReadBytes(In,Buffer,BuffSize);
+	while (result >=0)
+	{
+		val+=STREAMWriteBytes(Out,Buffer,result);
+		if ((Max > 0) && (val >= Max)) break;
+		result=STREAMReadBytes(In,Buffer,BuffSize);
+	}
+}
+
+DestroyString(Buffer);
+
+return(val);
 }

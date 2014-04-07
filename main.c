@@ -301,17 +301,15 @@ int fd, infd, outfd, errfd;
 char *Tempstr=NULL, *ptr;
 HTTPSession *Session;
 STREAM *S;
-int i,pid;
+int pid;
 
 		//Check if log file has gotten big and rotate if needs be
 		LogFileCheckRotate(Settings.LogPath);
 
-		fd=TCPServerSockAccept(ServiceSock,&i);
 		Session=HTTPSessionCreate();
+		fd=TCPServerSockAccept(ServiceSock,&Session->ClientIP);
 		Session->S=STREAMFromFD(fd);
 		STREAMSetFlushType(Session->S, FLUSH_FULL,0);
-
-		Session->ClientIP=CopyStr(Session->ClientIP,IPtoStr(i));
 
 		pid=PipeSpawnFunction(&infd,&outfd,NULL, ChildFunc, Session);
 		Tempstr=FormatStr(Tempstr,"%d",pid);
@@ -439,7 +437,7 @@ Settings.AuthMethods=CopyStr(Settings.AuthMethods,"native,accesstoken");
 Settings.AuthRealm=CopyStr(Settings.AuthRealm,UnameData.nodename);
 Settings.DirListFlags=DIR_SHOWFILES | DIR_FANCY;
 Settings.IndexFiles=CopyStr(Settings.IndexFiles,"index.html,dir.html");
-Settings.M3UFileTypes=CopyStr(Settings.M3UFileTypes,".mp3,.ogg");
+Settings.M3UFileTypes=CopyStr(Settings.M3UFileTypes,".mp3,.ogg,.mp4,.flv,.webm,.m4v,.m4a,.aac");
 Settings.VPaths=ListCreate();
 Settings.HostConnections=ListCreate();
 Settings.ScriptHandlers=ListCreate();
@@ -472,8 +470,6 @@ DestroyString(Tempstr);
 
 
 
-
-
 main(int argc, char *argv[])
 {
 STREAM *ServiceSock, *S;
@@ -482,9 +478,13 @@ char *Tempstr=NULL;
 int result;
 
 
+//Drop most capabilities
+DropCapabilities(CAPS_LEVEL_STARTUP);
 nice(10);
 InitSettings();
+
 openlog("alaya",LOG_PID, LOG_DAEMON);
+
 Connections=ListCreate();
 
 
@@ -515,6 +515,10 @@ WritePidFile(Tempstr);
 
 ServiceSock=STREAMFromFD(fd);
 ListAddItem(Connections,ServiceSock);
+
+//We no longer need the 'bind port' capablity
+DropCapabilities(CAPS_LEVEL_NETBOUND);
+
 while (1)
 {
 S=STREAMSelect(Connections,NULL);

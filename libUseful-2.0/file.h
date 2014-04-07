@@ -46,6 +46,7 @@
 #define SF_AUTH 512
 #define SF_WRLOCK 1024
 #define SF_RDLOCK 2048
+#define SF_FOLLOW 4096
 
 //Stream state values
 #define SS_CONNECTING 1
@@ -121,7 +122,7 @@ void STREAMResizeBuffer(STREAM *, int);
 int STREAMReadChar(STREAM *);
 int STREAMWriteChar(STREAM *,unsigned char);
 char* STREAMReadLine(char *Buffer, STREAM *);
-int ReadBytesToTerm(STREAM *S, char *Buffer, int BuffSize,unsigned char Term);
+int STREAMReadBytesToTerm(STREAM *S, char *Buffer, int BuffSize,unsigned char Term);
 char* STREAMReadToTerminator(char *Buffer, STREAM *,unsigned char Term);
 char* STREAMReadToMultiTerminator(char *Buffer, STREAM *, char *Terms);
 int STREAMWriteString(const char *Buffer, STREAM *);
@@ -145,6 +146,7 @@ char *STREAMGetValue(STREAM *S, const char *Name);
 void STREAMSetItem(STREAM *S, const char *Name, void *Item);
 void *STREAMGetItem(STREAM *S, const char *Name);
 
+off_t STREAMSendFile(STREAM *In, STREAM *Out, off_t Max);
 
 #ifdef __cplusplus
 }

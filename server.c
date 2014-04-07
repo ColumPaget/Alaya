@@ -712,17 +712,9 @@ int ICYInterval=4096000;
 		if (SendData)
 		{
 		if (Session->Flags & HTTP_ICECAST) IcecastSendData(Doc, S, ICYInterval);
-		else
-		{
-			Buffer=SetStrLen(Buffer,BuffSize);
-			result=STREAMReadBytes(Doc,Buffer,BuffSize);
-			while (result > 0)
-			{
-				STREAMWriteBytes(S,Buffer,result);
-				result=STREAMReadBytes(Doc,Buffer,BuffSize);
-			}
+		else STREAMSendFile(Doc, S, 0);
 		}
-		}	
+
 		STREAMClose(Doc);
 		DestroyHTTPSession(ResponseHeaders);
 	}
@@ -874,23 +866,15 @@ if (! Doc)
 }
 else
 {
-fchmod(Doc->in_fd,0660); 
+	fchmod(Doc->in_fd,0660); 
 
 	Buffer=SetStrLen(Buffer,BuffSize);
-	result=STREAMReadBytes(S,Buffer,BuffSize);
-	while (result > 0)
-	{
-		STREAMWriteBytes(Doc,Buffer,result);
-		total+=result;
-		if ((Heads->ContentSize > 0) && (total >= Heads->ContentSize)) break;
+	total=STREAMSendFile(S,Doc,Heads->ContentSize);
+	STREAMClose(Doc);
 
-		result=STREAMReadBytes(S,Buffer,BuffSize);
-	}
-STREAMClose(Doc);
-
-stat(Heads->Path,&FileStat);
-LogToFile(Settings.LogPath,"%s@%s (%s) uploaded %s (%d bytes)",Heads->UserName,Heads->ClientHost,Heads->ClientIP,Heads->Path,FileStat.st_size);
-HTTPServerSendHTML(S, Heads, "201 Created","");
+	stat(Heads->Path,&FileStat);
+	LogToFile(Settings.LogPath,"%s@%s (%s) uploaded %s (%d bytes)",Heads->UserName,Heads->ClientHost,Heads->ClientIP,Heads->Path,FileStat.st_size);
+	HTTPServerSendHTML(S, Heads, "201 Created","");
 }
 
 
@@ -1174,10 +1158,15 @@ LogToFile(Settings.LogPath,"User Context: Chroot: %s, StartDir: %s, UserID: %d, 
 if (Session->GroupID > 0) setgid(Session->GroupID);
 else if (Settings.DefaultGroupID > 0) setgid(Settings.DefaultGroupID);
 
-if (setreuid(Session->RealUserUID,Session->RealUserUID)==0)
+DropCapabilities(CAPS_LEVEL_CHROOTED);
+
+if (setresuid(Session->RealUserUID,Session->RealUserUID,Session->RealUserUID)==0)
 {
 //  RetVal=TRUE;
 }
+
+//drop everything! (In case someting went wrong with setresuid) 
+DropCapabilities(CAPS_LEVEL_SESSION);
 
 DestroyString(Tempstr);
 DestroyString(ChrootDir);

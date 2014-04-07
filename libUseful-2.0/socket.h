@@ -16,12 +16,16 @@
 extern "C" {
 #endif
 
+int IsIP4Address(char *Str);
+int IsIP6Address(char *Str);
+
+const char *GetInterfaceIP(const char *Interface);
 
 
 /* Server Socket Funcs*/
 int InitServerSock(char *Address, int Port);
 int InitUnixServerSock(char *Path);
-int TCPServerSockAccept(int ServerSock,int *Addr);
+int TCPServerSockAccept(int ServerSock,char **Addr);
 int UnixServerSockAccept(int ServerSock);
 
 int GetSockDetails(int fd, char **LocalAddress, int *LocalPort, char **RemoteAddress, int *RemotePort);

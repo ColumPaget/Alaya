@@ -529,6 +529,7 @@ DestroyString(Token);
 return(TRUE);
 }
 
+
 int ChrootProcessRequest(STREAM *S, HTTPSession *Session, char *Type, char *Path, char *SearchPath)
 {
 char *Tempstr=NULL, *PortStr=NULL, *ContentLengthStr=NULL, *ArgumentsStr=NULL, *Referrer=NULL;
@@ -596,18 +597,7 @@ if (Settings.Flags & FLAG_VERBOSE) LogToFile(Settings.LogPath,"CGI HEAERS: [%s]"
 
 
 //Read remaining data from CGI
-Tempstr=SetStrLen(Tempstr,4096);
-result=STREAMReadBytes(ParentProcessPipe,Tempstr,4096);
-while (result > -1)
-{
-	if (Settings.Flags & FLAG_LOG_VERBOSE) 
-	{
-		Tempstr[result]='\0';
-		LogToFile(Settings.LogPath,"READ FROM CGI SCRIPT: %d [%s]",result,Tempstr);
-	}
-	STREAMWriteBytes(S,Tempstr,result);
-	result=STREAMReadBytes(ParentProcessPipe,Tempstr,4096);
-}
+STREAMSendFile(ParentProcessPipe, S, 0);
 
 
 DestroyString(Tempstr);

@@ -1,0 +1,27 @@
+CONFIGURE OPTIONS
+
+run ./configure --help to see configure options. These include:
+
+	--enable-sendfile       enable sendfile support (default=yes)
+  --enable-capabilities       enable linux capabilities support
+  --enable-ssl          use Secure Sockets Layer (default=no)
+  --enable-ip6          use IPv6 (default=no)
+  --enable-largefiles           enable largefile support (default=no)
+  --enable-pam          enable Pluggable Authentication Modules (default=autodetect)
+
+
+'sendfile support' allows alaya to use the linux 'sendfile' syscall which should lessen processor usage when copying files in plain http mode (sadly, it will not work for https)
+
+'linux capabilities' is a security feature that allows alaya to give up many of the priviledges that a process running as root would have. Though alaya switches to a non-root user once a connection is made, the 'top level' process that listens for connections needs to run as root, but by dropping some capablities it can do so rather more safely, giving up some of the powers that root would normally have.
+
+'Secure sockets layer' is needed for https (secure or encrypted http).
+
+'largefile' support allows alaya to serve up files larger than 2GB.
+
+
+BUILDING
+
+./configure --enable-sendfile --enable-ssl
+make
+
+This should produce an 'alaya' executable that you can copy into the appropriate place on your system

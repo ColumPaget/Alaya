@@ -265,10 +265,16 @@ for (i=0; i < 4; i++) close(i);
 close(pty);
 
 setsid();
-dup(tty);
-dup(tty);
-dup(tty);
 ioctl(tty,TIOCSCTTY,0);
+
+dup(tty);
+dup(tty);
+dup(tty);
+
+///now that we've dupped it, we don't need to keep it open
+//as it will be open on stdin/stdout
+close(tty);
+
 Func((char *) Data);
 _exit(0);
 }

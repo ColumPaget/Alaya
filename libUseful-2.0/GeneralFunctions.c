@@ -1,36 +1,34 @@
 #include "includes.h"
 #include "base64.h"
 
-int WritePidFile(char *ProgName) 
-{ 
-char *Tempstr=NULL; 
-STREAM *S;
-int result=FALSE;
- 
+int WritePidFile(char *ProgName)
+{
+char *Tempstr=NULL;
+int result=FALSE, fd;
+
 
 if (*ProgName=='/') Tempstr=CopyStr(Tempstr,ProgName);
 else Tempstr=FormatStr(Tempstr,"/var/run/%s.pid",ProgName);
 
-S=STREAMOpenFile(Tempstr,O_CREAT | O_WRONLY); 
-if (S)
+fd=open(Tempstr,O_CREAT | O_TRUNC | O_WRONLY);
+if (fd > -1)
 {
-	fchmod(S->in_fd,0644); 
-	if (flock(S->in_fd,LOCK_EX|LOCK_NB) !=0) 
-	{ 
-		STREAMClose(S); 
-		exit(1); 
-	}
-	result=TRUE; 
-	Tempstr=FormatStr(Tempstr,"%d\n",getpid()); 
-	STREAMWriteLine(Tempstr,S); 
-	STREAMFlush(S); 
-} 
+  fchmod(fd,0644);
+  if (flock(fd,LOCK_EX|LOCK_NB) !=0)
+  {
+    close(fd);
+    exit(1);
+  }
+  result=TRUE;
+  Tempstr=FormatStr(Tempstr,"%d\n",getpid());
+  write(fd,Tempstr,StrLen(Tempstr));
+}
 
-//Don't close 'S'!
+//Don't close 'fd'!
 
 DestroyString(Tempstr);
 
-return(result);
+return(fd);
 } 
 
 
@@ -301,18 +299,18 @@ GIG=GIGIBYTE;
       kMGT='T';
     }
     else*/
-	 if (val > (GIG))
+	 if (val >= (GIG))
     {
       val=val / GIG;
       kMGT='G';
     }
-    else if (val > (MEG))
+    else if (val >= (MEG))
     {
       val=val / MEG;
       kMGT='M';
 
     }
-    else if (val > (KAY))
+    else if (val >= (KAY))
     {
       val=val /  KAY;
       kMGT='k';

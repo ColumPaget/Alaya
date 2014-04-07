@@ -484,7 +484,7 @@ return(NoOfItems);
 
 void pmatch_compile(char *Pattern, char ***Compiled)
 {
-int NoOfRecords=0, NoOfItems=0;;
+int NoOfRecords=0, NoOfItems=0;
 char *ptr;
 
 ptr=Pattern;

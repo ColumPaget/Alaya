@@ -2,9 +2,11 @@
 #include "server.h"
 #include "grp.h"
 
+//for 'get default user'
+#include "Authenticate.h"
 
 TSettings Settings;
-char *Version="1.1.0";
+char *Version="1.2.0";
 
 
 TPathItem *PathItemCreate(int Type, char *URL, char *Path)
@@ -448,27 +450,6 @@ return(FALSE);
 
 
 
-int CopyStreams(STREAM *In, STREAM *Out)
-{
-int RetVal=EFAULT, result;
-char *Tempstr=NULL;
-
-			Tempstr=SetStrLen(Tempstr,4096);
-			result=STREAMReadBytes(In,Tempstr,4096);
-			while (result > -1)
-			{
-				STREAMWriteBytes(Out,Tempstr,result);
-				result=STREAMReadBytes(In,Tempstr,4096);
-			}
-			RetVal=0;
-
-
-		STREAMClose(Out);
-		STREAMClose(In);
-
-return(RetVal);
-}
-
 
 int CopyLocalItem(char *From, char *To)
 {
@@ -476,34 +457,38 @@ glob_t Glob;
 struct stat FStat;
 char *Tempstr=NULL, *ptr;
 int i, RetVal=EFAULT;
-STREAM *In, *Out;
+STREAM *In=NULL, *Out=NULL;
 
-		stat(From,&FStat);
-		if (S_ISDIR(FStat.st_mode))
-		{
-			mkdir(To,FStat.st_mode);
-			Tempstr=MCopyStr(Tempstr, From, "/*", NULL);
-			glob(Tempstr, 0, 0, &Glob);
-			for (i=0; i < Glob.gl_pathc; i++)
-			{
-				ptr=strrchr(Glob.gl_pathv[i],'/');
-				if (! ptr) ptr=Glob.gl_pathv[i];
-				Tempstr=MCopyStr(Tempstr, To, ptr, NULL);
-				CopyLocalItem(Glob.gl_pathv[i],Tempstr);
-			}
-			RetVal=0;
-			globfree(&Glob);
-		}
-		else
-		{
-			In=STREAMOpenFile(From,O_RDONLY);
-			if (In)
-			{
-				Out=STREAMOpenFile(To, O_CREAT| O_WRONLY | O_TRUNC);
-				if (Out) RetVal=CopyStreams(In, Out);
-			}
-		}
+stat(From,&FStat);
+if (S_ISDIR(FStat.st_mode))
+{
+	mkdir(To,FStat.st_mode);
+	Tempstr=MCopyStr(Tempstr, From, "/*", NULL);
+	glob(Tempstr, 0, 0, &Glob);
+	for (i=0; i < Glob.gl_pathc; i++)
+	{
+		ptr=strrchr(Glob.gl_pathv[i],'/');
+		if (! ptr) ptr=Glob.gl_pathv[i];
+		Tempstr=MCopyStr(Tempstr, To, ptr, NULL);
+		CopyLocalItem(Glob.gl_pathv[i],Tempstr);
+	}
+	RetVal=0;
+	globfree(&Glob);
+}
+else
+{
+	In=STREAMOpenFile(From,O_RDONLY);
+	if (In)
+	{
+		Out=STREAMOpenFile(To, O_CREAT| O_WRONLY | O_TRUNC);
+		if (Out) RetVal=STREAMSendFile(In, Out, 0);
+	}
+}
 
+//as In and Out are NULL if not opened, it's safe to close them 
+//here as STREAMClose will ignore a NULL argument
+STREAMClose(In);
+STREAMClose(Out);
 DestroyString(Tempstr);
 
 return(RetVal);
@@ -529,7 +514,9 @@ if (IsLocalHost(Session,Host))
 	{
 			In=HTTPGet(From,User,Password);
 			if (In) Out=STREAMOpenFile(ToPath,O_CREAT|O_WRONLY|O_TRUNC);
-			if (Out) RetVal=CopyStreams(In, Out);
+			if (Out) RetVal=STREAMSendFile(In, Out, 0);
+			STREAMClose(In);
+			STREAMClose(Out);
 	}
 	else RetVal=CopyLocalItem(FromPath, ToPath);
 }
@@ -543,4 +530,103 @@ DestroyString(FromPath);
 DestroyString(ToPath);
 
 return(RetVal);
+}
+
+
+
+
+void DropCapabilities(int Level)
+{
+#ifdef USE_LINUX_CAPABILITIES
+
+//use portable 'libcap' interface if it's available
+#ifdef HAVE_LIBCAP
+#include <sys/capability.h>
+
+#define CAPSET_SIZE 10
+int CapSet[CAPSET_SIZE];
+int NumCapsSet=0, i;
+cap_t cap;
+
+
+//if we are a session then drop everything. Switch user should have happened,
+//but if it failed we drop everything. Yes, a root attacker can probably 
+//reclaim caps, but it at least makes them do some work
+
+if (Level < CAPS_LEVEL_SESSION) 
+{
+	CapSet[NumCapsSet]= CAP_CHOWN;
+	NumCapsSet++;
+
+	CapSet[NumCapsSet]= CAP_SETUID;
+	NumCapsSet++;
+
+	CapSet[NumCapsSet]= CAP_SETGID;
+	NumCapsSet++;
+}
+
+if (Level < CAPS_LEVEL_CHROOTED) 
+{
+	CapSet[NumCapsSet] = CAP_SYS_CHROOT;
+	NumCapsSet++;
+}
+
+if (Level==CAPS_LEVEL_STARTUP) 
+{
+	CapSet[NumCapsSet] = CAP_NET_BIND_SERVICE;
+	NumCapsSet++;
+}
+
+cap=cap_init();
+if (cap_set_flag(cap, CAP_EFFECTIVE, NumCapsSet, CapSet, CAP_SET) == -1)  ;
+if (cap_set_flag(cap, CAP_PERMITTED, NumCapsSet, CapSet, CAP_SET) == -1)  ;
+if (cap_set_flag(cap, CAP_INHERITABLE, NumCapsSet, CapSet, CAP_SET) == -1)  ;
+
+cap_set_proc(cap);
+
+#else 
+
+//if libcap is not available try linux-only interface
+
+#include <linux/capability.h>
+
+struct __user_cap_header_struct cap_hdr;
+cap_user_data_t cap_values;
+unsigned long CapVersions[]={ _LINUX_CAPABILITY_VERSION_3, _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_1, 0};
+int val=0, i, result;
+
+//the CAP_ values are not bitmask flags, but instead indexes, so we have
+//to use shift to get the appropriate flag value
+if (Level < CAPS_LEVEL_SESSION)
+{
+ val |=(1 << CAP_CHOWN);
+ val |=(1 << CAP_SETUID);
+ val |=(1 << CAP_SETGID);
+}
+
+if (Level < CAPS_LEVEL_CHROOTED) val |= (1 << CAP_SYS_CHROOT);
+
+if (Level==CAPS_LEVEL_STARTUP) val |= (1 << CAP_NET_BIND_SERVICE);
+
+
+for (i=0; CapVersions[i] > 0; i++)
+{
+	cap_hdr.version=CapVersions[i];
+	cap_hdr.pid=0;
+
+	//Horrible cludgy interface. V1 uses 32bit, V2 uses 64 bit, and somehow spreads this over
+	//two __user_cap_data_struct items
+	if (CapVersions[i]==_LINUX_CAPABILITY_VERSION_1) cap_values=calloc(1,sizeof(struct __user_cap_data_struct));
+	else cap_values=calloc(2,sizeof(struct __user_cap_data_struct));
+
+	cap_values->effective=val;
+	cap_values->permitted=val;
+	cap_values->inheritable=val;
+	result=capset(&cap_hdr, cap_values);
+	free(cap_values);
+	if (result == 0) break;
+}
+
+#endif
+#endif
 }

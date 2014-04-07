@@ -50,6 +50,12 @@ typedef enum {PATHTYPE_EXTFILE, PATHTYPE_CGI, PATHTYPE_STREAM, PATHTYPE_LOGOUT, 
 #define DIR_TARBALLS		524288
 
 
+#define CAPS_LEVEL_STARTUP  1
+#define CAPS_LEVEL_NETBOUND 2
+#define CAPS_LEVEL_CHROOTED 3
+#define CAPS_LEVEL_SESSION  4
+
+
 typedef struct
 {
 int Type;
@@ -161,6 +167,7 @@ char *SessionGetArgument(char *RetBuff, HTTPSession *Session, char *ReqName);
 int CopyURL(HTTPSession *Session, char *From, char *To);
 
 
+void DropCapabilities(int Level);
 
 #endif
 

@@ -1,3 +1,5 @@
+1.2.0 IPv6 support added. Capabilities support added: most capabilities dropped at startup. Linux 'sendfile' system call support added for better performance with plain http.
+
 1.1.0 Very many bugfixes. Proxy support working again. CGI interface improved. 'UserAgentSettings' added. Digest Authentication added (READ THE 'README'!). Ability to log out of HTTP session by going to a fake url. 
 
 1.0.4 Support for custom headers to be added from config-file. 'AuthDelay' system completely removed on realization that it can never work perfectly in a stateless protocol. Added 'LookupClientHost' option to allow turning client hostname lookups on/off. Various bugfixes and performance improvements. 

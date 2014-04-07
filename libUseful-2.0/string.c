@@ -687,6 +687,7 @@ char *DeQuoteStr(char *Buffer, const char *Line)
 {
 char *out, *in;
 int olen=0;
+char hex[3];
 
 if (Line==NULL) return(NULL);
 out=CopyStr(Buffer,"");
@@ -705,7 +706,7 @@ while(in && (*in != '\0') )
 			break;
 
 
-		   case 'n': 
+		  case 'n': 
 			out=AddCharToBuffer(out,olen,'\n');
 			olen++;
 			break;
@@ -715,14 +716,21 @@ while(in && (*in != '\0') )
 			olen++;
 			break;
 
-		   case 't': 
+		  case 't': 
 			out=AddCharToBuffer(out,olen,'\t');
 			olen++;
 			break;
 
+			case 'x':
+			in++; hex[0]=*in;
+			in++; hex[1]=*in;
+			hex[2]='\0';
+			out=AddCharToBuffer(out,olen,strtol(hex,NULL,16) & 0xFF);
+			olen++;
+			break;
 
-		   case '\\': 
-		   default:
+		  case '\\': 
+		  default:
 			out=AddCharToBuffer(out,olen,*in);
 			olen++;
 			break;

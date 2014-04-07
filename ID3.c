@@ -118,7 +118,7 @@ while (1)
 TagName=SetStrLen(TagName,TagNameLen);
 result=STREAMReadBytes(S,TagName,TagNameLen);
 TagName[result]='\0';
-if (*TagName=='/0') break;
+if (*TagName=='\0') break;
 
 //Flags
 STREAMReadBytes(S,Tempstr,2);

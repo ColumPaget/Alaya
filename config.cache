@@ -49,6 +49,7 @@ ac_cv_header_stdint_h=${ac_cv_header_stdint_h=yes}
 ac_cv_header_stdlib_h=${ac_cv_header_stdlib_h=yes}
 ac_cv_header_string_h=${ac_cv_header_string_h=yes}
 ac_cv_header_strings_h=${ac_cv_header_strings_h=yes}
+ac_cv_header_sys_sendfile_h=${ac_cv_header_sys_sendfile_h=yes}
 ac_cv_header_sys_soundcard_h=${ac_cv_header_sys_soundcard_h=yes}
 ac_cv_header_sys_stat_h=${ac_cv_header_sys_stat_h=yes}
 ac_cv_header_sys_types_h=${ac_cv_header_sys_types_h=yes}

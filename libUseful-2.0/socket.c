@@ -1,6 +1,8 @@
 #include "includes.h"
 
 #include <arpa/inet.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
 
 #ifdef HAVE_LIBSSL
 #include <openssl/crypto.h>
@@ -12,6 +14,51 @@
 #endif
 
 #include "ConnectionChain.h"
+
+int IsIP4Address(char *Str)
+{
+char *ptr;
+int dot_count=0;
+int AllowDot=FALSE;
+
+if (! Str) return(FALSE);
+
+for (ptr=Str; *ptr != '\0'; ptr++)
+{
+	if (*ptr == '.') 
+	{
+		if (! AllowDot) return(FALSE);
+		dot_count++;
+		AllowDot=FALSE;
+	}
+	else 
+	{
+		if (! isdigit(*ptr)) return(FALSE);
+		AllowDot=TRUE;
+	}
+}
+
+if (dot_count != 3) return(FALSE);
+
+return(TRUE);
+}
+
+
+int IsIP6Address(char *Str)
+{
+char *ptr;
+const char *IP6CHARS="0123456789abcdefABCDEF:%";
+
+if (!Str) return(FALSE);
+
+for (ptr=Str; *ptr != '\0'; ptr++)
+{
+ if (*ptr=='%') break;
+ if (! strchr(IP6CHARS,*ptr)) return(FALSE);
+}
+
+return(TRUE);
+}
 
 
 int IsSockConnected(int sock)
@@ -28,24 +75,142 @@ return(FALSE);
 }
 
 
+const char *GetInterfaceIP(const char *Interface)
+{
+ int fd, result;
+ struct ifreq ifr;
+
+ fd = socket(AF_INET, SOCK_DGRAM, 0);
+ if (fd==-1) return("");
+
+ ifr.ifr_addr.sa_family = AF_INET;
+ strncpy(ifr.ifr_name, Interface, IFNAMSIZ-1);
+ result=ioctl(fd, SIOCGIFADDR, &ifr);
+ if (result==-1) return("");
+ close(fd);
+
+ return(inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
+}
+
+
+#ifdef USE_INET6
 int InitServerSock(char *Address, int Port)
 {
 int sock;
-struct sockaddr_in sa;
+struct sockaddr_storage sa;
+struct sockaddr_in *sa4;
+struct sockaddr_in6 *sa6;
 int salen;
 int result;
+char *p_Addr=NULL, *ptr;
+
+
+if (StrLen(Address))  
+{
+	if (IsIP4Address(Address)) 
+	{
+		sa.ss_family=AF_INET;
+		p_Addr=Address;
+	}
+	else if (IsIP6Address(Address)) 
+	{
+		sa.ss_family=AF_INET6;
+		p_Addr=Address;
+	}
+	else 
+	{
+		sa.ss_family=AF_INET;
+		p_Addr=GetInterfaceIP(Address);
+	}
+}
+else sa.ss_family=AF_INET;
+
+if (sa.ss_family==AF_INET)
+{
+	sa4=(struct sockaddr_in *) &sa;
+	if (StrLen(p_Addr)) sa4->sin_addr.s_addr=StrtoIP(p_Addr);
+	else sa4->sin_addr.s_addr=INADDR_ANY;
+	sa4->sin_port=htons(Port);
+	sa4->sin_family=AF_INET;
+	salen=sizeof(struct sockaddr_in);
+}
+else
+{
+	sa6=(struct sockaddr_in6 *) &sa;
+	sa6->sin6_port=htons(Port);
+	sa6->sin6_family=AF_INET6;
+	if (StrLen(p_Addr)) 
+	{
+		ptr=strchr(p_Addr,'%');
+		if (ptr)
+		{
+			sa6->sin6_scope_id=if_nametoindex(ptr+1);
+			*ptr='\0';	
+		}
+		inet_pton(AF_INET6, p_Addr, &(sa6->sin6_addr));
+	}
+	else sa6->sin6_addr=in6addr_any;
+	salen=sizeof(struct sockaddr_in6);
+}
+
+sock=socket(sa.ss_family,SOCK_STREAM,0);
+if (sock <0) return(-1);
+
+//No reason to pass server/listen sockets across an exec
+fcntl(sock, F_SETFD, FD_CLOEXEC);
+
+result=1;
+setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&result,sizeof(result));
+
+result=bind(sock,(struct sockaddr *) &sa, salen);
+
+if (result==0)
+{
+ result=listen(sock,10);
+}
+
+if (result==0) return(sock);
+else 
+{
+close(sock);
+return(-1);
+}
+}
+
+#else 
+
+int InitServerSock(char *Address, int Port)
+{
+struct sockaddr_in sa;
+int result;
+char *ptr;
+int salen;
+int sock;
+
+sa.sin_port=htons(Port);
+sa.sin_family=AF_INET;
+
+
+if (StrLen(Address) > 0) 
+{
+	if (IsIP6Address(Address)) return(-1);
+
+	if (IsIP4Address(Address)) ptr=Address;
+	else ptr=GetInterfaceIP(Address);
+	sa.sin_addr.s_addr=StrtoIP(ptr);
+}
+else sa.sin_addr.s_addr=INADDR_ANY;
 
 sock=socket(AF_INET,SOCK_STREAM,0);
 if (sock <0) return(-1);
+
+//No reason to pass server/listen sockets across an exec
+fcntl(sock, F_SETFD, FD_CLOEXEC);
 
 result=1;
 salen=sizeof(result);
 setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&result,salen);
 
-sa.sin_port=htons(Port);
-sa.sin_family=AF_INET;
-if (StrLen(Address) > 0) sa.sin_addr.s_addr=StrtoIP(Address);
-else sa.sin_addr.s_addr=INADDR_ANY;
 
 salen=sizeof(struct sockaddr_in);
 result=bind(sock,(struct sockaddr *) &sa, salen);
@@ -62,7 +227,7 @@ close(sock);
 return(-1);
 }
 }
-
+#endif
 
 
 int InitUnixServerSock(char *Path)
@@ -74,6 +239,10 @@ int result;
 
 sock=socket(AF_UNIX,SOCK_STREAM,0);
 if (sock <0) return(-1);
+
+//No reason to pass server/listen sockets across an exec
+fcntl(sock, F_SETFD, FD_CLOEXEC);
+
 result=1;
 salen=sizeof(result);
 strcpy(sa.sun_path,Path);
@@ -95,17 +264,22 @@ return(-1);
 }
 
 
-int TCPServerSockAccept(int ServerSock, int *Addr)
+int TCPServerSockAccept(int ServerSock, char **Addr)
 {
-struct sockaddr_in sa;
+struct sockaddr_storage sa;
 int salen;
 int sock;
 
 salen=sizeof(sa);
 sock=accept(ServerSock,(struct sockaddr *) &sa,&salen);
-if (Addr) *Addr=sa.sin_addr.s_addr;
+if (Addr) 
+{
+*Addr=SetStrLen(*Addr,NI_MAXHOST);
+getnameinfo((struct sockaddr *) &sa, salen, *Addr, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+}
 return(sock);
 }
+
 
 int UnixServerSockAccept(int ServerSock)
 {
@@ -122,22 +296,53 @@ return(sock);
 
 
 
-int IsAddress(char *Str)
+
+
+#ifdef USE_INET6
+int GetSockDetails(int sock, char **LocalAddress, int *LocalPort, char **RemoteAddress, int *RemotePort)
 {
-int len,count;
-len=StrLen(Str);
-if (len <1) return(FALSE);
-for (count=0; count < len; count++)
+int salen, result;
+struct sockaddr_storage sa;
+char *Tempstr=NULL;
+
+*LocalPort=0;
+*RemotePort=0;
+*LocalAddress=CopyStr(*LocalAddress,"");
+*RemoteAddress=CopyStr(*RemoteAddress,"");
+
+salen=sizeof(struct sockaddr_storage);
+result=getsockname(sock, (struct sockaddr *) &sa, &salen);
+
+if (result==0)
 {
- if ((! isdigit(Str[count])) && (Str[count] !='.')) 
- {
-	return(FALSE);
- }
+*LocalAddress=SetStrLen(*LocalAddress,NI_MAXHOST);
+Tempstr=SetStrLen(Tempstr,NI_MAXSERV);
+getnameinfo((struct sockaddr *) &sa, salen, *LocalAddress, NI_MAXHOST, Tempstr, NI_MAXSERV, NI_NUMERICHOST|NI_NUMERICSERV);
+	*LocalPort=atoi(Tempstr);
+
+	//Set Address to be the same as control sock, as it might not be INADDR_ANY
+	result=getpeername(sock, (struct sockaddr *) &sa, &salen);
+
+	if (result==0)
+	{
+		*RemoteAddress=SetStrLen(*RemoteAddress,NI_MAXHOST);
+		Tempstr=SetStrLen(Tempstr,NI_MAXSERV);
+		getnameinfo((struct sockaddr *) &sa, salen, *RemoteAddress, NI_MAXHOST, Tempstr, NI_MAXSERV, NI_NUMERICHOST|NI_NUMERICSERV);
+		*RemotePort=atoi(Tempstr);
+
+	}
+
+	//We've got the local sock, so lets still call it a success
+	result=0;
 }
 
-return(TRUE);
+DestroyString(Tempstr);
+
+if (result==0) return(TRUE);
+return(FALSE);
 }
 
+#else
 
 int GetSockDetails(int sock, char **LocalAddress, int *LocalPort, char **RemoteAddress, int *RemotePort)
 {
@@ -174,7 +379,7 @@ if (result==0) return(TRUE);
 return(FALSE);
 }
 
-
+#endif
 
 
 
@@ -191,7 +396,7 @@ struct hostent *hostdata;
 sa.sin_family=AF_INET;
 sa.sin_port=htons(Port);
 
-if (IsAddress(Host))
+if (IsIP4Address(Host))
 {
 inet_aton(Host, (struct in_addr *) &sa.sin_addr);
 }
@@ -816,7 +1021,7 @@ sa.sin_family=AF_INET;
 inet_aton(Host,& sa.sin_addr);
 salen=sizeof(sa);
 
-if (IsAddress(Host))
+if (IsIP4Address(Host))
 {
    inet_aton(Host, (struct in_addr *) &sa.sin_addr);
 }
