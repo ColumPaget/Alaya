@@ -3453,8 +3453,12 @@ done
 ac_fn_c_check_header_mongrel "$LINENO" "sys/capability.h" "ac_cv_header_sys_capability_h" "$ac_includes_default"
 if test "x$ac_cv_header_sys_capability_h" = xyes; then :
   cf_have_capabilities=yes
-else
-  cf_have_capabilities=no
+fi
+
+
+ac_fn_c_check_header_mongrel "$LINENO" "linux/capability.h" "ac_cv_header_linux_capability_h" "$ac_includes_default"
+if test "x$ac_cv_header_linux_capability_h" = xyes; then :
+  cf_have_capabilities=yes
 fi
 
 

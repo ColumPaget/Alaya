@@ -24,7 +24,8 @@ AC_ARG_ENABLE(capabilities, [  --enable-capabilities       enable linux capabili
 
 if test "$cf_use_capabilities" != "no"
 then
-AC_CHECK_HEADER(sys/capability.h,cf_have_capabilities=yes,cf_have_capabilities=no,)
+AC_CHECK_HEADER(sys/capability.h,cf_have_capabilities=yes,,)
+AC_CHECK_HEADER(linux/capability.h,cf_have_capabilities=yes,,)
 fi
 
 if test "$cf_have_capabilities" = "yes"
