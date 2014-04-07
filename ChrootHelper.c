@@ -593,7 +593,7 @@ while (Tempstr)
 Tempstr=MCopyStr(Tempstr, ResponseLine,"\r\n",Headers,"\r\n",NULL);
 STREAMWriteLine(Tempstr,S);
 
-if (Settings.Flags & FLAG_VERBOSE) LogToFile(Settings.LogPath,"CGI HEAERS: [%s]",Tempstr);
+if (Settings.Flags & FLAG_VERBOSE) LogToFile(Settings.LogPath,"CGI HEADERS: [%s]",Tempstr);
 
 
 //Read remaining data from CGI

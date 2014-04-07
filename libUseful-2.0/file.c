@@ -1127,11 +1127,12 @@ else ListAddNamedItem(S->Items,Name,Value);
 }
 
 
+#define SENDFILE_FAILED -1
 off_t STREAMSendFile(STREAM *In, STREAM *Out, off_t Max)
 {
 char *Buffer=NULL;
 int BuffSize=BUFSIZ;
-off_t val, result;
+off_t val, result=SENDFILE_FAILED;
 
 #ifdef USE_SENDFILE
 
@@ -1150,11 +1151,13 @@ if ((! (val & SF_SSL)) && (ListSize(In->ProcessingModules)==0) && (ListSize(Out-
 	{
 		val+=result;
 		if ((Max > 0) && (val >= Max)) break;
-	result=sendfile(Out->out_fd, In->in_fd,0,BUFSIZ);
+		result=sendfile(Out->out_fd, In->in_fd,0,BUFSIZ);
 	}
 }
-else
+
 #endif
+
+if (result==SENDFILE_FAILED)
 {
 	val=0;
 	Buffer=SetStrLen(Buffer,BuffSize);
