@@ -29,6 +29,30 @@ char *AuthMethods[]={"native","pam","passwd","shadow","digest","accesstoken","op
 #define AUTH_OPEN 4
 #define AUTH_OPEN_STD 5
 
+
+int CheckSSLAuthentication(HTTPSession *Session, char *UserName)
+{
+char *ptr;
+
+if (! Session->S) return(FALSE);
+if (Settings.AuthFlags & FLAG_AUTH_CERT_SUFFICIENT)
+{
+  ptr=STREAMGetValue(Session->S,"SSL-Certificate-Verify");
+  if (StrLen(ptr) && (strcmp(ptr,"OK")==0))
+  {
+  	ptr=STREAMGetValue(Session->S,"SSL-Certificate-CommonName");
+		if (StrLen(ptr) && (strcmp(ptr,UserName)==0))
+		{
+			LogToFile(Settings.LogPath,"SSL-Certificate Authentication sufficient for User %s",UserName);
+			return(TRUE);
+		}
+  }
+}
+
+return(FALSE);
+}
+
+
 void AuthenticateExamineMethods(char *Methods)
 {
 char *ptr, *Token=NULL;
@@ -44,13 +68,13 @@ while (ptr)
 	{
 		if (MethodFound==AUTH_NONE) MethodFound=AUTH_DIGEST;
 		else MethodFound=AUTH_DIGEST_STD;
-		Settings.Flags |= FLAG_DIGEST_AUTH;
+		Settings.AuthFlags |= FLAG_AUTH_DIGEST;
 	}
 	else if (strcasecmp(Token,"open")==0) 
 	{
 		if (MethodFound==AUTH_NONE) MethodFound=AUTH_OPEN;
 		else MethodFound=AUTH_OPEN_STD;
-		Settings.Flags &= ~FLAG_REQUIRE_AUTH;
+		Settings.AuthFlags &= ~FLAG_AUTH_REQUIRED;
 	}
 	else switch (MethodFound)
 	{
@@ -72,7 +96,7 @@ while (ptr)
 ptr=GetToken(ptr,",",&Token,0);
 }
 
-	if ((Settings.Flags & FLAG_REQUIRE_AUTH) && (MethodFound==AUTH_NONE))
+	if ((Settings.AuthFlags & FLAG_AUTH_REQUIRED) && (MethodFound==AUTH_NONE))
 	{
 		 LogToFile(Settings.LogPath,"WARNING: NO AUTHENTICATION SYSTEM CONFIGURED, but not set to run as an 'open' system");
 	}
@@ -162,32 +186,37 @@ return(FALSE);
 
 int AuthAccessToken(HTTPSession *Session)
 {
-char *URL=NULL, *Token=NULL, *Token2=NULL;
+char *URL=NULL, *Salt=NULL, *Token=NULL, *Token2=NULL;
+char *ptr;
 int result=FALSE;
 
-//if (! (Session->Flags & FLAG_ACCESS_TOKEN)) return(FALSE);
+//if (! (Session->Flags & FLAG_AUTH_ACCESS_TOKEN)) return(FALSE);
 URL=FormatURL(URL,Session,Session->Path);
 
-//Salt value for access token is stored in UserSettings
-Token=MakeAccessToken(Token, Session->UserSettings, Session->Method, Session->ClientIP, URL);
-if (strncmp(Session->ClientIP,"::ffff:",7)==0) Token2=MakeAccessToken(Token2, Session->UserSettings, Session->Method, Session->ClientIP+7, URL);
+//Password will be in format <salt>:<access token>
+ptr=GetToken(Session->Password,":",&Salt,0);
+if (StrLen(Salt) && (StrLen(ptr)))
+{
+	Token=MakeAccessToken(Token, Salt, Session->Method, Session->ClientIP, URL);
+	Token2=CopyStr(Token2,"");
+	if (strncmp(Session->ClientIP,"::ffff:",7)==0) Token2=MakeAccessToken(Token2, Salt, Session->Method, Session->ClientIP+7, URL);
 
-if (Session->Password && 
-		(
-			(strcmp(Token,Session->Password)==0) ||
-			(strcmp(Token2,Session->Password)==0)
-		)
+	if (
+			(StrLen(Token) && (strcmp(Token,ptr)==0)) ||
+			(StrLen(Token2) && (strcmp(Token2,ptr)==0))
 	)
-{ 
-	result=TRUE; 
-	LogToFile(Settings.LogPath,"Client Authenticated with AccessToken for %s", Session->UserName);
+	{ 
+		result=TRUE; 
+		LogToFile(Settings.LogPath,"Client Authenticated with AccessToken for %s", Session->UserName);
+	}
+	else LogToFile(Settings.LogPath,"AccessToken Failed for %s@%s", Session->UserName,Session->ClientIP);
 }
-else LogToFile(Settings.LogPath,"AccessToken Failed for %s@%s", Session->UserName,Session->ClientIP);
 
 AuthenticationsTried=CatStr(AuthenticationsTried,"accesstoken ");
 
 DestroyString(Token2);
 DestroyString(Token);
+DestroyString(Salt);
 DestroyString(URL);
 
 return(result);
@@ -287,8 +316,9 @@ sptr=pass_struct->sp_pwdp;
 
 #ifdef HAVE_LIBCRYPT
 
+if (CheckSSLAuthentication(Session, Session->UserName)) result=TRUE;
 // this is an md5 password
-if (
+else if (
 	(StrLen(sptr) > 4) && 
 	(strncmp(sptr,"$1$",3)==0)
    )
@@ -371,22 +401,24 @@ int fd, result;
 char *Tempstr=NULL;
 struct timeval tv;
 
+Tempstr=SetStrLen(Tempstr,len);
+
 fd=open("/dev/random",O_RDONLY);
 if (fd > -1)
 {
-	Tempstr=SetStrLen(Tempstr,len);
 	result=read(fd,Tempstr,len);
-	RetStr=SetStrLen(RetStr,len*4);
-	to64frombits(RetStr, Tempstr, result);
 	close(fd);
 }
 else
 {
 	//if /dev/random is missing, then this should be 'better than nothing'
-	gettimeofday(&tv,NULL);
-	RetStr=FormatStr(RetStr,"%lux-%lux-%lux-%lux",getpid(),tv.tv_usec,tv.tv_sec,clock());
+	result=GenerateRandomBytes(Tempstr, len);
+
 	fprintf(stderr,"WARNING: Failed to open /dev/random. Using less secure 'generated' salt for password.\n");
 }
+
+RetStr=SetStrLen(RetStr,len*8);
+to64frombits(RetStr, Tempstr, result);
 
 DestroyString(Tempstr);
 
@@ -472,20 +504,38 @@ return(RetVal);
 	
 
 
-int NativeFileCheckPassword(char *Name, char *PassType,char *Salt,char *Password,char *ProvidedPass)
+int NativeFileCheckPassword(char *Name, char *PassType, char *AuthStr,char *ProvidedPass)
 {
-char *Digest=NULL, *Tempstr=NULL;
+char *Salt=NULL, *Password=NULL, *Digest=NULL, *Tempstr=NULL;
+char *ptr;
+int result=FALSE;
 
 if (! PassType) return(FALSE);
-if (! Password) return(FALSE);
+if (! AuthStr) return(FALSE);
 if (! ProvidedPass) return(FALSE);
 
 if (strcmp(PassType,"null")==0) return(TRUE);
 if (
 			(strcmp(PassType,"plain")==0) &&
-			(strcmp(Password,ProvidedPass)==0) 
+			(strcmp(AuthStr,ProvidedPass)==0) 
 	)
 return(TRUE);
+
+
+ptr=strchr(AuthStr,'$');
+if (ptr)
+{
+		*ptr='\0';
+		ptr++;
+		Salt=CopyStr(Salt,AuthStr);
+		Password=CopyStr(Password,ptr);
+}
+else 
+{
+	Salt=CopyStr(Salt,"");
+	Password=CopyStr(Password,AuthStr);
+}
+
 
 if (StrLen(PassType) && StrLen(ProvidedPass))
 {
@@ -494,22 +544,19 @@ if (StrLen(PassType) && StrLen(ProvidedPass))
 			//Salted passwords as of version 1.1.1
 			Tempstr=MCopyStr(Tempstr,Name,":",ProvidedPass,":",Salt,NULL);
 			HashBytes(&Digest, PassType, Tempstr, StrLen(Tempstr), ENCODE_BASE64);
-
-			
 	}
 	//Old-style unsalted passwords
 	else HashBytes(&Digest,PassType,ProvidedPass,StrLen(ProvidedPass),ENCODE_HEX);
 		
-	if (StrLen(Digest) && (strcmp(Password,Digest)==0))
-	{
-		DestroyString(Digest);
-		return(TRUE);
-	}
+	if (StrLen(Digest) && (strcmp(Password,Digest)==0)) result=TRUE;
 }
+
 DestroyString(Tempstr);
+DestroyString(Password);
+DestroyString(Salt);
 DestroyString(Digest);
 
-return(FALSE);
+return(result);
 }
 
 
@@ -521,8 +568,8 @@ int result=FALSE;
 
 if (! ProvidedPass) return(FALSE);
 
-	p_AuthDetails=GetToken(Session->AuthDetails,":",&URI,NULL);
-	p_AuthDetails=GetToken(p_AuthDetails,":",&Algo,NULL);
+	p_AuthDetails=GetToken(Session->AuthDetails,":",&URI,0);
+	p_AuthDetails=GetToken(p_AuthDetails,":",&Algo,0);
 	if (! StrLen(URI)) URI=CopyStr(URI,Session->Path);
 
 	//Calc 'HA1'
@@ -561,9 +608,10 @@ int AuthNativeFile(HTTPSession *Session, int HTTPDigest)
 {
 STREAM *S;
 char *Tempstr=NULL, *ptr;
-char *Name=NULL, *Salt=NULL, *Pass=NULL, *RealUser=NULL, *HomeDir=NULL, *PasswordType=NULL;
+char *Name=NULL, *Pass=NULL, *RealUser=NULL, *HomeDir=NULL, *PasswordType=NULL, *UserSettings=NULL;
 int RetVal=USER_UNKNOWN, result;
 struct passwd *pass_struct;
+
 
 S=STREAMOpenFile(Settings.AuthPath,O_RDONLY);
 if (! S) 
@@ -580,33 +628,22 @@ while (Tempstr)
 	ptr=GetToken(ptr,":",&Pass,0);
 	ptr=GetToken(ptr,":",&RealUser,0);
 	ptr=GetToken(ptr,":",&HomeDir,0);
+	ptr=GetToken(ptr,":",&UserSettings,0);
 	
   if (strcasecmp(Name,Session->UserName)==0)
   {
 		RetVal=FALSE;
 
-		if (HTTPDigest) RetVal=NativeFileCheckHTTPDigestAuth(Session, Pass,Session->Password);
-		else 
-		{
-			ptr=strchr(Pass,'$');
-			if (ptr)
-			{
-				*ptr='\0';
-				ptr++;
-				Salt=CopyStr(Salt,Pass);
-				memmove(Pass,ptr,StrLen(ptr)+1);
-			}
-			else Salt=CopyStr(Salt,"");
-
-			RetVal=NativeFileCheckPassword(Name,PasswordType,Salt,Pass,Session->Password);
-		}
+		if (CheckSSLAuthentication(Session, Name)) RetVal=TRUE;
+		else if (HTTPDigest) RetVal=NativeFileCheckHTTPDigestAuth(Session, Pass,Session->Password);
+		else RetVal=NativeFileCheckPassword(Name,PasswordType,Pass,Session->Password);
 
 		if (RetVal)
     {
 			Session->RealUser=CopyStr(Session->RealUser,RealUser);	
+			Session->UserSettings=CopyStr(Session->UserSettings,UserSettings);	
 			if (StrLen(HomeDir)) Session->HomeDir=CopyStr(Session->HomeDir,HomeDir);	
 			else Session->HomeDir=GetUserHomeDir(Session->HomeDir,Session->RealUser);
-			Session->UserSettings=CopyStr(Session->UserSettings,ptr);
     }
 		break;
   }
@@ -650,10 +687,10 @@ AuthenticationsTried=CatStr(AuthenticationsTried,"native ");
 
 DestroyString(Name);
 DestroyString(Pass);
-DestroyString(Salt);
 DestroyString(Tempstr);
 DestroyString(HomeDir);
 DestroyString(RealUser);
+DestroyString(UserSettings);
 DestroyString(PasswordType);
 
 return(RetVal);
@@ -799,10 +836,6 @@ else if (result==FALSE) LogToFile(Settings.LogPath,"Authentication failed for Us
 //We no longer care if it was 'user unknown' or 'password wrong'
 if (result !=TRUE) result=FALSE;
 
-if (result)
-{
-	//Session->Flags |= FLAG_AUTHENTICATED;
-}
 
 DestroyString(Token);
 return(result);

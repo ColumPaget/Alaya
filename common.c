@@ -6,7 +6,23 @@
 #include "Authenticate.h"
 
 TSettings Settings;
-char *Version="1.2.0";
+char *Version="1.3.0";
+
+void HandleError(int Flags, const char *FmtStr, ...)
+{
+va_list args;
+char *Tempstr=NULL;
+
+va_start(args,FmtStr);
+Tempstr=VFormatStr(Tempstr,FmtStr,args);
+va_end(args);
+
+if (Flags & ERR_LOG) LogToFile(Settings.LogPath, "%s", Tempstr);
+if (Flags & ERR_PRINT) printf("%s\n",Tempstr);
+
+DestroyString(Tempstr);
+if (Flags & ERR_EXIT) exit(1);
+}
 
 
 TPathItem *PathItemCreate(int Type, char *URL, char *Path)
@@ -33,299 +49,6 @@ free(PI);
 }
 
 
-void ParsePathItem(char *Data)
-{
-char *Type=NULL, *URL=NULL, *Path=NULL, *Tempstr=NULL, *ptr;
-TPathItem *PI;
-int val;
-char *PathTypes[]={"Files","Cgi","Stream","Logout","Proxy",NULL};
-
-ptr=GetToken(Data,",",&Type,0);
-
-val=MatchTokenFromList(Type,PathTypes,0);
-if (val > -1)
-{
-	ptr=GetToken(ptr,",",&Tempstr,0);
-
-	StripLeadingWhitespace(Tempstr);
-	if (*Tempstr !='/') URL=MCopyStr(URL,"/",Tempstr,NULL);
-	else URL=CopyStr(URL,Tempstr);
-	
-	PI=PathItemCreate(val, URL, ptr);
-	if (PI->Type==PATHTYPE_LOGOUT) Settings.Flags |= FLAG_LOGOUT_AVAILABLE;
-	ListAddNamedItem(Settings.VPaths,PI->URL,PI);
-}
-else LogToFile(Settings.LogPath,"ERROR: Unknown Path type '%s' in Config File",Type);
-
-
-DestroyString(Tempstr);
-DestroyString(Type);
-DestroyString(Path);
-DestroyString(URL);
-}
-
-void ParseDirListType(char *Data)
-{
-char *Token=NULL, *ptr;
-
-Settings.DirListFlags=DIR_REJECT;
-
-ptr=GetToken(Data,",",&Token,0);
-while (ptr)
-{
-	StripLeadingWhitespace(Token);
-	StripTrailingWhitespace(Token);
-	if (strcasecmp(Token,"None")==0) Settings.DirListFlags=DIR_REJECT;
-	if (strcasecmp(Token,"Basic")==0) Settings.DirListFlags=DIR_SHOWFILES;
-	if (strcasecmp(Token,"Fancy")==0) Settings.DirListFlags=DIR_SHOWFILES | DIR_FANCY;
-	if (strcasecmp(Token,"Interactive")==0) Settings.DirListFlags=DIR_SHOWFILES | DIR_FANCY | DIR_INTERACTIVE;
-	if (strcasecmp(Token,"Full")==0) Settings.DirListFlags=DIR_SHOWFILES | DIR_FANCY | DIR_INTERACTIVE | DIR_MEDIA_EXT | DIR_SHOW_VPATHS | DIR_TARBALLS;
-
-	if (strcasecmp(Token,"Media")==0) Settings.DirListFlags |= DIR_MEDIA_EXT;
-	if (strcasecmp(Token,"IndexPages")==0) Settings.DirListFlags |= DIR_INDEX_FILES;
-	if (strcasecmp(Token,"ShowVPaths")==0) Settings.DirListFlags |= DIR_SHOW_VPATHS;
-	if (strcasecmp(Token,"TarDownloads")==0) Settings.DirListFlags |= DIR_TARBALLS;
-ptr=GetToken(ptr,",",&Token,0);
-}
-
-DestroyString(Token);
-}
-
-
-void ParseConfigItem(char *ConfigLine)
-{
-char *ConfTokens[]={"Chroot","Chshare","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","Path","LogVerbose","AuthRealm","Compression","StreamDir","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","HostConnections","SanitizeAllowTags","CustomHeader","UserAgentSettings",NULL};
-typedef enum {CT_CHROOT, CT_CHSHARE, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER,CT_DEFAULTGROUP,CT_SSLKEY,CT_SSLCERT,CT_PATH, CT_LOG_VERBOSE,CT_AUTH_REALM, CT_COMPRESSION, CT_STREAMDIR, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_HOSTCONNECTIONS, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS};
-
-char *Token=NULL, *ptr;
-struct group *grent;
-int result;
-
-
-ptr=GetToken(ConfigLine,"=|:",&Token,GETTOKEN_MULTI_SEPARATORS);
-StripLeadingWhitespace(Token);
-StripTrailingWhitespace(Token);
-result=MatchTokenFromList(Token,ConfTokens,0);
-
-if (ptr)
-{
- StripLeadingWhitespace(ptr);
- StripTrailingWhitespace(ptr);
-}
-
-switch(result)
-{
-	case CT_PORT:
-		Settings.Port=atoi(ptr);
-	break;
-
-	case CT_CHROOT:
-		Settings.Flags &= ~FLAG_CHHOME;
-		Settings.Flags |= FLAG_CHROOT;
-		Settings.DefaultDir=CopyStr(Settings.DefaultDir,ptr);
-	break;
-
-	case CT_CHHOME:
-		Settings.Flags &= ~FLAG_CHROOT;
-		Settings.Flags|=FLAG_CHHOME;
-	break;
-
-	case CT_ALLOWUSERS:
-		Settings.AllowUsers=CopyStr(Settings.AllowUsers,ptr);
-	break;
-
-	case CT_DENYUSERS:
-		Settings.DenyUsers=CopyStr(Settings.DenyUsers,ptr);
-	break;
-
-	case CT_AUTHFILE:
-		Settings.AuthPath=CopyStr(Settings.AuthPath,ptr);
-	break;
-
-	case CT_BINDADDRESS:
-		Settings.BindAddress=CopyStr(Settings.BindAddress,ptr);
-	break;
-
-	case CT_LOGPASSWORDS:
-		//	Settings.Flags |= FLAG_LOGPASSWORDS;
-	break;
-
-	case CT_DISPLAYNAMELEN:
-		Settings.DisplayNameLen=atoi(ptr);
-	break;
-
-	case CT_AUTHMETHODS:
-		Settings.AuthMethods=CopyStr(Settings.AuthMethods,ptr);
-	break;
-
-	case CT_HTTPMETHODS:
-		Settings.HttpMethods=CopyStr(Settings.HttpMethods,ptr);
-	break;
-
-	case CT_DEFAULTUSER:
-		Settings.DefaultUser=CopyStr(Settings.DefaultUser,ptr);
-		Settings.CgiUser=CopyStr(Settings.CgiUser,ptr);
-	break;
-
-	case CT_DEFAULTGROUP:
-		Settings.DefaultGroup=CopyStr(Settings.DefaultGroup,ptr);
-    grent=getgrnam(ptr);
-    if (grent) Settings.DefaultGroupID=grent->gr_gid;
-	break;
-
-	case CT_SSLKEY:
-		if (! Settings.SSLKeys) Settings.SSLKeys=ListCreate();
-		Token=FormatStr(Token,"SSL_KEY_FILE:%d",ListSize(Settings.SSLKeys));
-		ListAddNamedItem(Settings.SSLKeys,Token,CopyStr(NULL,ptr));
-		Settings.Flags |=FLAG_SSL;
-	break;
-
-	case CT_SSLCERT:
-		if (! Settings.SSLKeys) Settings.SSLKeys=ListCreate();
-		Token=FormatStr(Token,"SSL_CERT_FILE:%d",ListSize(Settings.SSLKeys));
-		ListAddNamedItem(Settings.SSLKeys,Token,CopyStr(NULL,ptr));
-		Settings.Flags |=FLAG_SSL;
-	break;
-	
-
-	case CT_AUTH_REALM:
-		Settings.AuthRealm=CopyStr(Settings.AuthRealm,ptr);
-	break;
-
-	case CT_COMPRESSION:
-		if (strcasecmp(ptr,"no")==0) Settings.Flags &= ~(FLAG_COMPRESS | FLAG_PARTIAL_COMPRESS);
-		else if (strcasecmp(ptr,"partial")==0) 
-		{
-			Settings.Flags &= ~FLAG_COMPRESS;
-			Settings.Flags |= FLAG_PARTIAL_COMPRESS;
-		}
-		else
-		{
-			Settings.Flags &= ~FLAG_PARTIAL_COMPRESS;
-			Settings.Flags |= FLAG_COMPRESS;
-		}
-	break;
-
-
-	case CT_PATH:
-		ParsePathItem(ptr);
-	break;
-
-	case CT_DIRTYPE:
-		ParseDirListType(ptr);
-	break;
-
-	case CT_LOGFILE:
-		Settings.LogPath=CopyStr(Settings.LogPath,ptr);
-	break;
-
-	case CT_LOG_VERBOSE:
-		Settings.Flags |= FLAG_LOG_VERBOSE;
-	break;
-
-	case CT_MAXLOGSIZE:
-		Settings.MaxLogSize = atoi(ptr);
-	break;
-
-  case CT_SCRIPTHANDLER:
-    ptr=GetToken(ptr,"=",&Token,0);
-    if (! Settings.ScriptHandlers) Settings.ScriptHandlers=ListCreate();
-    SetVar(Settings.ScriptHandlers,Token,ptr);
-  break;
-
-	case CT_SCRIPTHASHFILE:
-		Settings.ScriptHashFile=CopyStr(Settings.ScriptHashFile,ptr);
-		Settings.Flags |= FLAG_CHECK_SCRIPTS;
-	break;
-
-	case CT_SANITIZEALLOW:
-		if (! Settings.SanitizeArgumentsAllowedTags) Settings.SanitizeArgumentsAllowedTags=ListCreate();
-		ptr=GetToken(ptr,",",&Token,0);
-		while (ptr)
-		{
-			SetVar(Settings.SanitizeArgumentsAllowedTags,Token,"Y");
-			ptr=GetToken(ptr,",",&Token,0);
-		}
-	break;
-
-	case CT_CUSTOMHEADER:
-		if (! Settings.CustomHeaders) Settings.CustomHeaders=ListCreate();
-		ptr=GetToken(ptr,":",&Token,0);
-		ListAddNamedItem(Settings.CustomHeaders,Token,CopyStr(NULL,ptr));
-	break;
-
-	case CT_LOOKUPCLIENT:
-		Settings.Flags |= FLAG_LOOKUP_CLIENT;
-	break;
-
-	case CT_USERAGENTSETTINGS:
-		if (! Settings.UserAgents) Settings.UserAgents=ListCreate();
-		ptr=GetToken(ptr,",",&Token,0);
-		ListAddNamedItem(Settings.UserAgents,Token,CopyStr(NULL,ptr));
-	break;
-
-}
-
-DestroyString(Token);
-}
-
-
-void PostProcessSettings(TSettings *Settings)
-{
-char *Tempstr=NULL, *Token=NULL, *ptr;
-
-if (StrLen(Settings->DefaultUser)==0) Settings->DefaultUser=CopyStr(Settings->DefaultUser,GetDefaultUser());
-if (StrLen(Settings->CgiUser)==0) Settings->CgiUser=CopyStr(Settings->CgiUser,Settings->DefaultUser);
-
-LogToFile(Settings->LogPath, "Default User: %s %s\n",Settings->DefaultUser,Settings->CgiUser);
-
-Tempstr=CopyStr(Tempstr,"");
-ptr=GetToken(Settings->HttpMethods,",",&Token,0);
-while (ptr)
-{
-if (strcmp(Token,"BASE")==0) Tempstr=CatStr(Tempstr,"GET,POST,HEAD,OPTIONS,");
-else if (strcmp(Token,"DAV")==0) Tempstr=CatStr(Tempstr,"GET,POST,HEAD,OPTIONS,DELETE,MKCOL,MOVE,COPY,PUT,PROPFIND,PROPPATCH,");
-else if (strcmp(Token,"PROXY")==0) Tempstr=CatStr(Tempstr,"CONNECT,RGET,RPOST");
-else Tempstr=MCatStr(Tempstr,Token,",",NULL);
-
-ptr=GetToken(ptr,",",&Token,0);
-}
-
-Settings->HttpMethods=CopyStr(Settings->HttpMethods,Tempstr);
-
-AuthenticateExamineMethods(Settings->AuthMethods);
-
-if (Settings->Port < 1)
-{
-  if (Settings->Flags & FLAG_SSL) Settings->Port=443;
-  else Settings->Port=80;
-}
-
-
-DestroyString(Tempstr);
-DestroyString(Token);
-}
-
-
-void ParseConfigItemList(const char *ConfigItemList)
-{
-char *Tempstr=NULL, *ptr;
-
-    if (StrLen(ConfigItemList))
-    {
-      ptr=GetToken(ConfigItemList,"\\S",&Tempstr,0);
-      while (ptr)
-      {
-        ParseConfigItem(Tempstr);
-        ptr=GetToken(ptr,"\\S",&Tempstr,0);
-      }
-    }
-
-PostProcessSettings(&Settings);
-
-DestroyString(Tempstr);
-}
-
 
 
 char *FormatURL(char *Buff, HTTPSession *Session, char *ItemPath)
@@ -351,7 +74,7 @@ while (*sd_ptr == '/') sd_ptr++;
 len=StrLen(sd_ptr);
 
 if (strncmp(ptr, sd_ptr,len)==0) ptr+=len;
-Quoted=HTTPQuoteChars(Quoted,ptr," ()[]{}\t?&!,+\':;#");
+Quoted=HTTPQuoteChars(Quoted,ptr," ()[]{}\t?&%!,+\':;#");
 
 Tempstr=CatStr(Tempstr,Quoted);
 
@@ -568,6 +291,12 @@ if (Level < CAPS_LEVEL_SESSION)
 if (Level < CAPS_LEVEL_CHROOTED) 
 {
 	CapSet[NumCapsSet] = CAP_SYS_CHROOT;
+	NumCapsSet++;
+
+	CapSet[NumCapsSet] = CAP_FOWNER;
+	NumCapsSet++;
+
+	CapSet[NumCapsSet] = CAP_DAC_OVERRIDE;
 	NumCapsSet++;
 }
 

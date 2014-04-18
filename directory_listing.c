@@ -324,12 +324,12 @@ char *FinalizeDirListHTML(char *Buffer, HTTPSession *Session, char *Path, char *
 char *HTML=NULL;
 
 	HTML=MCopyStr(Buffer,"<html>\r\n<head><title>Index of ",Session->URL,"</title></head>\r\n<body>\r\n",NULL);
+	if (Settings.Flags & FLAG_SSL) HTML=MCatStr(HTML,"<p align=center><font color=green>SECURE SESSION: Encrypted with ",Session->Cipher,"</font></p>\n",NULL);
 
 	if ((Flags & DIR_FANCY))
 	{
 		if (Flags & DIR_INTERACTIVE) HTML=CatStr(HTML,"<form>\r\n");
-		HTML=MCatStr(HTML,"<p align=center>Index of ",Session->URL," @",Session->Host, "<br> ",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",Now,NULL),NULL);
-		
+		HTML=MCatStr(HTML,"<p align=center>Index of ",Session->URL," @",Session->Host, " ",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",Now,NULL)," User: ",Session->UserName,NULL);
 
 		HTML=DisplayDirActions(HTML,Session,Flags);
 
@@ -603,6 +603,52 @@ return(Action);
 
 
 
+
+char *FormatFileProperties(char *HTML, int FType, char *Path, ListNode *Vars)
+{
+ListNode *Curr;
+char *Tempstr=NULL, *ptr;
+char *IgnoreFields[]={"FileSize","ContentType","CTime-Secs","MTime-Secs", "IsExecutable", "creationdate", "getlastmodified", "getcontentlength", "getcontenttype", "executable",NULL};
+
+	if (FType != FILE_DIR) 
+	{
+		ptr=GetVar(Vars,"FileSize");
+		if (ptr) HTML=MCatStr(HTML,"<tr><td>Size</td><td>", GetHumanReadableDataQty(strtod(ptr, NULL),0), " - (",ptr," bytes)","</td></tr>",NULL);
+	}
+
+	ptr=GetVar(Vars,"MTime-Secs");
+	if (ptr)
+	{
+		HTML=MCatStr(HTML,"<tr><td>Modify Time</td><td>",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",atoi(ptr),NULL),"</td></tr>",NULL);
+	}
+
+	ptr=GetVar(Vars,"CTime-Secs");
+	if (ptr)
+	{
+		HTML=MCatStr(HTML,"<tr><td>Create Time</td><td>",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",atoi(ptr),NULL),"</td></tr>",NULL);
+	}
+
+	HTML=MCatStr(HTML,"<tr bgcolor=#CCFFCC><td>ContentType</td><td>",GetVar(Vars,"ContentType"),"</td></tr>",NULL);
+
+	if (FType != FILE_DIR)
+	{
+		Tempstr=CopyStr(Tempstr,"");
+		HashFile(&Tempstr,"md5",Path,ENCODE_HEX);
+		HTML=MCatStr(HTML,"<tr><td>MD5 Sum</td><td>",Tempstr,"</td></tr>",NULL);
+	}
+
+	Curr=ListGetNext(Vars);
+	while (Curr)
+	{
+		if (StrLen(Curr->Item) && (MatchTokenFromList(Curr->Tag,IgnoreFields,0)==-1))  HTML=MCatStr(HTML,"<tr bgcolor=#CCFFCC><td>",Curr->Tag,"</td><td>",(char *) Curr->Item,"</td></tr>",NULL);
+		Curr=ListGetNext(Curr);
+	}
+
+DestroyString(Tempstr);
+
+return(HTML);
+}
+
 //Path is the ACTUAL path to the item, not it's VPath or URL. Thus, use Session->URL
 //unless accessing the actual file
 void DirectoryItemEdit(STREAM *S, HTTPSession *Session, char *Path)
@@ -610,7 +656,6 @@ void DirectoryItemEdit(STREAM *S, HTTPSession *Session, char *Path)
 char *HTML=NULL, *Tempstr=NULL, *URL=NULL, *ptr;
 ListNode *Vars;
 int val, FType;
-char *OptionalFields[]={"Artist","Album","Title","AlbumTrackNumber","BPM","Comment","Year","Date","Copyright","License","Genre","Duration","Location","Contact","ISRC","ImageDetails",NULL};
 
 
 HTML=MCopyStr(HTML,"<html>\r\n<head><title>Editing ",Session->URL,"</title></head>\r\n<body>\r\n<form>\r\n",NULL);
@@ -621,40 +666,14 @@ URL=FormatURL(URL,Session,Tempstr);
 HTML=CatStr(HTML,"<table align=center width=90%% border=0>");
 	
 Vars=ListCreate();	
-FType=ExamineFile(Path, TRUE, Vars);	
+FType=LoadFileProperties(Path, Vars);
 
 	HTML=MCatStr(HTML,"<tr><td><a href=\"",URL,"\">.. (Parent Directory)</a></td><td> &nbsp; </td></tr>",NULL);
 
 	HTML=MCatStr(HTML,"<tr bgcolor=#CCCCFF><td>Path</td><td>",Session->URL,"</td></tr>",NULL);
-	if (FType != FILE_DIR) HTML=MCatStr(HTML,"<tr><td>Size</td><td>",GetVar(Vars,"FileSize"),"</td></tr>",NULL);
 
-	ptr=GetVar(Vars,"MTime-Secs");
-	if (ptr)
-	{
-		val=atoi(ptr);
-		HTML=MCatStr(HTML,"<tr><td>Modify Time</td><td>",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",val,NULL),"</td></tr>",NULL);
-	}
 
-	ptr=GetVar(Vars,"CTime-Secs");
-	if (ptr)
-	{
-		val=atoi(ptr);
-		HTML=MCatStr(HTML,"<tr><td>Create Time</td><td>",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",val,NULL),"</td></tr>",NULL);
-	}
-
-	if (FType != FILE_DIR)
-	{
-		Tempstr=CopyStr(Tempstr,"");
-		HashFile(&Tempstr,"md5",Path,ENCODE_HEX);
-		HTML=MCatStr(HTML,"<tr><td>MD5 Sum</td><td>",Tempstr,"</td></tr>",NULL);
-	}
-
-	HTML=MCatStr(HTML,"<tr bgcolor=#CCFFCC><td>ContentType</td><td>",GetVar(Vars,"ContentType"),"</td></tr>",NULL);
-	for (val=0; OptionalFields[val] !=NULL; val++)
-	{
-		ptr=GetVar(Vars,OptionalFields[val]);
-		if (StrLen(ptr)) HTML=MCatStr(HTML,"<tr bgcolor=#CCFFCC><td>",OptionalFields[val],"</td><td>",ptr,"</td></tr>",NULL);
-	}
+	HTML=FormatFileProperties(HTML, FType, Path, Vars);
 
 	//We must use the URL that this file was asked under, not its directory path. The directory path may not be
 	//directly accessible to the user, and they may be accessing it via a VPATH
@@ -732,12 +751,7 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 	time(&Now);
 	Path=CopyStr(Path,InPath);
 
-	if (HTTPServerDecideToCompress(Session,NULL)) 
-	{
-		Session->Flags |= HTTP_ENCODE_GZIP;
-		LogToFile(Settings.LogPath,"DIR: No compression");
-	}
-	else LogToFile(Settings.LogPath,"DIR: With compression");
+	if (HTTPServerDecideToCompress(Session,NULL)) Session->Flags |= HTTP_ENCODE_GZIP;
 
 	if (Settings.DirListFlags & DIR_INDEX_FILES)
 	{

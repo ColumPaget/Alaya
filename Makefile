@@ -1,16 +1,16 @@
 CC = gcc
 VERSION = 1.1.2
 CFLAGS = -g -O2
-LIBS = -lcrypt -lcrypto -lssl -lpam -lz 
+LIBS = -lcrypt -lpam -lz 
 INSTALL=/bin/install -c
 prefix=/usr/local
 bindir=$(prefix)${exec_prefix}/bin
-FLAGS=$(CFLAGS) -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DSTDC_HEADERS=1 -DHAVE_LIBZ=1 -DHAVE_SYS_TYPES_H=1 -DHAVE_SYS_STAT_H=1 -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_MEMORY_H=1 -DHAVE_STRINGS_H=1 -DHAVE_INTTYPES_H=1 -DHAVE_STDINT_H=1 -DHAVE_UNISTD_H=1 -DUSE_LINUX_CAPABILITIES=1 -D_LARGEFILE64_SOURCE=1 -D_FILE_OFFSET_BITS=64 -DHAVE_LIBPAM=1 -DHAVE_LIBSSL=1 -DHAVE_LIBCRYPTO=1 -DHAVE_LIBCRYPT=1 -DHAVE_SHADOW_H=1 
-OBJ=Authenticate.o MimeType.o DavProps.o common.o server.o directory_listing.o ChrootHelper.o ID3.o upload.o proxy.o libUseful-2.0/libUseful-2.0.a
+FLAGS=$(CFLAGS) -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DSTDC_HEADERS=1 -DHAVE_LIBZ=1 -DHAVE_SYS_TYPES_H=1 -DHAVE_SYS_STAT_H=1 -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_MEMORY_H=1 -DHAVE_STRINGS_H=1 -DHAVE_INTTYPES_H=1 -DHAVE_STDINT_H=1 -DHAVE_UNISTD_H=1 -DUSE_LINUX_CAPABILITIES=1 -DHAVE_LIBPAM=1 -DHAVE_LIBCRYPT=1 -DHAVE_SHADOW_H=1 
+OBJ=Authenticate.o MimeType.o DavProps.o Settings.o common.o server.o directory_listing.o ChrootHelper.o ID3.o upload.o proxy.o libUseful-2.0/libUseful-2.0.a
 
 all: $(OBJ)
 	@cd libUseful-2.0; $(MAKE)
-	gcc -g -o alaya $(LIBS) $(OBJ)  main.c
+	gcc $(FLAGS) -o alaya $(LIBS) $(OBJ)  main.c
 
 libUseful-2.0/libUseful-2.0.a: 
 	@cd libUseful-2.0; $(MAKE)
@@ -26,6 +26,9 @@ ChrootHelper.o: ChrootHelper.c ChrootHelper.h
 
 DavProps.o: DavProps.c DavProps.h
 	gcc $(FLAGS) -c DavProps.c 
+
+Settings.o: Settings.c Settings.h
+	gcc $(FLAGS) -c Settings.c 
 
 common.o: common.c common.h
 	gcc $(FLAGS) -c common.c 

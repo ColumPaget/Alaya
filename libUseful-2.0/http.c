@@ -98,7 +98,7 @@ if (Chunk->ChunkSize==0)
 
 	//if there's nothing in our buffer, and nothing being added, then
 	//we've already finished!
-	if (InLen==0) return(EOF);
+  if ((Chunk->BuffLen==0) && (InLen==0)) return(EOF);
 
 	vptr=ptr;
 	//skip past any leading '\r' or '\n'
@@ -116,12 +116,8 @@ if (Chunk->ChunkSize==0)
 	  *ptr='\0';
 		ptr++;
 	}
-	else 
-	{
-		return(0);
-	}
+	else return(EOF);
 	Chunk->ChunkSize=strtol(vptr,NULL,16);
-
 
 
 	Chunk->BuffLen=Chunk->Buffer+len-ptr;

@@ -38,6 +38,8 @@ char *GetHumanReadableDataQty(double Size, int Type);
 
 void EraseString(char *Buff, char *Target);
 
+int GenerateRandomBytes(char *RetBuff, int ReqLen);
+
 
 #ifdef __cplusplus
 }

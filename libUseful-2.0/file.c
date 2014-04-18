@@ -390,7 +390,7 @@ STREAM *STREAMCreate()
 STREAM *S;
 
 S=(STREAM *) calloc(1,sizeof(STREAM));
-STREAMResizeBuffer(S,4096);
+STREAMResizeBuffer(S,BUFSIZ);
 S->in_fd=-1;
 S->out_fd=-1;
 S->Timeout=30;
@@ -555,9 +555,10 @@ SSL_CTX=STREAMGetItem(S,"LIBUSEFUL-SSL-CTX");
 
 if (S->InStart >= S->InEnd)
 {
-S->InEnd=0;
-S->InStart=0;
+	S->InEnd=0;
+	S->InStart=0;
 }
+
 diff=S->InEnd-S->InStart;
 
 if (S->InStart > (S->BuffSize / 2))
@@ -662,7 +663,19 @@ return(read_result);
 }
 
 
+inline int STREAMTransferBytesOut(STREAM *S, char *Dest, int DestSize)
+{
+int bytes;
 
+	bytes=S->InEnd - S->InStart;
+	
+	if (bytes > DestSize) bytes=DestSize;
+	
+	memcpy(Dest,S->InputBuff+S->InStart,bytes);
+	S->InStart+=bytes;
+	
+	return(bytes);
+}
 
 
 
@@ -686,18 +699,9 @@ if (S->InStart >= S->InEnd)
 
 while (total < Buffsize)
 {
-
-	bytes=S->InEnd - S->InStart;
-	
-	
-	if (bytes > (Buffsize-total)) bytes=(Buffsize-total);
-	
-	memcpy(ptr+total,S->InputBuff+S->InStart,bytes);
-	S->InStart+=bytes;
-	total+=bytes;
+	total+=STREAMTransferBytesOut(S, Buffer+total, Buffsize-total);
 	
 	bytes=S->InEnd - S->InStart;
-	
 	
 	if (bytes < 1) 
 	{
@@ -983,41 +987,42 @@ return(pos);
 
 char *STREAMReadToTerminator(char *Buffer, STREAM *S,unsigned char Term)
 {
-int inchar, len=0;
-char *Tempptr;
+int result, len=0, bytes_read=0;
+char *RetStr=NULL, *end, *ptr;
 
-Tempptr=CopyStr(Buffer,"");
 
-inchar=STREAMReadChar(S);
-while (inchar != EOF)
+RetStr=Buffer;
+while (1)
 {
-	//if ((len % 100)== 0) Tempptr=realloc(Tempptr,(len/100 +1) *100 +2);
-	//*(Tempptr+len)=inchar;
-
-		if (inchar >= 0)
+	if (S->InEnd > S->InStart)
+	{
+		//memchr is wicked fast, so use it
+		ptr=memchr(S->InputBuff+S->InStart,Term,S->InEnd - S->InStart);
+		if (ptr) len=(ptr+1)-(S->InputBuff+S->InStart);
+		else len=S->InEnd-S->InStart;
+	
+		//Get length of RetStr, because SetStrLen might realloc it
+		RetStr=SetStrLen(RetStr,bytes_read + len);
+		len=STREAMTransferBytesOut(S, RetStr+bytes_read , len);
+		bytes_read+=len;
+		*(RetStr+bytes_read)='\0';
+		if (ptr) return(RetStr);
+	}
+	
+	result=STREAMReadCharsToBuffer(S);
+	if ((result != STREAM_NODATA) && (S->InStart >= S->InEnd))
+	{
+		if (bytes_read==0)
 		{
-    	Tempptr=AddCharToBuffer(Tempptr,len,(char) inchar);
-			len++;
+			DestroyString(RetStr);
+			return(NULL);
 		}
-		else if (inchar !=STREAM_NODATA) break;
-    if (inchar==Term) break;
-    inchar=STREAMReadChar(S);
+		return(RetStr);
+	}
 }
-
-
-*(Tempptr+len)='\0';
-//if ((inchar==EOF) && (errno==ECONNREFUSED)) return(Tempptr);
-if (
-	((inchar==EOF) || (inchar==STREAM_DATA_ERROR))
-	&& 
-	(StrLen(Tempptr)==0)
-   )
-{
-  free(Tempptr);
-  return(NULL);
-}
-
-return(Tempptr);
+	
+//impossible to get here!
+return(NULL);
 }
 
 

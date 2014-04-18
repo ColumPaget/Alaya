@@ -6,26 +6,37 @@
 #include <sys/wait.h>
 #include <pwd.h>
 
-#define FLAG_REQUIRE_AUTH 1
+#define FLAG_NODEMON 1
 #define FLAG_CHROOT 2
 #define FLAG_CHHOME 4
 #define FLAG_CHSHARE 8
 #define FLAG_SSL 16
-#define FLAG_NODEMON 32
+#define FLAG_SSL_PFS 32
 #define FLAG_LOG_VERBOSE 64
 #define FLAG_LOG_MORE_VERBOSE 128
 #define FLAG_COMPRESS 256
 #define FLAG_PARTIAL_COMPRESS 512
-#define FLAG_ACCESS_TOKEN 1024
-#define FLAG_HAS_AUTH 2048
 #define FLAG_CHECK_SCRIPTS 4096
 #define FLAG_LOGOUT_AVAILABLE 8192
 #define FLAG_LOOKUP_CLIENT 16384
-#define FLAG_DIGEST_AUTH 32768
 #define FLAG_NOCACHE 65536
+
+
+#define FLAG_AUTH_REQUIRED 1
+#define FLAG_AUTH_PRESENT  2
+#define FLAG_AUTH_DIGEST   4
+#define FLAG_AUTH_ACCESS_TOKEN  8
+#define FLAG_AUTH_CERT_REQUIRED 16
+#define FLAG_AUTH_CERT_SUFFICIENT 32
+#define FLAG_AUTH_CERT_ASK 64
+
+
 
 #define ERR_OKAY 0
 #define ERR_FILE 1
+#define ERR_LOG 2
+#define ERR_PRINT 4
+#define ERR_EXIT 8
 
 
 #define LOGGED_IN 1
@@ -80,6 +91,7 @@ int DirListFlags;
 char *CgiUser;
 char *AllowUsers;
 char *DenyUsers;
+int AuthFlags;
 char *AuthMethods;
 char *AuthPath;
 char *AuthRealm;
@@ -106,6 +118,7 @@ int MaxLogSize;
 typedef struct
 {
 int Flags;
+int AuthFlags;
 char *Protocol;
 char *Method;
 int MethodID;
@@ -113,6 +126,7 @@ char *ResponseCode;
 char *URL;
 char *Path;
 char *Arguments;
+char *Cipher;
 char *Destination;
 char *ContentType;
 char *ContentBoundary;
@@ -151,11 +165,9 @@ extern TSettings Settings;
 extern char *Version;
 
 
+void HandleError(int Flags, const char *FmtStr, ...);
 TPathItem *PathItemCreate(int Type, char *URL, char *Path);
 void PathItemDestroy(void *pi_ptr);
-
-void ParseConfigItem(char *ConfigLine);
-void ParseConfigItemList(const char *Settings);
 
 char *FormatURL(char *Buff, HTTPSession *Session, char *ItemPath);
 char *MakeAccessToken(char *Buffer, char *Salt, char *Method, char *RequestingHost, char *RequestURL);

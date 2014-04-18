@@ -147,6 +147,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		else if (strcmp(Name,"StartDir")==0) Response->StartDir=CopyStr(Response->StartDir,Value);
 		else if (strcmp(Name,"ClientReferrer")==0) Response->ClientReferrer=CopyStr(Response->ClientReferrer,Value);
 		else if (strcmp(Name,"RemoteAuthenticate")==0) Response->RemoteAuthenticate=CopyStr(Response->RemoteAuthenticate,Value);
+		else if (strcmp(Name,"Cipher")==0) Response->Cipher=CopyStr(Response->Cipher,Value);
 		else if (strcmp(Name,"Cookies")==0) Response->Cookies=CopyStr(Response->Cookies,Value);
 
 		ptr=GetNameValuePair(ptr," ","=",&Name,&Tempstr);
@@ -182,6 +183,7 @@ char *Tempstr=NULL;
 	setenv("REQUEST_METHOD",Session->Method,TRUE);
 	setenv("REQUEST_URI",Session->URL,TRUE);
 	setenv("SERVER_PROTOCOL","HTTP/1.1",TRUE);
+	if (StrLen(Session->Cipher)) setenv("SLL",Session->Cipher,TRUE);
 
 DestroyString(Tempstr);
 }
@@ -390,7 +392,9 @@ HTTPSession *Response;
 char *Tempstr=NULL;
 int result;
 
+
 Response=ParseSessionInfo(Data);
+LogToFile(Settings.LogPath,"PSI: [%s] [%s]",Response->Path,Data);
 result=fork();
 if (result==0)
 {
@@ -466,7 +470,6 @@ if (*ptr=='I') Flags |= LOGGED_IN;
 if (*ptr=='F') Flags |= LOGIN_FAIL;
 if (*ptr=='C') Flags |= LOGIN_CHANGE;
 
-
 ptr=GetVar(Settings.HostConnections,Host);
 
 LastTime=time(NULL);
@@ -509,11 +512,12 @@ char *Tempstr=NULL, *Token=NULL, *ptr;
 int val;
 
 Tempstr=STREAMReadLine(Tempstr,S);
+
+
 if (! Tempstr) return(FALSE);
 
 StripTrailingWhitespace(Tempstr);
 ptr=GetToken(Tempstr,"\\S",&Token,0);
-LogToFile(Settings.LogPath,"HandleRequest: [%s] [%s]",Token,ptr);
 if (strcmp(Token,"EXEC")==0) HandleExecRequest(S,ptr);
 if (strcmp(Token,"LOG")==0) LogToFile(Settings.LogPath,ptr);
 if (strcmp(Token,"GETF")==0) HandleGetFileRequest(S,ptr);
@@ -545,11 +549,13 @@ Referrer=QuoteCharsInStr(Referrer,Session->ClientReferrer,"'");
 Tempstr=MCopyStr(Tempstr,Type," Host='",Session->Host,"' URL='",Session->URL,"' Arguments='",ArgumentsStr, "' ClientIP='",Session->ClientIP,"' StartDir='",Session->StartDir,"'",NULL);
 if (StrLen(Session->UserName)) Tempstr=MCatStr(Tempstr," User='",Session->UserName,"'",NULL);
 if (StrLen(Session->RemoteAuthenticate)) Tempstr=MCatStr(Tempstr," RemoteAuthenticate='",Session->RemoteAuthenticate,"'",NULL);
-Tempstr=MCatStr(Tempstr," ClientReferrer='",Referrer,"' ServerName=",Session->ServerName," ServerPort=",PortStr,NULL);
+Tempstr=MCatStr(Tempstr," ClientReferrer='",Referrer,"' ServerName=",Session->ServerName," ServerPort=",PortStr," Cipher='",Session->Cipher,"' ",NULL);
 Tempstr=MCatStr(Tempstr," Method=",Session->Method," UserAgent='",Session->UserAgent,"' SearchPath='",SearchPath,"' Path='",Path,"' ContentType='",Session->ContentType,"' ContentLength='",ContentLengthStr,"'",NULL);
 if (StrLen(Session->Cookies)) Tempstr=MCatStr(Tempstr," Cookies='",Session->Cookies,"'",NULL);
 Tempstr=CatStr(Tempstr,"\n");
 
+
+LogToFile(Settings.LogPath,"CHROOT: [%s]",Tempstr);
 STREAMWriteLine(Tempstr,ParentProcessPipe);
 STREAMFlush(ParentProcessPipe);
 

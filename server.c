@@ -3,6 +3,7 @@
 #include "MimeType.h"
 #include "DavProps.h"
 #include "directory_listing.h"
+#include "Settings.h"
 #include "ID3.h"
 #include "upload.h"
 #include "proxy.h"
@@ -27,9 +28,9 @@ for (ptr=Str; ptr < (Str+ilen); ptr++)
 
 switch (*ptr)
 {
-case '&': RetStr=CatStr(RetStr,"&amp;");
-case '<': RetStr=CatStr(RetStr,"&lt;");
-case '>': RetStr=CatStr(RetStr,"&gt;");
+case '&': RetStr=CatStr(RetStr,"&amp;"); break;
+case '<': RetStr=CatStr(RetStr,"&lt;"); break;
+case '>': RetStr=CatStr(RetStr,"&gt;"); break;
 
 default:
 		 RetStr=AddCharToStr(RetStr,*ptr); 
@@ -83,6 +84,7 @@ DestroyString(Trans->Method);
 DestroyString(Trans->ResponseCode);
 DestroyString(Trans->URL);
 DestroyString(Trans->Path);
+DestroyString(Trans->Cipher);
 DestroyString(Trans->Arguments);
 DestroyString(Trans->Destination);
 DestroyString(Trans->ContentType);
@@ -197,21 +199,62 @@ DestroyString(Value);
 }
 
 
+//Will only return false if FLAG_SSL_CERT_REQUIRED is set
+int HTTPServerCheckCertificate(STREAM *S)
+{
+char *ptr;
+int result=TRUE;
+
+	ptr=STREAMGetValue(S,"SSL-Certificate-Verify");
+	if (StrLen(ptr) && (strcmp(ptr,"OK")==0))
+	{
+	 LogToFile(Settings.LogPath,"CLIENT CERTIFIED BY: %s", STREAMGetValue(S,"SSL-Certificate-Issuer"));
+	 LogToFile(Settings.LogPath,"CLIENT CERTIFICATE SUBJECT: %s", STREAMGetValue(S,"SSL-Certificate-Subject"));
+	}
+	else if (Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED)
+	{
+	 result=FALSE;
+	 LogToFile(Settings.LogPath,"ERROR: SSL Certificate required, but client failed to provide a valid certificate. Error was: %s",ptr);
+	 ptr=STREAMGetValue(S,"SSL-Certificate-Subject");
+	if (StrLen(ptr))
+	{
+	 LogToFile(Settings.LogPath,"CLIENT CERTIFICATE ISSUER: %s", STREAMGetValue(S,"SSL-Certificate-Issuer"));
+	 LogToFile(Settings.LogPath,"CLIENT CERTIFICATE SUBJECT: %s", STREAMGetValue(S,"SSL-Certificate-Subject"));
+	}
+	LogFileFlushAll(TRUE);
+	}
+
+return(result);
+}
+
+
 void HTTPServerReadHeaders(HTTPSession *Heads, STREAM *S)
 {
 char *Tempstr=NULL, *Token=NULL, *ptr, *tmp_ptr;
 ListNode *Curr;
 int val;
 
-
 Tempstr=STREAMReadLine(Tempstr,S);
-
 GetSockDetails(S->in_fd,&Heads->ServerName,&Heads->ServerPort,&Heads->ClientIP,&val);
 if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrLen(Heads->ClientIP)) Heads->ClientHost=CopyStr(Heads->ClientHost,IPStrToHostName(Heads->ClientIP));
 
 LogToFile(Settings.LogPath,"");
 //Log first line of the response
 LogToFile(Settings.LogPath,"NEW REQUEST: %s (%s) %s",Heads->ClientHost,Heads->ClientIP,Tempstr);
+if (Settings.Flags & FLAG_SSL)
+{
+	Heads->Cipher=CopyStr(Heads->Cipher,STREAMGetValue(S,"SSL-Cipher"));
+	LogToFile(Settings.LogPath,"SSL CIPHER: %s", Heads->Cipher);
+	if (! HTTPServerCheckCertificate(S)) exit(1);
+
+	//Set the Username to be the common name signed in the certificate. If it doesn't
+	//authenticate against a user then we can query for a username later
+	Heads->UserName=CopyStr(Heads->UserName,STREAMGetValue(Heads->S,"SSL-Certificate-CommonName"));
+	if (Settings.AuthFlags & FLAG_AUTH_CERT_SUFFICIENT)
+	{
+		if (StrLen(Heads->UserName)) Heads->AuthFlags |= FLAG_AUTH_PRESENT;
+	}
+}
 
 ptr=GetToken(Tempstr,"\\S",&Heads->Method,0);
 Heads->MethodID=MatchTokenFromList(Heads->Method,HTTPMethods,0);
@@ -275,6 +318,7 @@ else Heads->Path=MCopyStr(Heads->Path,"/",tmp_ptr,NULL);
 
 while (StrLen(Tempstr) )
 {
+
 	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"<< %s",Tempstr);
 	ptr=GetToken(Tempstr,":",&Token,0);
 
@@ -289,7 +333,7 @@ while (StrLen(Tempstr) )
 			{
 			ptr=GetToken(ptr,"\\S",&Token,0);
 			HTTPServerHandleAuthHeader(Heads,val,Token,ptr);
-			Heads->Flags |= FLAG_HAS_AUTH;
+			Heads->AuthFlags |= FLAG_AUTH_PRESENT;
 			}
 	break;
 
@@ -303,7 +347,7 @@ while (StrLen(Tempstr) )
 			{
 				ptr=GetToken(ptr,"\\S",&Token,0);
 				HTTPServerHandleAuthHeader(Heads,val,Token,ptr);
-				Heads->Flags |= FLAG_HAS_AUTH;
+				Heads->AuthFlags |= FLAG_AUTH_PRESENT;
 			}
 		break;
 
@@ -385,7 +429,7 @@ StripLeadingWhitespace(Tempstr);
 }
 
 
-	if (strstr(Heads->Arguments,"AccessToken")) Heads->Flags |= FLAG_HAS_AUTH | FLAG_ACCESS_TOKEN;
+if (strstr(Heads->Arguments,"AccessToken")) Heads->AuthFlags |= FLAG_AUTH_PRESENT | FLAG_AUTH_ACCESS_TOKEN;
 
 DestroyString(Tempstr);
 DestroyString(Token);
@@ -420,13 +464,13 @@ if (Session->LastModified > 0) HTTPServerSendHeader(S,"Last-Modified",GetDateStr
 
 if (Flags & HEADERS_AUTH) 
 {
-	if (Settings.Flags & FLAG_DIGEST_AUTH) Tempstr=FormatStr(Tempstr,"Digest realm=\"%s\", qop=\"auth\", nonce=\"%x\"", Settings.AuthRealm, rand());
+	if (Settings.AuthFlags & FLAG_AUTH_DIGEST) Tempstr=FormatStr(Tempstr,"Digest realm=\"%s\", qop=\"auth\", nonce=\"%x\"", Settings.AuthRealm, rand());
 	else Tempstr=MCopyStr(Tempstr,"Basic realm=\"",Settings.AuthRealm,"\"",NULL);
 
 	if (IsProxyMethod(Session->MethodID) ) HTTPServerSendHeader(S,"Proxy-Authenticate",Tempstr);
 	else
 	{
-		if (Settings.Flags & FLAG_DIGEST_AUTH)
+		if (Settings.AuthFlags & FLAG_AUTH_DIGEST)
 		{
 			Tempstr=FormatStr(Tempstr,"Digest realm=\"%s\", qop=\"auth\", nonce=\"%x\"", Settings.AuthRealm, rand());
 			HTTPServerSendHeader(S,"WWW-Authenticate",Tempstr);
@@ -466,6 +510,7 @@ if (! (Flags & HEADERS_CGI))
 {
 	HTTPServerSendHeader(S, "DAV", "1");
 	if (StrLen(Session->ContentType)) HTTPServerSendHeader(S,"Content-Type",Session->ContentType);
+	else HTTPServerSendHeader(S,"Content-Type","octet/stream");
 	if (Session->ContentSize > 0)
 	{
 		Tempstr=FormatStr(Tempstr,"%d",Session->ContentSize);
@@ -492,10 +537,12 @@ void HTTPServerSendResponse(STREAM *S, HTTPSession *Heads, char *ResponseLine, c
 STREAM *Doc;
 HTTPSession *Response;
 char *Tempstr=NULL;
+long ResponseCode=0;
 
+ResponseCode=strtol(ResponseLine,NULL,10);
 Response=HTTPSessionCreate();
 Response->ResponseCode=CopyStr(Response->ResponseCode,ResponseLine);
-if (strncmp(ResponseLine,"302",3)==0) SetVar(Response->Headers,"Location",Body);
+if (ResponseCode==302) SetVar(Response->Headers,"Location",Body);
 else Response->ContentSize=StrLen(Body);
 Response->ContentType=CopyStr(Response->ContentType,ContentType);
 if (Heads)
@@ -512,7 +559,9 @@ if (HTTPServerDecideToCompress(Heads,NULL))
 }
 else Tempstr=CopyStr(Tempstr,Body);
 
-HTTPServerSendHeaders(S, Response,0);
+
+if ((ResponseCode==401) || (ResponseCode==407)) HTTPServerSendHeaders(S, Response,HEADERS_AUTH);
+else HTTPServerSendHeaders(S, Response,0);
 STREAMWriteBytes(S,Tempstr,Response->ContentSize);
 
 DestroyHTTPSession(Response);
@@ -792,7 +841,7 @@ int len;
 
 	if (Curr)
 	{
-	PI=(TPathItem *) Curr->Item;
+		PI=(TPathItem *) Curr->Item;
 		
 		LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s]",PI->Type,Curr->Tag,PI->Path);
 		switch (PI->Type)
@@ -843,6 +892,7 @@ int len;
 
 		HTTPServerSendDocument(S, Session, Path, SendData);
 	}
+
 
 DestroyString(Tempstr);
 DestroyString(Path);
@@ -1097,17 +1147,6 @@ DestroyString(Tempstr);
 
 
 
-void HTTPServerDemandAuth(STREAM *S, HTTPSession *Session)
-{
-HTTPSession *Response;
-
-Response=HTTPSessionCreate();
-if (IsProxyMethod(Session->MethodID)) Response->ResponseCode=CopyStr(Response->ResponseCode,"407 UNAUTHORIZED");
-else Response->ResponseCode=CopyStr(Response->ResponseCode,"401 UNAUTHORIZED");
-Response->MethodID=Session->MethodID;
-HTTPServerSendHeaders(S, Response, HEADERS_AUTH);
-DestroyHTTPSession(Response);
-}
 
 
 
@@ -1118,9 +1157,10 @@ char *ChrootDir=NULL, *Tempstr=NULL;
 Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 ChrootDir=CopyStr(ChrootDir,Settings.DefaultDir);
 
+
 if (IsProxyMethod(Session->MethodID))
 {
-//Do not chroot for proxy commands
+	//Do not chroot for proxy commands
 }
 else 
 {
@@ -1128,6 +1168,8 @@ else
 
 	if (chdir(ChrootDir) !=0) 
 	{
+		LogToFile(Settings.LogPath,"CHDIR FAILED: %d %s %s\n",getuid(),ChrootDir,strerror(errno));
+
 		//If we cannot chdir to the home dir, try the DefaultDir
 		ChrootDir=CopyStr(ChrootDir,Settings.DefaultDir);
 		chdir(ChrootDir);
@@ -1176,6 +1218,7 @@ DestroyString(ChrootDir);
 int ActivateSSL(STREAM *S,ListNode *Keys)
 {
 ListNode *Curr;
+int Flags=0;
 
 Curr=ListGetNext(Keys);
 while (Curr)
@@ -1184,7 +1227,10 @@ STREAMSetValue(S,Curr->Tag,(char *) Curr->Item);
 Curr=ListGetNext(Curr);
 }
 
-DoSSLServerNegotiation(S,0);
+Flags |= LU_SSL_PFS;
+if (Settings.AuthFlags & (FLAG_AUTH_CERT_REQUIRED | FLAG_AUTH_CERT_SUFFICIENT | FLAG_AUTH_CERT_ASK)) Flags |= LU_SSL_VERIFY_PEER;
+
+DoSSLServerNegotiation(S,Flags);
 }
 
 
@@ -1211,46 +1257,52 @@ return(FALSE);
 }
 
 
-
-
-int HTTPServerAuthenticate(HTTPSession *Session)
+void ParseAccessToken(HTTPSession *Session)
 {
-	char *Name=NULL, *Value=NULL, *ptr;
-	char *Salt=NULL, *AccessToken=NULL;
-	int result=FALSE;
-	
-	//This handles someone clicking a 'logout' button
-	if (! HTTPServerHandleRegister(Session, LOGIN_CHECK_ALLOWED)) 
-	{
-			LogToFile(Settings.LogPath,"REG AUTH");
-			return(FALSE);
-	}
+char *Salt=NULL, *Token=NULL;
+char *Name=NULL, *Value=NULL, *ptr;
 
-	//Consider AccessToken Authentication for this URL!
-	if (Session->Flags & FLAG_ACCESS_TOKEN)
-	{
 		ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
 		while (ptr)
 		{
 			//Put salt in User settings, it will get overwritten during 'Authenticate'
-			if (strcasecmp(Name,"Salt")==0) Session->UserSettings=CopyStr(Session->UserSettings,Value);
+			if (strcasecmp(Name,"Salt")==0) Salt=CopyStr(Salt,Value);
 			if (strcasecmp(Name,"User")==0) Session->UserName=CopyStr(Session->UserName,Value);
-			if (strcasecmp(Name,"AccessToken")==0) Session->Password=CopyStr(Session->Password,Value);
+			if (strcasecmp(Name,"AccessToken")==0) Token=CopyStr(Token,Value);
 			ptr=GetNameValuePair(ptr,"&","=",&Name,&Value);
 		}
-	}
-
-	if ((! result) && (Session->Flags & FLAG_HAS_AUTH))
-	{
-		if (StrLen(Session->UserName) && Authenticate(Session)) result=TRUE;
-		if (result) HTTPServerHandleRegister(Session, LOGGED_IN);
-		else HTTPServerHandleRegister(Session, LOGIN_FAIL);
-	}
+		Session->Password=MCopyStr(Session->Password,Salt,":",Token,NULL);
 
 	DestroyString(Salt);
 	DestroyString(Name);
 	DestroyString(Value);
-	DestroyString(AccessToken);
+	DestroyString(Token);
+}
+
+int HTTPServerAuthenticate(HTTPSession *Session)
+{
+	int result=FALSE;
+	
+	//This handles someone clicking a 'logout' button
+	if (! HTTPServerHandleRegister(Session, LOGIN_CHECK_ALLOWED)) return(FALSE);
+
+	//Consider AccessToken Authentication for this URL!
+	if (Session->AuthFlags & FLAG_AUTH_ACCESS_TOKEN) ParseAccessToken(Session);
+
+	if ((! result) && (Session->AuthFlags & FLAG_AUTH_PRESENT))
+	{
+		if (StrLen(Session->UserName) && Authenticate(Session)) result=TRUE;
+
+		//If authentication provided any users settings, then apply those
+		if (StrLen(Session->UserSettings)) ParseConfigItemList(Session->UserSettings);
+
+		//The FLAG_SSL_CERT_REQUIRED flag might have been set by user settings
+		//during authentication, so check it again here
+		if (! HTTPServerCheckCertificate(Session->S)) result=FALSE;
+
+		if (result) HTTPServerHandleRegister(Session, LOGGED_IN);
+		else HTTPServerHandleRegister(Session, LOGIN_FAIL);
+	}
 
 	return(result);
 }
@@ -1405,15 +1457,16 @@ int val, AuthOkay=TRUE, result;
 int NoOfConnections;
 time_t LastTime, Delay=0;
 
+
 STREAMSetFlushType(Session->S,FLUSH_FULL,4096);
 if (Settings.Flags & FLAG_SSL) ActivateSSL(Session->S,Settings.SSLKeys);
+
 
 HTTPServerReadHeaders(Session,Session->S);
 Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 
-		
-
-if (Settings.Flags & FLAG_REQUIRE_AUTH)
+LogToFile(Settings.LogPath,"PREAUTH: %s against %s %s\n",Session->UserName,Settings.AuthPath,Settings.AuthMethods);
+if (Settings.AuthFlags & FLAG_AUTH_REQUIRED)
 {
 	AuthOkay=FALSE;
 
@@ -1421,11 +1474,12 @@ if (Settings.Flags & FLAG_REQUIRE_AUTH)
 	{
 		LogToFile(Settings.LogPath,"AUTHENTICATE: %s against %s %s\n",Session->UserName,Settings.AuthPath,Settings.AuthMethods);
 		AuthOkay=TRUE;
-		if (StrLen(Session->UserSettings)) ParseConfigItemList(Session->UserSettings);
 	}
 	else
 	{
-		HTTPServerDemandAuth(Session->S, Session);
+		if (IsProxyMethod(Session->MethodID)) HTTPServerSendHTML(Session->S, Session, "407 UNAUTHORIZED","Proxy server requires authentication.");
+		else HTTPServerSendHTML(Session->S, Session, "401 UNAUTHORIZED","Server requires authentication.");
+
 		LogToFile(Settings.LogPath,"AUTHENTICATE FAIL: %s against %s\n",Session->UserName,Settings.AuthPath);
 	}
 }

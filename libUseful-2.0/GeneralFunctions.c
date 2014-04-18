@@ -1,5 +1,7 @@
 #include "includes.h"
 #include "base64.h"
+#include "Hash.h"
+#include <sys/utsname.h>
 
 int WritePidFile(char *ProgName)
 {
@@ -334,4 +336,43 @@ memset(ptr,' ',len);
 ptr=strstr(ptr,Target);
 }
 
+}
+
+
+
+int GenerateRandomBytes(char *RetBuff, int ReqLen)
+{
+struct utsname uts;
+int i, len;
+clock_t ClocksStart, ClocksEnd;
+struct timeval tv1, tv2;
+char *Tempstr=NULL, *Digest=NULL;
+
+ClocksStart=clock();
+gettimeofday(&tv1,NULL);
+//how many clock cycles used here will depend on overall
+//machine activity/performance/number of running processes
+for (i=0; i < 100; i++) sleep(0);
+uname(&uts);
+ClocksEnd=clock();
+gettimeofday(&tv2,NULL);
+
+
+Tempstr=FormatStr(Tempstr,"%lu:%lu:%lu:%lu:%lu:%lu\n",getpid(),getuid(),ClocksStart,ClocksEnd,tv1.tv_usec,tv2.tv_usec);
+//This stuff should be unique to a machine
+Tempstr=CatStr(Tempstr,uts.sysname);
+Tempstr=CatStr(Tempstr, uts.nodename);
+Tempstr=CatStr(Tempstr, uts.machine);
+Tempstr=CatStr(Tempstr, uts.release);
+Tempstr=CatStr(Tempstr, uts.version);
+
+
+len=HashBytes(&Digest, "sha256", Tempstr, StrLen(Tempstr), 0);
+if (len > ReqLen) len=ReqLen;
+memcpy(RetBuff,Digest,len);
+
+DestroyString(Tempstr);
+DestroyString(Digest);
+
+return(len);
 }

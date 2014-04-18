@@ -343,32 +343,19 @@ return(RetStr);
 
 int LoadFileProperties(char *Path, ListNode *PropList)
 {
-ListNode *EProps, *Node, *Curr;
 char *Dir=NULL, *ptr;
 int FType;
 
-EProps=ListCreate();
-
 ptr=GetToken(Path,"/",&Dir,0);
-LoadDirPropsFile(Dir, ptr, EProps);
-FType=ExamineFile(Path,FALSE,EProps);
-
-//Load extended properities
-Curr=ListGetNext(EProps);
-while (Curr)
-{
-SetVar(PropList,Curr->Tag,Curr->Item);
-Curr=ListGetNext(Curr);
-}
+LoadDirPropsFile(Dir, ptr, PropList);
+FType=ExamineFile(Path,FALSE,PropList);
 
 //Translate Some Props  to DAV names
-SetVar(PropList,"creationdate",GetVar(EProps,"CTime-secs"));
-SetVar(PropList,"getlastmodified",GetVar(EProps,"MTime-secs"));
-SetVar(PropList,"getcontentlength",GetVar(EProps,"FileSize"));
-SetVar(PropList,"getcontenttype",GetVar(EProps,"ContentType"));
-SetVar(PropList,"executable",GetVar(EProps,"IsExecutable"));
-
-ListDestroy(EProps,DestroyString);
+SetVar(PropList,"creationdate",GetVar(PropList,"CTime-secs"));
+SetVar(PropList,"getlastmodified",GetVar(PropList,"MTime-secs"));
+SetVar(PropList,"getcontentlength",GetVar(PropList,"FileSize"));
+SetVar(PropList,"getcontenttype",GetVar(PropList,"ContentType"));
+SetVar(PropList,"executable",GetVar(PropList,"IsExecutable"));
 
 return(FType);
 }
