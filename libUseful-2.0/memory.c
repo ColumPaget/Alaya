@@ -44,7 +44,6 @@ static void * libuseful_malloc_hook (size_t size)
 
   __malloc_hook = old_malloc_hook;
   mem_start = malloc (size);
-  __malloc_hook = libuseful_malloc_hook;
 
 	mem_end=mem_start+size;
 	if (! HeapBase) HeapBase=mem_start;
@@ -52,6 +51,7 @@ static void * libuseful_malloc_hook (size_t size)
 	
 	if (! HeapTop) HeapTop=mem_end;
 	else if (mem_end > HeapTop) HeapTop=mem_end;
+  __malloc_hook = libuseful_malloc_hook;
 
   return(mem_start);
 }
@@ -82,13 +82,13 @@ __free_hook = libuseful_free_hook;
 
 void MemoryInit()
 {
+	if (LibUsefulMemFlags & MEMORY_INIT_DONE) return;
+	LibUsefulMemFlags |= MEMORY_INIT_DONE;
+
   old_malloc_hook = __malloc_hook;
   __malloc_hook = libuseful_malloc_hook;
   old_free_hook = __free_hook;
   __free_hook = libuseful_free_hook;
-
-
-	LibUsefulMemFlags |= MEMORY_INIT_DONE;
 }
 
 
