@@ -35,6 +35,10 @@ Comma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for reado
 	-r:		'ChRoot mode', chroot into directory and offer services from it
 	-key:   Keyfile for SSL (HTTPS)
 	-cert:  Certificate for SSL (HTTPS). This can be a certificate chain bundled in .pem format.
+	-ciphers:		List of SSL ciphers to use.
+	-dhparams:		Path to a file containing Diffie Helmann parameters for Perfect Forward Secrecy.
+	-client-cert:		Settings for SSL client certificate authentication. Three levels are available: 'required' means a client MUST supply a certificate, but that it may still be required to log in through normal authentication. 'sufficient' means that a client CAN supply a certificate, and that the certificate is all the authentication that's needed. 'required+sufficient' means that a client MUST provide a certificate, and that this certificate is sufficient for authentication.
+	-verify-path:		Path to a file, or a directory, containing Authority certificates for verifying client certificates.
 	-cgi:   Directory containing cgi programs. These programs will be accessible even though they are outside of a 'chroot'
 	-hashfile:  File containing cryptographic hashes of cgi-scripts. This file contains the output of the md5sum, shasum, sha256sum or sha512sum utilities.
 	-ep:		'External path' containing files that will be accessible even outside a chroot.
@@ -57,11 +61,24 @@ User Setup for Alaya Authentication
 	-e:		Specify password encryption type (sha1, sha512, sha256, md5, null, or plain).
 				Config file type settings (like 'ChHome' or 'ChRoot=/var/shared' or 'HttpMethods=GET,PUT,PROPFIND' or 'Path=cgi,/cgi-bin/,/usr/share/cgi' can be added so that these settings are specific to a user
 
-		e.g. alaya -user add Guest Password -a /etc/FileServices.auth -e sha1 -h /home/Guest 'Path=cgi,/cgi-bin/,/usr/share/cgi' 'Path=files,/docs/,/usr/share/docs' ChHome
+	e.g.
+ 
+	Add user with home directory /home/Guest and a number of settings:
 
- Delete User: alaya -user del [-a <auth path>] <Username>
+		alaya -user add Guest Password -a /etc/FileServices.auth -e sha1 -h /home/Guest 'Path=cgi,/cgi-bin/,/usr/share/cgi' 'Path=files,/docs/,/usr/share/docs' ChHome 'SSLClientCertificate=required'
 
- List Users : alaya -user list
+	./alaya -user add test testing123 -h /home/test -e sha1 SSLClientCertificate=required
+
+ Delete User: 
+
+		alaya -user del [-a <auth path>] <Username>
+
+ List Users : 
+
+		alaya -user list
+
+
+Note that using 'SSLClientCertificate' in user entries in the authentication file requries 'SSLClientCertificate=ask' to be set in the main config file. This is so that alaya will ask for a certificate in the connection setup stage, BEFORE it gets to authentication. Without this entry it will be too late to ask for a certificate when we reach the authentication stage.
 
 
 CONFIG FILE:
@@ -85,6 +102,10 @@ HttpMethods=<list>	List of methods like GET, PUT that are allowed
 AuthMethods=<list>  Which methods (native, shadow, passwd, pam, accesstoken) should be used for user authentication, and in what order. See more in 'AUTHENTICATION' below.
 SSLKey=<path>		Path to SSL key file
 SSLCert=<path>	Path to SSL certificate file
+SSLCiphers=<cipher list> 	List of Ciphers to use with SSL (in standard openssl format)
+SSLVerifyPath=<path>		Path to file or directory containing Certificate Authority certificates for peer authentication.
+SSLClientCertificate=<type>		'required', 'sufficient' or 'required+sufficient' (See 'Client Certificates' below)
+SSLDHParams=<path>		Path to an openssl generated Diffie Helman parameters file.
 Path=<type>,<alias>,<path>	Path to a trusted directory outside of a chroot jail, which is made accessible as a 'virtual' directory under the top-level of the chroot. Currently there are two types of path 'cgi', for cgi programs, and 'files' for a standard directory made available in this way. (See 'VPaths' below)
 LogVerbose			More information in log file
 DefaultUser=<username>	Default user that is used both for running cgi scripts, and for 'native' users that have no specified 'real' user
@@ -98,9 +119,11 @@ LookupClientName 	 If present then lookup client hostnames with DNS and use in l
 SanitizeAllowTags=<tag list>		List of HTML tags allowed to be used in 'POST' to cgi-scripts. If left blank, then all are allowed, if set, then all but the listed html elements will be stripped 
 UserAgentSettings=UserAgentString,Settings		Settings to be applied when a particular user agent string is seen.
 
+
 AUTHENTICATION
 
 Alaya supports authentication as 'real users' via old style '/etc/passwd', newer '/etc/shadow' or via Pluggable Authentication Modules (PAM). However, alaya also supports it's own 'native' authentication using it's own password file (defaults to /etc/alaya.auth).  The native authentication method allows some of the config settings to be set against an individual user. This can be used to limit the HTTP methods a given user can use, or to limit CGI access to certain users, etc, etc.
+
 
 NATIVE AUTHENTICATION
 
@@ -129,14 +152,15 @@ Many settings that can be put in the config-file can also be booked against a sp
 would map the virtual user 'bill' to the real user 'nobody', in group 'users', and on login they'll be chrooted to '/tmp'. They will only be allowed to use the HTTP GET method.
 
 		
-
 SYSTEM AUTHENTICATION
 
 If alaya authenticates using the /etc/passwd, /etc/shadow or PAM methods, then the user will be logged in as the REAL system user that was found in /etc/passwd. If the 'ChHome' setting is active, then they will be chrooted into their home directory.
 
+
 ACCESS-TOKEN AUTHENTICATION
 
 Alaya supports a special authentication type 'accesstoken'. This is used in m3u playlists generated by directory listings when the 'Media' flag is active. A unique hash is created for each file in the playlist, against the ip-address that the user is coming from. This is done because many media players do not fully support HTTP authentication. Thus the URL in the m3u file includes and 'access token' for that particular client and that particular file. This does mean that other users on the same client host could use a replay attack to get the same file, so this method should never be used with media that is in any way sensitive (so use it for mp3s, don't use it for incrimating or compromising videos of yourself or your friends). 'AccessToken' authentication can be turned off by simply not including it in the list of allowed authentication methods.
+
 
 DIGEST AUTHENTICATION
 
@@ -147,7 +171,26 @@ Furthermore, digest authentication changes how the server and client interact, a
 To set up a user to use Digest Authentication, use:
 
 alaya -user add -e plain bill bills-alaya-password
- 
+
+
+CLIENT CERTIFICATE AUTHENTICATION
+
+Alaya can use client certificates for authentication. 
+
+If 'SSLClientCertificate' is set to 'required' then a client must provide a certificate to connect to the service at all, but this can be any certificate that validates against the certificates in 'SSLVerifyPath', and the client will still have to go through 'normal' authentication. 
+
+If 'SSLClientCertificate' is set to 'sufficient' then if a client provides a certificate that matches against a user entry in the native authentication file, it is logged in without needing any further authentication, otherwise it must go through the normal authentication methods.
+
+If 'SSLClientCertificate' is set to 'required+sufficient' then a client MUST provide a certificate, and if this certificate matches against a user name in the native authentication file, the client is logged in without any further authentication.
+
+The certificate for 'required' authentication can be a certificate that authenticates anything, a hostname, a username, a random string, whatever. The 'required' mode is simply intended as a form of two-factor authentication to be used in combination with normal username/password authentication.
+
+For 'sufficient' mode the certificate must have a username in the 'common name' field (where the hostname would go in server certificates) and this username must be present in the native authentication file.
+
+For 'required+sufficient' mode the rules are the same as for 'sufficient' mode.
+
+Finally, there is a mode called 'ask'. In this mode a certificate will be asked for, but it does not have any effect on authentication UNLESS the 'SSLClientCertificate' option is set in the 'User settings' field of the native authentication file. This allows a certificate to be asked for, but only applied to those users who have the appropriate settings in their authentication file entry.
+
 
 
 DIRECTORY LISTINGS
@@ -318,6 +361,23 @@ HTTPS ENCRYPTION
 HTTPS can be turned on (if compiled in) by using the -key and -cert command-line options to indictate where the SSL key and certificate files can be found.
 
 Some certificates need supporting 'intermediate' or 'chain' certificates. These can be bundled together in one pem format file by simply 'cat'-ing the certificates, in .pem format, into one file and supplying that file to alaya with the -cert command-line option or the SSLCert config-file entry.
+
+The '-ciphers' command-line-argument and the 'SSLCiphers' config file entry can be used to set a list of ciphers that should be used in openssl mode, though the default settings should be a suitable list of ciphers.
+
+
+PERFECT FORWARD SECRECY
+
+This is a complex topic. A better discussion than I can provide is to be found here: http://vincent.bernat.im/en/blog/2011-ssl-perfect-forward-secrecy.html
+
+If the appropriate ciphers are set in SSLCiphers then alaya should support Perfect Forward Secrecy, a mode of SSL in which an ephemeral, short-lived key is created for encryption. Without this feature SSL creates keys from a long-lived server key, allowing recorded communications to be retrospectively read if this server key ever falls into the wrong hands.
+
+Two types of PFS cipher are supported, those based on Eliptic Curves, and those based on Diffie-Helmann key exchange (actually both involve Diffie-Helmann, but whatever). An eliptic curve is a mathematical object that can be used for encryption, but for this system to work both the server and the client must agree to use the same curve. Unfortunately Firefox only supports a choice of three curves, and these three are ones recomended by the U.S. National Institute of Security and Technology, and some people (you know, the tin-hat types who say the government is spying on us) believe they may be 'backdoored' (i.e. contain weaknesses that would allow the government to decrypt communications using them).
+
+An alternative scheme to Eliptic Curves is Diffie Helmann Key Exchange. Unfortunately this has a considerably performance-hit and  requires the pre-generation of a file of random numbers, the 'DHParams' file. This file can be generated with the openssl command-line tool, with the command:
+
+openssl dhparam -out dhparams.pem 1024
+
+The path to the dhparams.pem file should then be provided to alaya with the -dhparams command-line-argument, or with the SSLDHParams config file entry.
 
 
 IPv6
