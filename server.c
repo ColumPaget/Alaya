@@ -3,7 +3,6 @@
 #include "MimeType.h"
 #include "DavProps.h"
 #include "directory_listing.h"
-#include "Settings.h"
 #include "ID3.h"
 #include "upload.h"
 #include "proxy.h"
@@ -1464,6 +1463,8 @@ if (Settings.Flags & FLAG_SSL) ActivateSSL(Session->S,Settings.SSLKeys);
 
 HTTPServerReadHeaders(Session,Session->S);
 Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
+
+ProcessEventTriggers(Session);
 
 LogToFile(Settings.LogPath,"PREAUTH: %s against %s %s\n",Session->UserName,Settings.AuthPath,Settings.AuthMethods);
 if (Settings.AuthFlags & FLAG_AUTH_REQUIRED)

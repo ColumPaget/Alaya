@@ -4,7 +4,7 @@ CFLAGS = @CFLAGS@
 LIBS = @LIBS@
 FLAGS=$(CFLAGS) -fPIC @DEFS@ 
 prefix=@prefix@
-OBJ=memory.o string.o list.o socket.o unix_socket.o file.o tar.o ansi.o FileSystem.o GeneralFunctions.o DataProcessing.o EncryptedFiles.o ConnectManager.o sound.o pty.o Log.o http.o inet.o expect.o base64.o crc32.o md5c.o sha1.o sha2.o Hash.o Compression.o oauth.o libsettings.o Vars.o MathExpr.o Time.o Markup.o SpawnPrograms.o PatternMatch.o ParseURL.o ConnectionChain.o openssl.o
+OBJ=string.o list.o socket.o unix_socket.o file.o tar.o ansi.o FileSystem.o GeneralFunctions.o DataProcessing.o EncryptedFiles.o ConnectManager.o sound.o pty.o Log.o http.o inet.o expect.o base64.o crc32.o md5c.o sha1.o sha2.o Hash.o Compression.o oauth.o libsettings.o Vars.o MathExpr.o Time.o Markup.o SpawnPrograms.o PatternMatch.o ParseURL.o ConnectionChain.o openssl.o
 
 
 all: $(OBJ)
@@ -12,9 +12,6 @@ all: $(OBJ)
 	#ld -i -o libUseful-2.0.a $(OBJ)
 	ar rcs libUseful-2.0.a $(OBJ)
 
-
-memory.o: memory.h memory.c
-	$(CC) $(FLAGS) -c memory.c
 
 string.o: string.h string.c
 	$(CC) $(FLAGS) -c string.c

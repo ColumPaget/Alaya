@@ -45,9 +45,6 @@
 #define LOGIN_CHANGE 8
 #define LOGIN_CHECK_ALLOWED 16
 
-typedef enum {PATHTYPE_EXTFILE, PATHTYPE_CGI, PATHTYPE_STREAM, PATHTYPE_LOGOUT, PATHTYPE_PROXY, PATHTYPE_URL, PATHTYPE_MIMEICONS, PATHTYPE_FILE, PATHTYPE_DIR} TPathTypes; 	
-
-
 #define DIR_REJECT      -1
 #define DIR_SHOWFILES   1
 #define DIR_INDEX_FILES 2
@@ -65,6 +62,10 @@ typedef enum {PATHTYPE_EXTFILE, PATHTYPE_CGI, PATHTYPE_STREAM, PATHTYPE_LOGOUT, 
 #define CAPS_LEVEL_NETBOUND 2
 #define CAPS_LEVEL_CHROOTED 3
 #define CAPS_LEVEL_SESSION  4
+
+typedef enum {PATHTYPE_EXTFILE, PATHTYPE_CGI, PATHTYPE_STREAM, PATHTYPE_LOGOUT, PATHTYPE_PROXY, PATHTYPE_URL, PATHTYPE_MIMEICONS, PATHTYPE_FILE, PATHTYPE_DIR} TPathTypes;
+
+typedef enum {EVENT_METHOD, EVENT_PATH, EVENT_USER, EVENT_PEERIP} TEventTypes; 	
 
 
 typedef struct
@@ -110,6 +111,7 @@ ListNode *SanitizeArgumentsAllowedTags;
 ListNode *CustomHeaders;
 ListNode *HostConnections;
 ListNode *UserAgents;
+ListNode *Events;
 char *LogPath;
 int MaxLogSize;
 } TSettings;
@@ -177,6 +179,9 @@ char *ParentDirectory(char *RetBuff, char *Path);
 char *SessionGetArgument(char *RetBuff, HTTPSession *Session, char *ReqName);
 
 int CopyURL(HTTPSession *Session, char *From, char *To);
+
+
+int ProcessEventTriggers(HTTPSession *Session);
 
 
 void DropCapabilities(int Level);

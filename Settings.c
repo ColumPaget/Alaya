@@ -3,6 +3,69 @@
 #include <grp.h>
 
 
+void PostProcessSettings(TSettings *Settings)
+{
+char *Tempstr=NULL, *Token=NULL, *ptr;
+
+if (StrLen(Settings->DefaultUser)==0) Settings->DefaultUser=CopyStr(Settings->DefaultUser,GetDefaultUser());
+if (StrLen(Settings->CgiUser)==0) Settings->CgiUser=CopyStr(Settings->CgiUser,Settings->DefaultUser);
+
+LogToFile(Settings->LogPath, "Default User: %s %s\n",Settings->DefaultUser,Settings->CgiUser);
+
+Tempstr=CopyStr(Tempstr,"");
+ptr=GetToken(Settings->HttpMethods,",",&Token,0);
+while (ptr)
+{
+if (strcmp(Token,"BASE")==0) Tempstr=CatStr(Tempstr,"GET,POST,HEAD,OPTIONS,");
+else if (strcmp(Token,"DAV")==0) Tempstr=CatStr(Tempstr,"GET,POST,HEAD,OPTIONS,DELETE,MKCOL,MOVE,COPY,PUT,PROPFIND,PROPPATCH,");
+else if (strcmp(Token,"PROXY")==0) Tempstr=CatStr(Tempstr,"CONNECT,RGET,RPOST");
+else Tempstr=MCatStr(Tempstr,Token,",",NULL);
+
+ptr=GetToken(ptr,",",&Token,0);
+}
+
+Settings->HttpMethods=CopyStr(Settings->HttpMethods,Tempstr);
+
+AuthenticateExamineMethods(Settings->AuthMethods);
+
+if (Settings->Port < 1)
+{
+  if (Settings->Flags & FLAG_SSL) Settings->Port=443;
+  else Settings->Port=80;
+}
+
+
+if (Settings->Flags & FLAG_SSL)
+{
+	ptr=LibUsefulGetValue("SSL-Permitted-Ciphers");
+	if (! StrLen(ptr))
+	{
+		LibUsefulSetValue("SSL-Permitted-Ciphers", "DH+AESGCM:DH+AES256:DH+CAMELLIA256:ECDH+AESGCM:ECDH+AES256:ECDH+AES128:DH+AES:EDH-RSA-DES-CBC3-SHA:ECDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:CAMELLIA256:AES128-SHA256:CAMELLIA128:AES128-GCM-SHA256:AES128-SHA256:AES128-SHA:DES-CBC3-SHA:!ADH:!AECDH:!aNULL:!eNULL:!LOW:!EXPORT:!MD5");
+	}
+
+	ptr=LibUsefulGetValue("SSL_VERIFY_CERTFILE");
+	if (! StrLen(ptr)) ptr=LibUsefulGetValue("SSL_VERIFY_CERTDIR");
+
+	if ((Settings->AuthFlags & FLAG_AUTH_CERT_REQUIRED) && (! StrLen(ptr)))
+	{
+		HandleError(ERR_PRINT|ERR_LOG|ERR_EXIT, "ERROR: Client SSL Certificate required, but no certificate verify file/directory given.\nPlease Supply one with the -verify-path command-line-argument, or the SSLVerifyPath config file entry.");
+	}
+
+	ptr=LibUsefulGetValue("SSL-DHParams-File");
+	if (! StrLen(ptr))
+	{
+		HandleError(ERR_PRINT|ERR_LOG, "WARNING: No DH parameters file given for SSL. Perfect Forward Secrecy can only be achieved with Eliptic Curve (ECDH) methods. ECDH depends on fixed values recomended by the U.S. National Institute of Standards and technology (NIST) and thus may not be trustworthy.\n\nCreate a DHParams file with 'openssl dhparam -2 -out dhparams.pem 4096' and give the path to it using the -dhparams command-line-argument or the DHParams config file entry, if you want DiffieHelman key exchange for Perfect Forward Secrecy.");
+
+	}
+}
+
+DestroyString(Tempstr);
+DestroyString(Token);
+}
+
+
+
+
 
 void ParsePathItem(char *Data)
 {
@@ -63,10 +126,31 @@ DestroyString(Token);
 }
 
 
+
+void ParseEventConfig(char *ConfigLine)
+{
+char *EventTypeStrings[]={"Method","Path","User","PeerIP",NULL};
+char *Token=NULL, *ptr;
+ListNode *Node;
+int Type;
+
+if (! Settings.Events) Settings.Events=ListCreate();
+
+ptr=GetToken(ConfigLine,":",&Token,0);
+Type=MatchTokenFromList(Token,EventTypeStrings,0);
+ptr=GetToken(ptr,":",&Token,0);
+
+Node=ListAddNamedItem(Settings.Events,Token,CopyStr(NULL,ptr));
+Node->ItemType=Type;
+
+DestroyString(Token);
+}
+
+
 void ParseConfigItem(char *ConfigLine)
 {
-char *ConfTokens[]={"Chroot","Chshare","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","StreamDir","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","HostConnections","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath",NULL};
-typedef enum {CT_CHROOT, CT_CHSHARE, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_STREAMDIR, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_HOSTCONNECTIONS, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH};
+char *ConfTokens[]={"Chroot","Chshare","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","StreamDir","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","HostConnections","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event",NULL};
+typedef enum {CT_CHROOT, CT_CHSHARE, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_STREAMDIR, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_HOSTCONNECTIONS, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT};
 
 char *Token=NULL, *Value=NULL, *ptr;
 struct group *grent;
@@ -183,7 +267,6 @@ switch(result)
 		}
 	break;
 
-
 	case CT_PATH:
 		ParsePathItem(ptr);
 	break;
@@ -255,6 +338,10 @@ switch(result)
 		if (strcasecmp(ptr,"required")==0) Settings.AuthFlags |= FLAG_AUTH_CERT_REQUIRED;
 		if (strcasecmp(ptr,"sufficient")==0) Settings.AuthFlags |= FLAG_AUTH_CERT_SUFFICIENT;
 		if (strcasecmp(ptr,"required+sufficient")==0) Settings.AuthFlags |= FLAG_AUTH_CERT_REQUIRED | FLAG_AUTH_CERT_SUFFICIENT;
+	break;
+
+	case CT_EVENT:
+		ParseEventConfig(ptr);
 	break;
 }
 
@@ -598,67 +685,6 @@ Settings.LoginEntries=ListCreate();
 //this will be set to 80 or 443 in 'PostProcessSettings'
 Settings.Port=0;
 
-}
-
-
-void PostProcessSettings(TSettings *Settings)
-{
-char *Tempstr=NULL, *Token=NULL, *ptr;
-
-if (StrLen(Settings->DefaultUser)==0) Settings->DefaultUser=CopyStr(Settings->DefaultUser,GetDefaultUser());
-if (StrLen(Settings->CgiUser)==0) Settings->CgiUser=CopyStr(Settings->CgiUser,Settings->DefaultUser);
-
-LogToFile(Settings->LogPath, "Default User: %s %s\n",Settings->DefaultUser,Settings->CgiUser);
-
-Tempstr=CopyStr(Tempstr,"");
-ptr=GetToken(Settings->HttpMethods,",",&Token,0);
-while (ptr)
-{
-if (strcmp(Token,"BASE")==0) Tempstr=CatStr(Tempstr,"GET,POST,HEAD,OPTIONS,");
-else if (strcmp(Token,"DAV")==0) Tempstr=CatStr(Tempstr,"GET,POST,HEAD,OPTIONS,DELETE,MKCOL,MOVE,COPY,PUT,PROPFIND,PROPPATCH,");
-else if (strcmp(Token,"PROXY")==0) Tempstr=CatStr(Tempstr,"CONNECT,RGET,RPOST");
-else Tempstr=MCatStr(Tempstr,Token,",",NULL);
-
-ptr=GetToken(ptr,",",&Token,0);
-}
-
-Settings->HttpMethods=CopyStr(Settings->HttpMethods,Tempstr);
-
-AuthenticateExamineMethods(Settings->AuthMethods);
-
-if (Settings->Port < 1)
-{
-  if (Settings->Flags & FLAG_SSL) Settings->Port=443;
-  else Settings->Port=80;
-}
-
-
-if (Settings->Flags & FLAG_SSL)
-{
-	ptr=LibUsefulGetValue("SSL-Permitted-Ciphers");
-	if (! StrLen(ptr))
-	{
-		LibUsefulSetValue("SSL-Permitted-Ciphers", "DH+AESGCM:DH+AES256:DH+CAMELLIA256:ECDH+AESGCM:ECDH+AES256:ECDH+AES128:DH+AES:EDH-RSA-DES-CBC3-SHA:ECDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:CAMELLIA256:AES128-SHA256:CAMELLIA128:AES128-GCM-SHA256:AES128-SHA256:AES128-SHA:DES-CBC3-SHA:!ADH:!AECDH:!aNULL:!eNULL:!LOW:!EXPORT:!MD5");
-	}
-
-	ptr=LibUsefulGetValue("SSL_VERIFY_CERTFILE");
-	if (! StrLen(ptr)) ptr=LibUsefulGetValue("SSL_VERIFY_CERTDIR");
-
-	if ((Settings->AuthFlags & FLAG_AUTH_CERT_REQUIRED) && (! StrLen(ptr)))
-	{
-		HandleError(ERR_PRINT|ERR_LOG|ERR_EXIT, "ERROR: Client SSL Certificate required, but no certificate verify file/directory given.\nPlease Supply one with the -verify-path command-line-argument, or the SSLVerifyPath config file entry.");
-	}
-
-	ptr=LibUsefulGetValue("SSL-DHParams-File");
-	if (! StrLen(ptr))
-	{
-		HandleError(ERR_PRINT|ERR_LOG, "WARNING: No DH parameters file given for SSL. Perfect Forward Secrecy can only be achieved with Eliptic Curve (ECDH) methods. ECDH depends on fixed values recomended by the U.S. National Institute of Standards and technology (NIST) and thus may not be trustworthy.\n\nCreate a DHParams file with 'openssl dhparam -2 -out dhparams.pem 4096' and give the path to it using the -dhparams command-line-argument or the DHParams config file entry, if you want DiffieHelman key exchange for Perfect Forward Secrecy.");
-
-	}
-}
-
-DestroyString(Tempstr);
-DestroyString(Token);
 }
 
 

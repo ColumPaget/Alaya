@@ -6,7 +6,7 @@
 #include "Authenticate.h"
 
 TSettings Settings;
-char *Version="1.3.0";
+char *Version="1.3.1";
 
 void HandleError(int Flags, const char *FmtStr, ...)
 {
@@ -254,6 +254,73 @@ DestroyString(ToPath);
 
 return(RetVal);
 }
+
+
+int EventTriggerMatch(ListNode *Node, HTTPSession *Session)
+{
+char *Token=NULL, *ptr;
+int result=FALSE;
+
+ptr=GetToken(Node->Tag,",",&Token,0);
+while (ptr)
+{
+	switch (Node->ItemType)
+	{
+			case EVENT_METHOD:
+			if (strcmp(Token,Session->Method) ==0) result=TRUE;
+			break;
+
+			case EVENT_PATH:
+			if (fnmatch(Token,Session->Path,0) ==0) result=TRUE;
+			break;
+	
+			case EVENT_USER:
+			if (fnmatch(Token,Session->UserName,0) ==0) result=TRUE;
+			break;
+	
+			case EVENT_PEERIP:
+			if (fnmatch(Token,Session->ClientIP,0) ==0) result=TRUE;
+			break;
+	}
+	ptr=GetToken(ptr,",",&Token,0);
+}
+
+
+DestroyString(Token);
+
+return(result);
+}
+
+
+
+int ProcessEventTriggers(HTTPSession *Session)
+{
+ListNode *Curr;
+char *Tempstr=NULL, *SafeStr=NULL;
+
+Curr=ListGetNext(Settings.Events);
+while (Curr)
+{
+	if (EventTriggerMatch(Curr, Session))
+	{
+			Tempstr=MCopyStr(Tempstr,Session->Method," ",Session->URL,NULL);
+			SafeStr=QuoteCharsInStr(SafeStr,Tempstr,"'$;");
+			Tempstr=MCopyStr(Tempstr, (char *) Curr->Item, " '", Session->ClientIP,"' '", SafeStr, "' ",NULL);
+			
+			LogToFile(Settings.LogPath, "EVENT TRIGGERED: ClientIP='%s' REQUEST='%s' TriggeredScript='%s'",Session->ClientIP, SafeStr, (char *) Curr->Item);
+
+			if (system(Tempstr) ==-1)
+			{
+				LogToFile(Settings.LogPath, "ERROR: Failed to run event script '%s'. Error was: %s",(char *) Curr->Item, strerror(errno));
+			}
+	}
+	Curr=ListGetNext(Curr);
+}
+
+DestroyString(Tempstr);
+DestroyString(SafeStr);
+}
+
 
 
 

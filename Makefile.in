@@ -4,7 +4,9 @@ CFLAGS = @CFLAGS@
 LIBS = @LIBS@
 INSTALL=@INSTALL@
 prefix=@prefix@
-bindir=$(prefix)@bindir@
+exec_prefix=@exec_prefix@
+bindir=@sbindir@
+sysconfdir=@sysconfdir@
 FLAGS=$(CFLAGS) @DEFS@ 
 OBJ=Authenticate.o MimeType.o DavProps.o Settings.o common.o server.o directory_listing.o ChrootHelper.o ID3.o upload.o proxy.o libUseful-2.0/libUseful-2.0.a
 
@@ -51,3 +53,10 @@ proxy.o: proxy.c proxy.h
 
 clean:
 	rm -f *.o alaya */*.o */*.so */*.a
+
+
+install:
+	$(INSTALL) -d $(DESTDIR)$(bindir)
+	$(INSTALL) -d $(DESTDIR)$(sysconfdir)
+	$(INSTALL) alaya $(DESTDIR)$(bindir)
+	$(INSTALL) alaya.conf $(DESTDIR)$(sysconfdir)

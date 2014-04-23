@@ -1,5 +1,4 @@
 #include "includes.h"
-#include "memory.h"
 
 #ifndef va_copy
 #define va_copy(dest, src) (dest) = (src) 
@@ -88,7 +87,6 @@ int len=0;
 char *ptr=NULL;
 const char *sptr=NULL;
 
-if (! LibUsefulMemFlags & MEMORY_INIT_DONE) MemoryInit();
 
 if (Dest !=NULL) 
 {
@@ -147,7 +145,6 @@ char *CatStr(char *Dest, const char *Src)
 int len;
 char *ptr;
 
-if (! LibUsefulMemFlags & MEMORY_INIT_DONE) MemoryInit();
 if (Dest !=NULL) 
 {
 len=StrLen(Dest);
@@ -296,7 +293,6 @@ return(actb_ptr);
 char *SetStrLen(char *Str,int len)
 {
 /* Note len+1 to allow for terminating NULL */
-if (! LibUsefulMemFlags & MEMORY_INIT_DONE) MemoryInit();
 if (Str==NULL) return((char *) calloc(1,len+1));
 else return( (char *) realloc(Str,len+1));
 }
