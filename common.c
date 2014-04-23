@@ -309,7 +309,7 @@ while (Curr)
 			
 			LogToFile(Settings.LogPath, "EVENT TRIGGERED: ClientIP='%s' REQUEST='%s' TriggeredScript='%s'",Session->ClientIP, SafeStr, (char *) Curr->Item);
 
-			if (system(Tempstr) ==-1)
+			if (Spawn(Tempstr,Settings.DefaultUser,Settings.DefaultGroup,NULL) ==-1)
 			{
 				LogToFile(Settings.LogPath, "ERROR: Failed to run event script '%s'. Error was: %s",(char *) Curr->Item, strerror(errno));
 			}

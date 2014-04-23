@@ -107,6 +107,7 @@ SSLVerifyPath=<path>		Path to file or directory containing Certificate Authority
 SSLClientCertificate=<type>		'required', 'sufficient' or 'required+sufficient' (See 'Client Certificates' below)
 SSLDHParams=<path>		Path to an openssl generated Diffie Helman parameters file.
 Path=<type>,<alias>,<path>	Path to a trusted directory outside of a chroot jail, which is made accessible as a 'virtual' directory under the top-level of the chroot. Currently there are two types of path 'cgi', for cgi programs, and 'files' for a standard directory made available in this way. (See 'VPaths' below)
+Event=<type>:<match string>,<match str>,<match str>...:Script
 LogVerbose			More information in log file
 DefaultUser=<username>	Default user that is used both for running cgi scripts, and for 'native' users that have no specified 'real' user
 DefaultGroup=<groupname>	Default group for webserver
@@ -423,3 +424,16 @@ Alaya supports gzip compression of both internally generated pages (like directo
 
 Compression obviously has a 'cost' on the server-side, so if serving many users on a not-too-powerful machine it might be wise to set compression to either 'no' or 'partial'.
 
+
+
+EVENTS
+
+Alaya supports running scripts when a connection matches in terms of the HTTP method, the file Path asked for, the Client IP, or the username.
+
+The script will be run OUT OF CHROOT and as the DefaultUser and DefaultGroup (either the configured ones, or else alaya will try to find a user like 'nobody' or 'wwwrun').
+
+Some example config-file entries for events:
+
+Event=Path:*/setup.php,*/xmlrpc.php,/vtigercrm/,/cgi-bin/php*,/sql*,/manager/html,/mysql*,/HNAP1/:/usr/local/sbin/BlockHTTPHacker.sh
+Event=Method:PUT:/usr/local/sbin/AlayaFilePut.sh
+Event=User:fred:/usr/local/sbin/Flintstone.sh

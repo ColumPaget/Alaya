@@ -129,7 +129,7 @@ DestroyString(Token);
 
 void ParseEventConfig(char *ConfigLine)
 {
-char *EventTypeStrings[]={"Method","Path","User","PeerIP",NULL};
+char *EventTypeStrings[]={"Method","Path","User","ClientIP",NULL};
 char *Token=NULL, *ptr;
 ListNode *Node;
 int Type;

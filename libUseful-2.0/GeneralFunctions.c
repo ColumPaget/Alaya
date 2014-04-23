@@ -81,26 +81,6 @@ return(len / 2);
 }
 
 
-void SwitchProgram(char *CommandLine)
-{
-char **argv, *ptr;
-char *Token=NULL;
-int i;
-
-argv=(char **) calloc(101,sizeof(char *));
-ptr=CommandLine;
-for (i=0; i < 100; i++)
-{
-ptr=GetToken(ptr,"\\S",&Token,GETTOKEN_QUOTES);
-if (! ptr) break;
-argv[i]=CopyStr(argv[i],Token);
-}
-
-/* we are the child so we continue */
-execv(argv[0],argv);
-//no point trying to free stuff here, we will no longer
-//be the main program
-}
 
 
 #include <pwd.h>
