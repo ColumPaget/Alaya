@@ -47,8 +47,17 @@ else
 
 int ChildFunc(void *Data)
 {
+HTTPSession *Session;
+
 		ParentProcessPipe=STREAMFromDualFD(0,1);
-		HTTPServerHandleConnection((HTTPSession *) Data);
+		Session=(HTTPSession *) Data;
+		STREAMSetFlushType(Session->S,FLUSH_FULL,4096);
+		if (Settings.Flags & FLAG_SSL) ActivateSSL(Session->S,Settings.SSLKeys);
+		HTTPServerHandleConnection(Session);
+
+		STREAMClose(Session->S);
+		HTTPSessionDestroy(Session);
+
 		STREAMClose(ParentProcessPipe);
 		LogFileFlushAll(TRUE);
 		_exit(0);
@@ -77,7 +86,7 @@ int pid;
 
 	//Closes 'fd' too
 	STREAMClose(Session->S);
-	DestroyHTTPSession(Session);
+	HTTPSessionDestroy(Session);
 	DestroyString(Tempstr);
 }
 
@@ -105,71 +114,15 @@ DestroyString(Tempstr);
 }
 
 
-/*
-void WatchConnections(int ListenSock)
+
+void SetGMT()
 {
-fd_set inputs;
-int highfd, result;
-ListNode *Curr, *Next;
-STREAM *S;
+time_t Now;
 
-FD_ZERO(&inputs);
-FD_SET(ListenSock,&inputs);
-highfd=ListenSock;
-
-Curr=ListGetNext(Connections);
-while (Curr)
-{
-	S=(STREAM *) Curr->Item;
-	if (S)
-	{
-		//Check for data left in buffer
-		if (S->InEnd > S->InStart) HandleChildProcessRequest(S);
-		FD_SET(S->in_fd,&inputs);
-		if (S->in_fd > highfd) highfd=S->in_fd;
-	}
-	Curr=ListGetNext(Curr);
+setenv("TZ","GMT",TRUE);
+time(&Now);
+localtime(&Now);
 }
-
-result=select(highfd+1,&inputs,NULL,NULL,NULL);
-if (result > 0)
-{
-	if (FD_ISSET(ListenSock,&inputs)) AcceptConnection(ListenSock);
-
-	Curr=ListGetNext(Connections);
-	while (Curr)
-	{
-		Next=ListGetNext(Curr);
-		S=(STREAM *) Curr->Item;
-		if (S && (! (SS->State & SS_EMBARGOED)) && FD_ISSET(S->in_fd,&inputs))
-		{		
-			result=HandleChildProcessRequest(S);
-			if (! result) 
-			{
-				STREAMClose(S);
-				ListDeleteNode(Curr);
-			}
-		}
-		Curr=Next;
-	}
-}
-else if (result==-1)
-{
-	sleep(2); //so we don't 'spin'	
-}
-
-
-
-}
-*/
-
-void WatchConnections(STREAM *ListenSock)
-{
-
-
-}
-
-
 
 
 main(int argc, char *argv[])
@@ -178,6 +131,9 @@ STREAM *ServiceSock, *S;
 int fd;
 char *Tempstr=NULL;
 int result;
+
+
+SetGMT();
 
 
 //Drop most capabilities

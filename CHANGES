@@ -1,3 +1,5 @@
+1.4.0 Browser caching support. HTTP keep alive support. Fixes for some issues with  largefiles. Fixes for some potential security issues. Mime Icon support. No longer advertises server version in responses.
+
 1.3.0 Client certificate support added. Support for SSL Perfect Forward Secrecy added.
 
 1.2.0 IPv6 support added. Capabilities support added: most capabilities dropped at startup. Linux 'sendfile' system call support added for better performance with plain http.

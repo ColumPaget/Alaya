@@ -55,6 +55,7 @@ char *Tempstr=NULL, *ptr;
 int result, RetVal=FALSE;
 STREAM *FOut=NULL;
 struct stat Stat;
+off_t fsize;
 
 //result=stat(FName,&Stat);
 //if ((result==-1) || (S_ISREG(Stat.st_mode)) ) 
@@ -83,8 +84,8 @@ FOut=STREAMOpenFile(FName,O_CREAT | O_TRUNC | O_WRONLY);
 	}
 
 //If we read to a boundary then there will always be a \r\n on the end of the file, 
-result=STREAMTell(FOut);
-if (result > 0) ftruncate(FOut->out_fd,result-2);
+fsize=(off_t) STREAMTell(FOut);
+if (fsize > 0) ftruncate(FOut->out_fd,fsize-2);
 
 STREAMClose(FOut);
 

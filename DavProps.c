@@ -297,7 +297,7 @@ break;
 
 case PROP_ISCOLLECTION:
 if (FileType==FILE_DIR) RetStr=CatStr(RetStr,"<iscollection>1</iscollection>\n");
-else RetStr=MCatStr(RetStr,"<iscollection>0</iscollection>\n");
+else RetStr=CatStr(RetStr,"<iscollection>0</iscollection>\n");
 break;
 
 

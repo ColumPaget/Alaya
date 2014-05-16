@@ -43,7 +43,7 @@ if (Settings.AuthFlags & FLAG_AUTH_CERT_SUFFICIENT)
   	ptr=STREAMGetValue(Session->S,"SSL-Certificate-CommonName");
 		if (StrLen(ptr) && (strcmp(ptr,UserName)==0))
 		{
-			LogToFile(Settings.LogPath,"SSL-Certificate Authentication sufficient for User %s",UserName);
+			LogToFile(Settings.LogPath,"AUTH: SSL-Certificate Authentication sufficient for User '%s'",UserName);
 			return(TRUE);
 		}
   }
@@ -152,7 +152,7 @@ while (ptr)
 {
 	if (strcmp(Token,UserName)==0)
 	{
-		LogToFile(Settings.LogPath,"UserName '%s' in 'DenyUsers' list. Login Denied",UserName);
+		LogToFile(Settings.LogPath,"AUTH: UserName '%s' in 'DenyUsers' list. Login Denied",UserName);
 		DestroyString(Token);
 		return(FALSE);
 	}
@@ -172,7 +172,7 @@ while (ptr)
 {
 	if (strcmp(Token,UserName)==0)
 	{
-		if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"UserName '%s' Found in 'AllowUsers' list.",UserName);
+		if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"AUTH: UserName '%s' Found in 'AllowUsers' list.",UserName);
 		DestroyString(Token);
 		return(TRUE);
 	}
@@ -207,9 +207,9 @@ if (StrLen(Salt) && (StrLen(ptr)))
 	)
 	{ 
 		result=TRUE; 
-		LogToFile(Settings.LogPath,"Client Authenticated with AccessToken for %s", Session->UserName);
+		LogToFile(Settings.LogPath,"AUTH: Client Authenticated with AccessToken for %s", Session->UserName);
 	}
-	else LogToFile(Settings.LogPath,"AccessToken Failed for %s@%s", Session->UserName,Session->ClientIP);
+	else LogToFile(Settings.LogPath,"AUTH: AccessToken Failed for %s@%s", Session->UserName,Session->ClientIP);
 }
 
 AuthenticationsTried=CatStr(AuthenticationsTried,"accesstoken ");
@@ -284,7 +284,7 @@ if (
 		ptr=crypt(Session->Password,pass_struct->pw_passwd);
 		if (ptr && (strcmp(pass_struct->pw_passwd, ptr)==0) )
 		{
-			if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"UserName '%s' Authenticated via /etc/passwd.",Session->UserName);
+			if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"AUTH: UserName '%s' Authenticated via /etc/passwd.",Session->UserName);
 			Session->RealUser=CopyStr(Session->RealUser,Session->UserName);
 			return(TRUE);
 		}
@@ -349,7 +349,7 @@ AuthenticationsTried=CatStr(AuthenticationsTried,"shadow ");
 
 if (result && (Settings.Flags & FLAG_LOG_VERBOSE)) 
 {
-	LogToFile(Settings.LogPath,"UserName '%s' Authenticated via /etc/shadow.",Session->UserName);
+	LogToFile(Settings.LogPath,"AUTH: UserName '%s' Authenticated via /etc/shadow.",Session->UserName);
 	Session->RealUser=CopyStr(Session->RealUser,Session->UserName);
 }
 
@@ -576,22 +576,16 @@ if (! ProvidedPass) return(FALSE);
 	Tempstr=MCopyStr(Tempstr,Session->UserName,":",Settings.AuthRealm,":",Password,NULL);
 	HashBytes(&Digest1,"md5",Tempstr,StrLen(Tempstr),ENCODE_HEX);
 
-	LogToFile(Settings.LogPath,"DIGEST1: %s",Tempstr);
-
 	//Calc 'HA2'
 
 	Tempstr=MCopyStr(Tempstr,Session->Method,":",URI,NULL);
 	HashBytes(&Digest2,"md5",Tempstr,StrLen(Tempstr),ENCODE_HEX);
-
-	LogToFile(Settings.LogPath,"DIGEST2: %s",Tempstr);
 
 	Tempstr=MCopyStr(Tempstr,Digest1,":",p_AuthDetails,":",Digest2,NULL);
 	Digest1=CopyStr(Digest1,"");
 	HashBytes(&Digest1,"md5",Tempstr,StrLen(Tempstr),ENCODE_HEX);
 		
 	if (strcasecmp(ProvidedPass,Digest1)==0) result=TRUE;
-
-	LogToFile(Settings.LogPath,"DIGEST3: t=%s pp=%s d=%s r=%d",Tempstr,ProvidedPass,Digest1,result);
 
 DestroyString(Tempstr);
 DestroyString(Digest1);
@@ -614,14 +608,12 @@ struct passwd *pass_struct;
 
 
 S=STREAMOpenFile(Settings.AuthPath,O_RDONLY);
-if (! S) 
-{
-return(USER_UNKNOWN);
-}
+if (! S) return(USER_UNKNOWN);
 
 Tempstr=STREAMReadLine(Tempstr,S);
 while (Tempstr)
 {
+
   StripTrailingWhitespace(Tempstr);
 	ptr=GetToken(Tempstr,":",&Name,0);
 	ptr=GetToken(ptr,":",&PasswordType,0);
@@ -663,7 +655,7 @@ if (RetVal==TRUE)
  
 	if (! StrLen(Session->RealUser)) 
 	{
-		LogToFile(Settings.LogPath,"No 'RealUser' set for '%s'. Login Denied",Session->UserName);
+		LogToFile(Settings.LogPath,"AUTH: No 'RealUser' set for '%s'. Login Denied",Session->UserName);
 		RetVal=FALSE;
 	}
 
@@ -674,14 +666,14 @@ if (RetVal==TRUE)
 	
 		if (! StrLen(Session->HomeDir)) 
 		{
-			LogToFile(Settings.LogPath,"No 'HomeDir' set for '%s'. Login Denied",Session->UserName);
+			LogToFile(Settings.LogPath,"AUTH: No 'HomeDir' set for '%s'. Login Denied",Session->UserName);
 			RetVal=FALSE;
 		}
 	}
 }
 
 
-if ((RetVal==TRUE) && (Settings.Flags & FLAG_LOG_VERBOSE)) LogToFile(Settings.LogPath,"UserName '%s' Authenticated via %s.",Session->UserName,Settings.AuthPath);
+if ((RetVal==TRUE) && (Settings.Flags & FLAG_LOG_VERBOSE)) LogToFile(Settings.LogPath,"AUTH: UserName '%s' Authenticated via %s.",Session->UserName,Settings.AuthPath);
 
 AuthenticationsTried=CatStr(AuthenticationsTried,"native ");
 
@@ -770,7 +762,7 @@ AuthenticationsTried=CatStr(AuthenticationsTried,"pam ");
 
 if (result==PAM_SUCCESS)
 {
-	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"UserName '%s' Authenticated via PAM.",Session->UserName);
+	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"AUTH: UserName '%s' Authenticated via PAM.",Session->UserName);
  return(TRUE);
 }
 else return(FALSE);
@@ -788,7 +780,7 @@ struct group *grent;
 AuthenticationsTried=CopyStr(AuthenticationsTried,"");
 if (! CheckUserExists(Session->UserName))
 {
-	LogToFile(Settings.LogPath,"Authentication failed for UserName '%s'. User Unknown. Tried methods: %s ",Session->UserName,AuthenticationsTried);
+	LogToFile(Settings.LogPath,"AUTH: Authentication failed for UserName '%s'. User Unknown. Tried methods: %s ",Session->UserName,AuthenticationsTried);
  return(FALSE);
 }
 
@@ -807,16 +799,15 @@ if (! StrLen(Session->HomeDir)) Session->HomeDir=GetUserHomeDir(Session->HomeDir
 
 if (! CheckServerAllowDenyLists(Session->UserName)) 
 {
-	LogToFile(Settings.LogPath,"Authentication failed for UserName '%s'. User not allowed to log in",Session->UserName);
+	LogToFile(Settings.LogPath,"AUTH: Authentication failed for UserName '%s'. User not allowed to log in",Session->UserName);
 	return(FALSE);
 }
 
 ptr=GetToken(Settings.AuthMethods,",",&Token,0);
 
-LogToFile(Settings.LogPath,"Auth: %s [%s]",Settings.AuthMethods,Session->UserName);
 while (ptr)
 {
-	LogToFile(Settings.LogPath,"Try: %s [%s]",Token,Session->UserName);
+	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"AUTH: Try to authenticate '%s' via '%s'. Remaining authentication types: %s",Session->UserName, Token, ptr);
 	if (strcasecmp(Token,"native")==0) result=AuthNativeFile(Session,FALSE);
 	else if (strcasecmp(Token,"digest")==0) result=AuthNativeFile(Session,TRUE);
 	else if (strcasecmp(Token,"shadow")==0) result=AuthShadowFile(Session);
@@ -830,8 +821,8 @@ while (ptr)
 	ptr=GetToken(ptr,",",&Token,0);
 }
 
-if (result==USER_UNKNOWN) LogToFile(Settings.LogPath,"Authentication failed for UserName '%s'. User Unknown. Tried methods: %s ",Session->UserName,AuthenticationsTried);
-else if (result==FALSE) LogToFile(Settings.LogPath,"Authentication failed for UserName '%s'. Bad Password/Credentials. Tried methods: %s ",Session->UserName,AuthenticationsTried);
+if (result==USER_UNKNOWN) LogToFile(Settings.LogPath,"AUTH: Authentication failed for UserName '%s'. User Unknown. Tried methods: %s ",Session->UserName,AuthenticationsTried);
+else if (result==FALSE) LogToFile(Settings.LogPath,"AUTH: Authentication failed for UserName '%s'. Bad Password/Credentials. Tried methods: %s ",Session->UserName,AuthenticationsTried);
 
 //We no longer care if it was 'user unknown' or 'password wrong'
 if (result !=TRUE) result=FALSE;

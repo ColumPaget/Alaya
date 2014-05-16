@@ -643,15 +643,17 @@ if (read_result==0)
 	}
 	else
 	{
-        if ((read_result == -1) && (errno==EAGAIN)) read_result=STREAM_NODATA;
-        else read_result=STREAM_CLOSED;
-        result=0;
+		if ((read_result == -1) && (errno==EAGAIN)) read_result=STREAM_NODATA;
+		else read_result=STREAM_CLOSED;
+		result=0;
 	}
 }
 
 if (result !=0) read_result=result;
 if (result < 0) result=0;
 read_result=STREAMReadThroughProcessors(S, tmpBuff, result);
+if (read_result==0) read_result=STREAM_NODATA;
+
 //if (result==STREAM_DATA_ERROR) read_result=STREAM_DATA_ERROR;
 
 //We are not returning number of bytes read. We only return something if
@@ -1006,6 +1008,8 @@ while (1)
 		len=STREAMTransferBytesOut(S, RetStr+bytes_read , len);
 		bytes_read+=len;
 		*(RetStr+bytes_read)='\0';
+
+		//Only return if we found the terminator (using memchr, above)
 		if (ptr) return(RetStr);
 	}
 	

@@ -19,7 +19,6 @@
 #define FLAG_CHECK_SCRIPTS 4096
 #define FLAG_LOGOUT_AVAILABLE 8192
 #define FLAG_LOOKUP_CLIENT 16384
-#define FLAG_NOCACHE 65536
 
 
 #define FLAG_AUTH_REQUIRED 1
@@ -50,6 +49,7 @@
 #define DIR_INDEX_FILES 2
 #define DIR_FANCY				4
 #define DIR_INTERACTIVE 8
+#define DIR_MIMEICONS  16
 #define DIR_MEDIA_EXT		4096
 #define DIR_IMAGE_EXT		8192
 #define DIR_UPLOAD			65536
@@ -63,7 +63,7 @@
 #define CAPS_LEVEL_CHROOTED 3
 #define CAPS_LEVEL_SESSION  4
 
-typedef enum {PATHTYPE_EXTFILE, PATHTYPE_CGI, PATHTYPE_STREAM, PATHTYPE_LOGOUT, PATHTYPE_PROXY, PATHTYPE_URL, PATHTYPE_MIMEICONS, PATHTYPE_FILE, PATHTYPE_DIR} TPathTypes;
+typedef enum {PATHTYPE_EXTFILE, PATHTYPE_CGI, PATHTYPE_STREAM, PATHTYPE_LOGOUT, PATHTYPE_PROXY, PATHTYPE_MIMEICONS, PATHTYPE_URL, PATHTYPE_FILE, PATHTYPE_DIR} TPathTypes;
 
 typedef enum {EVENT_METHOD, EVENT_PATH, EVENT_USER, EVENT_PEERIP} TEventTypes; 	
 
@@ -74,7 +74,7 @@ int Type;
 char *URL;
 char *Path;
 char *Name;
-int Size;
+off_t Size;
 time_t Mtime;
 } TPathItem;
 
@@ -103,6 +103,7 @@ char *HttpMethods;
 char *IndexFiles;
 char *M3UFileTypes;
 int DisplayNameLen;
+unsigned long DocumentCacheTime;
 ListNode *SSLKeys;
 ListNode *VPaths;
 ListNode *ScriptHandlers;
@@ -137,6 +138,7 @@ char *UserName;
 char *Password;
 char *AuthDetails;
 char *RemoteAuthenticate; //Used in proxy server mode
+char *AuthenticatedUser;
 char *RealUser;
 int RealUserUID;
 char *Group;
@@ -165,6 +167,13 @@ STREAM *S;
 
 extern TSettings Settings;
 extern char *Version;
+
+
+HTTPSession *HTTPSessionCreate();
+void HTTPSessionClear(void *);
+void HTTPSessionDestroy(void *);
+
+
 
 
 void HandleError(int Flags, const char *FmtStr, ...);

@@ -85,11 +85,15 @@ THTTPChunk *Chunk;
 char *ptr, *vptr;
 
 Chunk=(THTTPChunk *) Mod->Data;
+if (InLen > 0)
+{
 len=Chunk->BuffLen+InLen;
 Chunk->Buffer=SetStrLen(Chunk->Buffer,len);
 memcpy(Chunk->Buffer+Chunk->BuffLen,InBuff,InLen);
 Chunk->BuffLen=len;
 Chunk->Buffer[len]='\0';
+}
+else len=Chunk->BuffLen;
 ptr=Chunk->Buffer;
 
 if (Chunk->ChunkSize==0)
@@ -116,14 +120,15 @@ if (Chunk->ChunkSize==0)
 	  *ptr='\0';
 		ptr++;
 	}
-	else return(EOF);
+	else return(0);
+	
 	Chunk->ChunkSize=strtol(vptr,NULL,16);
-
-
 	Chunk->BuffLen=Chunk->Buffer+len-ptr;
 
 
 	if (Chunk->BuffLen > 0)	memmove(Chunk->Buffer,ptr,Chunk->BuffLen);
+	//in case it went negative in the above calcuation
+	else Chunk->BuffLen=0;
 
 
 	//if we got chunksize of 0 then we're done, return EOF

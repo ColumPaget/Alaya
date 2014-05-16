@@ -69,7 +69,7 @@ DestroyString(Token);
 
 void ParsePathItem(char *Data)
 {
-char *PathTypes[]={"Files","Cgi","Stream","Logout","Proxy",NULL};
+char *PathTypes[]={"Files","Cgi","Stream","Logout","Proxy","MimeIcons",NULL};
 char *Type=NULL, *URL=NULL, *Path=NULL, *Tempstr=NULL, *ptr;
 TPathItem *PI;
 int val;
@@ -119,6 +119,7 @@ while (ptr)
 	if (strcasecmp(Token,"IndexPages")==0) Settings.DirListFlags |= DIR_INDEX_FILES;
 	if (strcasecmp(Token,"ShowVPaths")==0) Settings.DirListFlags |= DIR_SHOW_VPATHS;
 	if (strcasecmp(Token,"TarDownloads")==0) Settings.DirListFlags |= DIR_TARBALLS;
+	if (strcasecmp(Token,"MimeIcons")==0) Settings.DirListFlags |= DIR_MIMEICONS;
 ptr=GetToken(ptr,",",&Token,0);
 }
 
@@ -149,8 +150,8 @@ DestroyString(Token);
 
 void ParseConfigItem(char *ConfigLine)
 {
-char *ConfTokens[]={"Chroot","Chshare","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","StreamDir","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","HostConnections","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event",NULL};
-typedef enum {CT_CHROOT, CT_CHSHARE, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_STREAMDIR, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_HOSTCONNECTIONS, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT};
+char *ConfTokens[]={"Chroot","Chshare","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","StreamDir","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","HostConnections","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime",NULL};
+typedef enum {CT_CHROOT, CT_CHSHARE, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_STREAMDIR, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_HOSTCONNECTIONS, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME};
 
 char *Token=NULL, *Value=NULL, *ptr;
 struct group *grent;
@@ -343,6 +344,10 @@ switch(result)
 	case CT_EVENT:
 		ParseEventConfig(ptr);
 	break;
+
+	case CT_FILE_CACHE_TIME:
+		Settings.DocumentCacheTime=strtol(ptr,NULL,10);
+	break;
 }
 
 DestroyString(Token);
@@ -436,9 +441,10 @@ fprintf(stdout,"\nAlaya Webdav Server: version %s\n",Version);
 fprintf(stdout,"Author: Colum Paget\n");
 fprintf(stdout,"Email: colums.projects@gmail.com\n");
 fprintf(stdout,"Blog: http://idratherhack.blogspot.com \n");
+fprintf(stdout,"Credits: Thanks to Gregor Heuer and Maurice R Volaski for bug reports.\n");
 fprintf(stdout,"\n");
 
-fprintf(stdout,"Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-key <path>] [-cert <path>] [-client-cert <level>] [-verify-path <path>] [-ciphers <cipher list>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>]\n\n");
+fprintf(stdout,"Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-key <path>] [-cert <path>] [-client-cert <level>] [-verify-path <path>] [-ciphers <cipher list>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>]\n\n");
 fprintf(stdout,"	-v:		Verbose logging.\n");
 fprintf(stdout,"	-v -v:		Even more verbose logging.\n");
 fprintf(stdout,"	-a:		Specify the authentication file for 'built in' authentication.\n");
@@ -467,6 +473,7 @@ fprintf(stdout,"	-allowed:		Comma separated list of users allowed to login (defa
 fprintf(stdout,"	-denied:		Comma separated list of users DENIED login\n");
 fprintf(stdout,"	-realm:		Realm for HTTP Authentication\n");
 fprintf(stdout,"	-compress:		Compress documents and responses. This can have three values, 'yes', 'no' or 'partial'. 'Partial' means alaya will compress directory listings and other internally genrated pages, but not file downloads.\n");
+fprintf(stdout,"	-cache:		Takes an argument in seconds which is the max-age recommended for browser caching. Setting this to zero will turn off caching in the browser. Default is 10 secs.\n");
 fprintf(stdout,"\n\nUser Setup for Alaya Authentication\n");
 fprintf(stdout,"	Alaya can use PAM, /etc/shadow or /etc/passwd to authenticate, but has its own password file that offers extra features, or is useful to create users who can only use Alaya. Users in the Alaya password file are mapped to a 'real' user on the system (usually 'guest' or 'nobody'). The Alaya password file can be setup through the alaya commandline.\n\n");
 fprintf(stdout," Add User: alaya -user add [-a <auth path>] [-e <password encryption type>]  [-h <user home directory>] <Username> <Password> <Setting> <Setting> <Setting>\n\n");
@@ -613,6 +620,7 @@ for (i=1; i < argc; i++)
 		Token=MCopyStr(Token,"ScriptHashFile=",argv[++i],NULL);
 		ParseConfigItem(Token);
 	}
+	else if (strcmp(argv[i],"-cache")==0) Settings->DocumentCacheTime=strtol(argv[++i],NULL,10);
 	else if (
 						(strcmp(argv[i],"-version")==0) ||
 						(strcmp(argv[i],"--version")==0) 
@@ -681,6 +689,7 @@ Settings.VPaths=ListCreate();
 Settings.HostConnections=ListCreate();
 Settings.ScriptHandlers=ListCreate();
 Settings.LoginEntries=ListCreate();
+Settings.DocumentCacheTime=10;
 
 //this will be set to 80 or 443 in 'PostProcessSettings'
 Settings.Port=0;

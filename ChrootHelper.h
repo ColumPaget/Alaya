@@ -11,6 +11,7 @@ void AlayaLog(char *Msg);
 
 int HandleChildProcessRequest(STREAM *S);
 
+void VPathMimeIcons(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendData);
 void HTTPServerHandleVPath(STREAM *S,HTTPSession *Session,TPathItem *VPath,int SendData);
 int HTTPServerHandleRegister(HTTPSession *Session, int Flags);
 

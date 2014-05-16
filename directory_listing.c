@@ -217,6 +217,55 @@ return(fcount);
 }
 
 
+char *FormatFileType(char *RetStr, TPathItem *File)
+{
+char *FileType=NULL, *Tempstr=NULL, *URL=NULL, *ptr;
+TFileMagic *FM;
+ListNode *Curr;
+TPathItem *PathItem;
+
+    if (File->Type==PATHTYPE_DIR)
+    {
+      FileType=CopyStr(FileType,"DIR");
+    }
+    else
+    {
+      FM=GetFileTypeInfo(File->Name);
+      if (! FM)
+      {
+        FileType=CopyStr(FileType,"FILE");
+      }
+      else FileType=CopyStr(FileType,FM->ContentType);
+    }
+
+
+
+    if (Settings.DirListFlags & DIR_MIMEICONS)
+    {
+      Curr=ListGetNext(Settings.VPaths);
+      while (Curr)
+      {
+        PathItem=(TPathItem *) Curr->Item;
+        if (PathItem->Type == PATHTYPE_MIMEICONS)
+        {
+					ptr=strrchr(File->Name,'.');
+					if (ptr) ptr++;
+
+					if (File->Type==PATHTYPE_DIR) URL=MCopyStr(URL,PathItem->URL,"?MimeType=inode/directory&FileType=folder&FileExtn=",NULL);
+					else URL=MCopyStr(URL,PathItem->URL,"?MimeType=",FileType,"&FileExtn=",ptr,NULL);
+          Tempstr=MCopyStr(Tempstr,"<img src=\"",URL,"\" alt=\"",FileType,"\">",NULL);
+					FileType=CopyStr(FileType,Tempstr);
+          break;
+        }
+        Curr=ListGetNext(Curr);
+      }
+    }
+
+DestroyString(Tempstr);
+DestroyString(URL);
+
+return(FileType);
+}
 
 
 
@@ -244,20 +293,7 @@ TFileMagic *FM;
 		}
 		else DisplayName=CopyStr(DisplayName,File->Name);
 
-		if (File->Type==PATHTYPE_DIR)
-		{
-			//FM=GetContentTypeInfo("folder");
-			FileType=CopyStr(FileType,"DIR");
-		}
-		else
-		{
-			FM=GetFileTypeInfo(File->Name);
-			if (! FM)	
-			{
-				FileType=CopyStr(FileType,"FILE");
-			}
-			else FileType=CopyStr(FileType,FM->ContentType);
-		}
+		FileType=FormatFileType(FileType, File);
 
 		if (Settings.DirListFlags & DIR_INTERACTIVE) 
 		{
@@ -391,7 +427,6 @@ int FileCount=0, DirCount=0, ByteCount=0;
 
 if (Settings.DirListFlags & DIR_FANCY) 
 {
-Session->Flags |= FLAG_NOCACHE;
 HTML=CatStr(HTML,"<table align=center width=90%% border=0>\r\n");
 
 Tempstr=CopyStr(Tempstr,Session->URL);
@@ -528,7 +563,7 @@ int result;
 
 	Tempstr=MCopyStr(Tempstr,"attachment; filename=",FileName,NULL);
 	SetVar(Response->Headers,"Content-disposition",Tempstr);
-	HTTPServerSendHeaders(S, Response, FLAG_NOCACHE); 
+	HTTPServerSendHeaders(S, Response, HEADERS_KEEPALIVE); 
 
 	TarFiles(S," *");
 	STREAMFlush(S);
@@ -555,7 +590,7 @@ while (ptr)
 	if (access(Tempstr,F_OK)==0) 
 	{
 		Session->Path=CopyStr(Session->Path,Tempstr);
-		HTTPServerSendDocument(S, Session, Tempstr, TRUE);
+		HTTPServerSendDocument(S, Session, Tempstr, HEADERS_SENDFILE | HEADERS_KEEPALIVE);
 		DirSent=TRUE;
 		break;
 	}
@@ -633,7 +668,7 @@ char *IgnoreFields[]={"FileSize","ContentType","CTime-Secs","MTime-Secs", "IsExe
 	if (FType != FILE_DIR)
 	{
 		Tempstr=CopyStr(Tempstr,"");
-		HashFile(&Tempstr,"md5",Path,ENCODE_HEX);
+	//	HashFile(&Tempstr,"md5",Path,ENCODE_HEX);
 		HTML=MCatStr(HTML,"<tr><td>MD5 Sum</td><td>",Tempstr,"</td></tr>",NULL);
 	}
 
@@ -684,7 +719,7 @@ FType=LoadFileProperties(Path, Vars);
 	HTML=CatStr(HTML,"</table>");
 	HTML=CatStr(HTML,"</form></body></html>");
 
-HTTPServerSendResponse(S, Session, "200 OKAY", "text/html",HTML);
+	HTTPServerSendResponse(S, Session, "200 OKAY", "text/html",HTML);
 
 DestroyString(Tempstr);
 DestroyString(HTML);
@@ -739,6 +774,7 @@ int DirSent=FALSE;
 char *Tempstr=NULL, *Path=NULL, *Token=NULL, *ptr;
 int Flags=0, Format, max=0;
 TPathItem **Files;
+
 
 //Maybe we can get out of sending the directory. Check 'IfModifiedSince'
 if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->LastModified <= Session->IfModifiedSince))

@@ -6,7 +6,109 @@
 #include "Authenticate.h"
 
 TSettings Settings;
-char *Version="1.3.1";
+char *Version="1.4.0";
+
+
+
+HTTPSession *HTTPSessionCreate()
+{
+HTTPSession *Session;
+
+Session=(HTTPSession *) calloc(1,sizeof(HTTPSession));
+
+//Must set all these to "" otherwise nulls can cause trouble later
+Session->Protocol=CopyStr(Session->Protocol,"HTTP/1.1");
+Session->ServerName=CopyStr(Session->ServerName,"");
+Session->UserAgent=CopyStr(Session->UserAgent,"");
+Session->UserName=CopyStr(Session->UserName,"");
+Session->ContentType=CopyStr(Session->ContentType,"");
+Session->Host=CopyStr(Session->Host,"");
+Session->Path=CopyStr(Session->Path,"");
+Session->Arguments=CopyStr(Session->Arguments,"");
+Session->ClientHost=CopyStr(Session->ClientHost,"");
+Session->ClientIP=CopyStr(Session->ClientIP,"");
+Session->ClientReferrer=CopyStr(Session->ClientReferrer,"");
+Session->StartDir=CopyStr(Session->StartDir,"");
+Session->Depth=1;
+Session->Headers=ListCreate();
+
+return(Session);
+}
+
+void HTTPSessionDestroy(void *p_Trans)
+{
+HTTPSession *Trans;
+
+if (! p_Trans) return;
+Trans=(HTTPSession *) p_Trans;
+
+DestroyString(Trans->Protocol);
+DestroyString(Trans->Method);
+DestroyString(Trans->ResponseCode);
+DestroyString(Trans->URL);
+DestroyString(Trans->Path);
+DestroyString(Trans->Cipher);
+DestroyString(Trans->Arguments);
+DestroyString(Trans->Destination);
+DestroyString(Trans->ContentType);
+DestroyString(Trans->ContentBoundary);
+DestroyString(Trans->UserName);
+DestroyString(Trans->Password);
+DestroyString(Trans->RealUser);
+DestroyString(Trans->HomeDir);
+DestroyString(Trans->AuthType);
+DestroyString(Trans->Host);
+DestroyString(Trans->ClientIP);
+DestroyString(Trans->ClientHost);
+DestroyString(Trans->ClientReferrer);
+DestroyString(Trans->UserAgent);
+DestroyString(Trans->ServerName);
+DestroyString(Trans->SearchPath);
+DestroyString(Trans->UserSettings);
+DestroyString(Trans->StartDir);
+
+ListDestroy(Trans->Headers,DestroyString);
+free(Trans);
+}
+
+
+void HTTPSessionClear(void *p_Trans)
+{
+HTTPSession *Trans;
+
+if (! p_Trans) return;
+Trans=(HTTPSession *) p_Trans;
+
+Trans->Protocol=CopyStr(Trans->Protocol,"");
+Trans->Method=CopyStr(Trans->Method,"");
+Trans->ResponseCode=CopyStr(Trans->ResponseCode,"");
+Trans->URL=CopyStr(Trans->URL,"");
+Trans->Path=CopyStr(Trans->Path,"");
+Trans->Cipher=CopyStr(Trans->Cipher,"");
+Trans->Arguments=CopyStr(Trans->Arguments,"");
+Trans->Destination=CopyStr(Trans->Destination,"");
+Trans->ContentType=CopyStr(Trans->ContentType,"");
+Trans->ContentBoundary=CopyStr(Trans->ContentBoundary,"");
+Trans->UserName=CopyStr(Trans->UserName,"");
+Trans->Password=CopyStr(Trans->Password,"");
+Trans->RealUser=CopyStr(Trans->RealUser,"");
+Trans->HomeDir=CopyStr(Trans->HomeDir,"");
+Trans->AuthType=CopyStr(Trans->AuthType,"");
+Trans->Host=CopyStr(Trans->Host,"");
+Trans->ClientIP=CopyStr(Trans->ClientIP,"");
+Trans->ClientHost=CopyStr(Trans->ClientHost,"");
+Trans->ClientReferrer=CopyStr(Trans->ClientReferrer,"");
+Trans->UserAgent=CopyStr(Trans->UserAgent,"");
+Trans->ServerName=CopyStr(Trans->ServerName,"");
+Trans->SearchPath=CopyStr(Trans->SearchPath,"");
+Trans->UserSettings=CopyStr(Trans->UserSettings,"");
+Trans->StartDir=CopyStr(Trans->StartDir,"");
+
+ListClear(Trans->Headers,DestroyString);
+}
+
+
+
 
 void HandleError(int Flags, const char *FmtStr, ...)
 {
@@ -400,7 +502,13 @@ if (Level < CAPS_LEVEL_SESSION)
  val |=(1 << CAP_SETGID);
 }
 
-if (Level < CAPS_LEVEL_CHROOTED) val |= (1 << CAP_SYS_CHROOT);
+if (Level < CAPS_LEVEL_CHROOTED) 
+{
+	val |= (1 << CAP_SYS_CHROOT);
+	val |= (1 << CAP_FOWNER);
+	val |= (1 << CAP_DAC_OVERRIDE);
+}
+
 
 if (Level==CAPS_LEVEL_STARTUP) val |= (1 << CAP_NET_BIND_SERVICE);
 

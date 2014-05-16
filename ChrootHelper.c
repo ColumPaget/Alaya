@@ -30,7 +30,7 @@ DestroyString(Tempstr);
 char *CleanStr(char *Buffer, char *Data)
 {
 char *RetStr=NULL;
-char *BadChars=";|";
+char *BadChars=";|`&";
 int len,i;
 
 len=StrLen(Data);
@@ -149,6 +149,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		else if (strcmp(Name,"RemoteAuthenticate")==0) Response->RemoteAuthenticate=CopyStr(Response->RemoteAuthenticate,Value);
 		else if (strcmp(Name,"Cipher")==0) Response->Cipher=CopyStr(Response->Cipher,Value);
 		else if (strcmp(Name,"Cookies")==0) Response->Cookies=CopyStr(Response->Cookies,Value);
+		else if (strcmp(Name,"KeepAlive")==0) Response->Flags |= HTTP_KEEP_ALIVE;
 
 		ptr=GetNameValuePair(ptr," ","=",&Name,&Tempstr);
 	}
@@ -275,7 +276,7 @@ STREAMClose(S);
 if (StrLen(FileHash) && StrLen(Hash) && (strcmp(FileHash,Hash)==0) ) result=TRUE;
 else 
 {
-	LogToFile(Settings.LogPath,"Script failed integrity check: %s",ScriptPath);
+	LogToFile(Settings.LogPath,"ERROR: Not running script '%s'. Script failed integrity check.",ScriptPath);
 	result=FALSE;
 }
 
@@ -329,8 +330,13 @@ HTTPSession *Response;
 			dup(ClientCon->out_fd);
 
 
-			//Switch to Cgi/Default user. ALAYA WILL NOT RUN SCRIPTS AS ROOT!
-			SwitchUser(Settings.CgiUser);
+      //Switch to Cgi/Default user. ALAYA WILL NOT RUN SCRIPTS AS ROOT!
+      if (! SwitchUser(Settings.CgiUser))
+      {
+        LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s using handler '%s'",Settings.CgiUser,ScriptPath,Tempstr);
+        _exit(1);
+      }
+
 			if (geteuid()==0)
 			{
 				HTTPServerSendHTML(ClientCon, NULL, "403 Forbidden","Alaya will not run .cgi programs as 'root'.<br>\r\nTry setting 'Default User' in config file or command line.");
@@ -377,7 +383,7 @@ ClientCon->out_fd=-1;
 
 
 
-DestroyHTTPSession(Response);
+HTTPSessionDestroy(Response);
 DestroyString(ScriptPath);
 DestroyString(Tempstr);
 DestroyString(Name);
@@ -394,25 +400,80 @@ int result;
 
 
 Response=ParseSessionInfo(Data);
-LogToFile(Settings.LogPath,"PSI: [%s] [%s]",Response->Path,Data);
 result=fork();
 if (result==0)
 {
 	Tempstr=FindFileInPath(Tempstr,Response->Path,Response->SearchPath);
-	HTTPServerSendDocument(ClientCon, Response, Tempstr, TRUE);
+	HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 		
 	STREAMFlush(ClientCon);
 	_exit(0);
 }
 
+/*
 //Do this to ensure that connection closes
 //when scripts finishes. All processes having a pipe open
 //must close it for the pipe to be considered closed.
 close(ClientCon->out_fd);
 ClientCon->out_fd=-1;
+*/
 
 DestroyString(Tempstr);
 }
+
+
+
+
+void HandleIconRequest(STREAM *ClientCon, char *Data)
+{
+HTTPSession *Response;
+char *Name=NULL, *Value=NULL, *ptr, *tptr;
+char *Tempstr=NULL;
+ListNode *Vars;
+int result;
+
+Response=ParseSessionInfo(Data);
+Vars=ListCreate();
+ptr=GetNameValuePair(Response->Arguments,"&","=",&Name,&Tempstr);
+while (ptr)
+{
+	Value=HTTPUnQuote(Value,Tempstr);
+	SetVar(Vars,Name,Value);
+	if (strcasecmp(Name,"MimeType")==0)
+	{
+		tptr=GetToken(Value,"/",&Tempstr,0);
+		SetVar(Vars,"MimeClass",Tempstr);
+		SetVar(Vars,"MimeSub",tptr);
+	}
+	ptr=GetNameValuePair(ptr,"&","=",&Name,&Tempstr);
+}
+
+
+result=fork();
+if (result==0)
+{
+	ptr=GetToken(Response->SearchPath,",",&Value,0);
+	while (ptr)
+	{
+		Tempstr=SubstituteVarsInString(Tempstr,Value,Vars,0);
+		if (access(Tempstr,R_OK)==0) break;
+		ptr=GetToken(ptr,",",&Value,0);
+	}
+		
+	HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
+	STREAMClose(ClientCon);
+	_exit(0);
+}
+
+DestroyString(Name);
+DestroyString(Value);
+DestroyString(Tempstr);
+}
+
+
+
+
+
 
 void HandleProxyRequest(STREAM *ClientCon, char *Data)
 {
@@ -506,6 +567,7 @@ DestroyString(Host);
 }
 
 
+
 int HandleChildProcessRequest(STREAM *S)
 {
 char *Tempstr=NULL, *Token=NULL, *ptr;
@@ -524,6 +586,7 @@ if (strcmp(Token,"GETF")==0) HandleGetFileRequest(S,ptr);
 if (strcmp(Token,"GETIP")==0) HandleResolveIPRequest(S,ptr);
 if (strcmp(Token,"REG")==0) HandleChildRegisterRequest(S,ptr);
 if (strcmp(Token,"PROXY")==0) HandleProxyRequest(S,ptr);
+if (strcmp(Token,"MIMEICON")==0) HandleIconRequest(S, ptr);
 
 STREAMFlush(S);
 
@@ -538,7 +601,8 @@ int ChrootProcessRequest(STREAM *S, HTTPSession *Session, char *Type, char *Path
 {
 char *Tempstr=NULL, *PortStr=NULL, *ContentLengthStr=NULL, *ArgumentsStr=NULL, *Referrer=NULL;
 char *ResponseLine=NULL, *Headers=NULL, *ptr;
-int result;
+int result, KeepAlive=FALSE;
+off_t ContentLength=0;
 
 PortStr=FormatStr(PortStr,"%d",Session->ServerPort);
 ContentLengthStr=FormatStr(ContentLengthStr,"%d",Session->ContentSize);
@@ -547,6 +611,7 @@ Referrer=QuoteCharsInStr(Referrer,Session->ClientReferrer,"'");
 
 //Trying to do this all as one string causes a problem!
 Tempstr=MCopyStr(Tempstr,Type," Host='",Session->Host,"' URL='",Session->URL,"' Arguments='",ArgumentsStr, "' ClientIP='",Session->ClientIP,"' StartDir='",Session->StartDir,"'",NULL);
+if (Session->Flags & HTTP_KEEP_ALIVE) Tempstr=CatStr(Tempstr," KeepAlive=Y");
 if (StrLen(Session->UserName)) Tempstr=MCatStr(Tempstr," User='",Session->UserName,"'",NULL);
 if (StrLen(Session->RemoteAuthenticate)) Tempstr=MCatStr(Tempstr," RemoteAuthenticate='",Session->RemoteAuthenticate,"'",NULL);
 Tempstr=MCatStr(Tempstr," ClientReferrer='",Referrer,"' ServerName=",Session->ServerName," ServerPort=",PortStr,NULL);
@@ -556,13 +621,15 @@ if (StrLen(Session->Cookies)) Tempstr=MCatStr(Tempstr," Cookies='",Session->Cook
 Tempstr=CatStr(Tempstr,"\n");
 
 
-LogToFile(Settings.LogPath,"CHROOT: [%s]",Tempstr);
+if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"REQUESTING DATA FROM OUTSIDE CHROOT: [%s]",Tempstr);
 STREAMWriteLine(Tempstr,ParentProcessPipe);
 STREAMFlush(ParentProcessPipe);
 
 
 if ((strcmp(Session->Method,"POST")==0) && StrLen(Session->Arguments))
 {
+	//Wait till process outside of chroot responds to our request, (is ready)
+	//then send it the post data
 	while (STREAMCheckForBytes(ParentProcessPipe)==0) usleep(10000);
 	STREAMWriteLine(Session->Arguments,ParentProcessPipe);	
 	//we shouldn't need this CR-LF, as we've sent 'Content-Length' characters
@@ -590,6 +657,20 @@ while (Tempstr)
 		while (isspace(*ptr) && (*ptr != '\0')) ptr++;
 		ResponseLine=MCopyStr(ResponseLine, Session->Protocol, " ", ptr, NULL);
 	}
+	else if (strncasecmp(Tempstr,"Content-Length:",15)==0)
+	{
+		ptr=Tempstr+15;
+		while (isspace(*ptr)) ptr++;
+		ContentLength=(off_t) strtoull(ptr,NULL,10);
+		Headers=MCatStr(Headers,Tempstr,"\r\n",NULL);
+	}
+	else if (strncasecmp(Tempstr,"Connection:",11)==0)
+	{
+		ptr=Tempstr+11;
+		while (isspace(*ptr)) ptr++;
+		if (strncasecmp(ptr,"Keep-Alive",10)==0) KeepAlive=TRUE;
+		Headers=MCatStr(Headers,Tempstr,"\r\n",NULL);
+	}
 	else Headers=MCatStr(Headers,Tempstr,"\r\n",NULL);
 	Tempstr=STREAMReadLine(Tempstr,ParentProcessPipe);
 }
@@ -604,7 +685,14 @@ if (Settings.Flags & FLAG_VERBOSE) LogToFile(Settings.LogPath,"CGI HEADERS: [%s]
 
 
 //Read remaining data from CGI
-STREAMSendFile(ParentProcessPipe, S, 0);
+STREAMSendFile(ParentProcessPipe, S, ContentLength);
+STREAMFlush(S);
+
+
+//if we're running a cgi program, then it will close the session when done, so
+//turn off the 'reuse session' flag
+if (KeepAlive) Session->Flags |= HTTP_REUSE_SESSION;
+else Session->Flags &= ~(HTTP_KEEP_ALIVE | HTTP_REUSE_SESSION);
 
 
 DestroyString(Tempstr);
@@ -617,12 +705,25 @@ DestroyString(Headers);
 }
 
 
+
 void HTTPServerHandleVPath(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendData)
 {
 char *Tempstr=NULL, *ptr;
-char *LocalPath=NULL, *ExternalPath=NULL, *Path=NULL;
+char *Name=NULL, *Value=NULL;
+char *LocalPath=NULL, *ExternalPath=NULL, *DocName=NULL;
+ListNode *Vars;
 
-Path=CopyStr(Path,Session->Path+StrLen(VPath->URL));
+
+Vars=ListCreate();
+ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
+while (ptr)
+{
+SetVar(Vars,Name,Value);
+ptr=GetNameValuePair(ptr,"&","=",&Name,&Value);
+}
+
+DocName=SubstituteVarsInString(DocName,Session->Path+StrLen(VPath->URL),Vars,0);
+
 ptr=GetToken(VPath->Path,":",&Tempstr,0);
 while (ptr)
 {
@@ -636,23 +737,30 @@ while (ptr)
 }
 
 Tempstr=CopyStr(Tempstr,"");
-if (StrLen(LocalPath)) Tempstr=FindFileInPath(Tempstr,Path,LocalPath);
+if (StrLen(LocalPath)) Tempstr=FindFileInPath(Tempstr,DocName,LocalPath);
 
-if (StrLen(Tempstr)) HTTPServerSendDocument(S, Session, Tempstr, TRUE);
+if (StrLen(Tempstr)) HTTPServerSendDocument(S, Session, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 else if (StrLen(ExternalPath))
 {
-	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,Path,ExternalPath);
-	ChrootProcessRequest(S, Session, "GETF", Path, ExternalPath);
+	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
+	ChrootProcessRequest(S, Session, "GETF", DocName, ExternalPath);
 }
 //This will send '404'
-else HTTPServerSendDocument(S, Session, Path, TRUE);
+else HTTPServerSendDocument(S, Session, DocName, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 
-	DestroyString(Path);
+	DestroyString(Name);
+	DestroyString(Value);
+	DestroyString(DocName);
 	DestroyString(Tempstr);
 	DestroyString(LocalPath);
 	DestroyString(ExternalPath);
 }
 
+void VPathMimeIcons(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendData)
+{
+	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,"",VPath->Path);
+	ChrootProcessRequest(S, Session, "MIMEICON", "", VPath->Path);
+}
 
 
 int HTTPServerHandleRegister(HTTPSession *Session, int Flags)

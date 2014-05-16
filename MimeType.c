@@ -244,7 +244,7 @@ if (stat(FName,&FileStat)==-1) return(FILE_NOSUCH);
 
 
 
-Buffer=FormatStr(Buffer,"%d",FileStat.st_size);
+Buffer=FormatStr(Buffer,"%llu",(unsigned long long) FileStat.st_size);
 SetVar(Vars,"FileSize",Buffer);
 Buffer=FormatStr(Buffer,"%d",FileStat.st_ctime);
 SetVar(Vars,"CTime-Secs",Buffer);

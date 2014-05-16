@@ -89,23 +89,57 @@ return(len / 2);
 int SwitchUser(char *NewUser)
 {
 struct passwd *pwent;
+char *ptr;
 
     pwent=getpwnam(NewUser);
-    if (! pwent) return(FALSE);
-    if (setreuid(pwent->pw_uid,pwent->pw_uid) !=0) return(FALSE);
-    return(TRUE);
+    if (! pwent)
+		{
+			syslog(LOG_ERR,"ERROR: Cannot switch to user '%s'. No such user",NewUser);
+			ptr=LibUsefulGetValue("SwitchUserAllowFail");
+			if (ptr && (strcasecmp(ptr,"yes")==0)) return(FALSE);
+			exit(1);
+		}
+
+
+    if (setreuid(pwent->pw_uid,pwent->pw_uid) !=0) 
+		{
+			syslog(LOG_ERR,"ERROR: Switch to user '%s' failed. Error was: %s",NewUser,strerror(errno));
+			ptr=LibUsefulGetValue("SwitchUserAllowFail");
+			if (ptr && (strcasecmp(ptr,"yes")==0)) return(FALSE);
+			exit(1);
+		}
+
+	return(TRUE);
 }
 
 
 int SwitchGroup(char *NewGroup)
 {
 struct group *grent;
+char *ptr;
  
-     grent=getgrnam(NewGroup);
-     if (! grent) return(FALSE);
-     if (setgid(grent->gr_gid) !=0) return(FALSE);
-     return(TRUE);
+		grent=getgrnam(NewGroup);
+		if (! grent) return(FALSE);
+		{
+			syslog(LOG_ERR,"ERROR: Cannot switch to group '%s'. No such group",NewGroup);
+			ptr=LibUsefulGetValue("SwitchGroupAllowFail");
+			if (ptr && (strcasecmp(ptr,"yes")==0)) return(FALSE);
+			exit(1);
+		}
+
+
+		if (setgid(grent->gr_gid) !=0) 
+		{
+			syslog(LOG_ERR,"ERROR: Switch to group '%s' failed. Error was: %s",NewGroup,strerror(errno));
+			ptr=LibUsefulGetValue("SwitchGroupAllowFail");
+			if (ptr && (strcasecmp(ptr,"yes")==0)) return(FALSE);
+			exit(1);
+		}
+
+	return(TRUE);
 }
+
+
 
 char *GetCurrUserHomeDir()
 {
