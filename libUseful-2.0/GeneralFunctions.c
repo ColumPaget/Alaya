@@ -12,7 +12,7 @@ int result=FALSE, fd;
 if (*ProgName=='/') Tempstr=CopyStr(Tempstr,ProgName);
 else Tempstr=FormatStr(Tempstr,"/var/run/%s.pid",ProgName);
 
-fd=open(Tempstr,O_CREAT | O_TRUNC | O_WRONLY);
+fd=open(Tempstr,O_CREAT | O_TRUNC | O_WRONLY,0600);
 if (fd > -1)
 {
   fchmod(fd,0644);
