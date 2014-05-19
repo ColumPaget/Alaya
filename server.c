@@ -177,9 +177,6 @@ if (! Tempstr) return(FALSE);
 
 HTTPSessionClear(Heads);
 
-//Clear everything but HTTP_REUSE_SESSION, HTTP_AUTHENTICATED and HTTP_SSL, which are persistent
-Heads->Flags &= (HTTP_REUSE_SESSION | HTTP_AUTHENTICATED | HTTP_SSL);
-
 GetSockDetails(S->in_fd,&Heads->ServerName,&Heads->ServerPort,&Heads->ClientIP,&val);
 if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrLen(Heads->ClientIP)) Heads->ClientHost=CopyStr(Heads->ClientHost,IPStrToHostName(Heads->ClientIP));
 

@@ -79,30 +79,37 @@ HTTPSession *Trans;
 if (! p_Trans) return;
 Trans=(HTTPSession *) p_Trans;
 
+//Clear everything but HTTP_REUSE_SESSION, HTTP_AUTHENTICATED and HTTP_SSL, which are persistent
+Trans->Flags &= (HTTP_REUSE_SESSION | HTTP_AUTHENTICATED | HTTP_SSL);
+
 Trans->Protocol=CopyStr(Trans->Protocol,"");
 Trans->Method=CopyStr(Trans->Method,"");
 Trans->ResponseCode=CopyStr(Trans->ResponseCode,"");
 Trans->URL=CopyStr(Trans->URL,"");
 Trans->Path=CopyStr(Trans->Path,"");
-Trans->Cipher=CopyStr(Trans->Cipher,"");
 Trans->Arguments=CopyStr(Trans->Arguments,"");
 Trans->Destination=CopyStr(Trans->Destination,"");
 Trans->ContentType=CopyStr(Trans->ContentType,"");
 Trans->ContentBoundary=CopyStr(Trans->ContentBoundary,"");
 Trans->UserName=CopyStr(Trans->UserName,"");
 Trans->Password=CopyStr(Trans->Password,"");
-Trans->RealUser=CopyStr(Trans->RealUser,"");
-Trans->HomeDir=CopyStr(Trans->HomeDir,"");
 Trans->AuthType=CopyStr(Trans->AuthType,"");
 Trans->Host=CopyStr(Trans->Host,"");
-Trans->ClientIP=CopyStr(Trans->ClientIP,"");
-Trans->ClientHost=CopyStr(Trans->ClientHost,"");
 Trans->ClientReferrer=CopyStr(Trans->ClientReferrer,"");
 Trans->UserAgent=CopyStr(Trans->UserAgent,"");
-Trans->ServerName=CopyStr(Trans->ServerName,"");
 Trans->SearchPath=CopyStr(Trans->SearchPath,"");
-Trans->UserSettings=CopyStr(Trans->UserSettings,"");
-Trans->StartDir=CopyStr(Trans->StartDir,"");
+
+//Do not clear these values, as 'SessionClear' is only called on persistent
+//'HTTP Keep-Alive' sessions
+//Trans->Cipher=CopyStr(Trans->Cipher,"");
+//Trans->ClientIP=CopyStr(Trans->ClientIP,"");
+//Trans->ClientHost=CopyStr(Trans->ClientHost,"");
+//Trans->StartDir=CopyStr(Trans->StartDir,"");
+//Trans->HomeDir=CopyStr(Trans->HomeDir,"");
+//Trans->RealUser=CopyStr(Trans->RealUser,"");
+//Trans->UserSettings=CopyStr(Trans->UserSettings,"");
+//Trans->ServerName=CopyStr(Trans->ServerName,"");
+
 
 ListClear(Trans->Headers,DestroyString);
 }
