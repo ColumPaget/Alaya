@@ -480,7 +480,9 @@ if (! (Flags & HEADERS_CGI))
 	HTTPServerSendHeader(S, "DAV", "1");
 	if (StrLen(Session->ContentType)) HTTPServerSendHeader(S,"Content-Type",Session->ContentType);
 	else HTTPServerSendHeader(S,"Content-Type","octet/stream");
-	if (Session->ContentSize > 0)
+
+
+	if ((Session->Flags & HTTP_REUSE_SESSION) || (Session->ContentSize > 0))
 	{
 		Tempstr=FormatStr(Tempstr,"%d",Session->ContentSize);
 		HTTPServerSendHeader(S,"Content-Length",Tempstr);
@@ -521,11 +523,7 @@ if (Session)
 }
 
 Response->ResponseCode=CopyStr(Response->ResponseCode,ResponseLine);
-if (ResponseCode==302)
-{
- SetVar(Response->Headers,"Location",Body);
- SetVar(Response->Headers,"Content-Length","0");
-}
+if (ResponseCode==302) SetVar(Response->Headers,"Location",Body);
 else Response->ContentSize=StrLen(Body);
 Response->ContentType=CopyStr(Response->ContentType,ContentType);
 
