@@ -177,8 +177,8 @@ if (! Tempstr) return(FALSE);
 
 HTTPSessionClear(Heads);
 
-//Clear everything but HTTP_REUSE_SESSION
-Heads->Flags &= (HTTP_REUSE_SESSION | HTTP_AUTHENTICATED);
+//Clear everything but HTTP_REUSE_SESSION, HTTP_AUTHENTICATED and HTTP_SSL, which are persistent
+Heads->Flags &= (HTTP_REUSE_SESSION | HTTP_AUTHENTICATED | HTTP_SSL);
 
 GetSockDetails(S->in_fd,&Heads->ServerName,&Heads->ServerPort,&Heads->ClientIP,&val);
 if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrLen(Heads->ClientIP)) Heads->ClientHost=CopyStr(Heads->ClientHost,IPStrToHostName(Heads->ClientIP));
@@ -1298,7 +1298,14 @@ char *Name=NULL, *Value=NULL, *ptr;
 int HTTPServerAuthenticate(HTTPSession *Session)
 {
 	int result=FALSE;
-	
+
+	//This handles someone clicking a 'logout' button
+	if (! HTTPServerHandleRegister(Session, LOGIN_CHECK_ALLOWED))
+	{
+		LogToFile(Settings.LogPath,"AUTH: LOGIN NOT ALLOWED: [%s]",Session->ClientIP);
+		return(FALSE);
+	}
+
 	if (Session->Flags & HTTP_AUTHENTICATED) 
 	{
 		if (strcmp(Session->UserName,Session->AuthenticatedUser)==0) 
@@ -1309,12 +1316,7 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 		else LogToFile(Settings.LogPath,"ERROR: Session Keep-Alive active, but user has changed.  '%s' != '%s'. Not resuing authentication",Session->UserName,Session->AuthenticatedUser);
 	}
 
-	//This handles someone clicking a 'logout' button
-	if (! HTTPServerHandleRegister(Session, LOGIN_CHECK_ALLOWED))
-	{
-		LogToFile(Settings.LogPath,"AUTH: LOGIN NOT ALLOWED: [%s]",Session->ClientIP);
-		return(FALSE);
-	}
+
 
 	//Consider AccessToken Authentication for this URL!
 	if (Session->AuthFlags & FLAG_AUTH_ACCESS_TOKEN) ParseAccessToken(Session);
@@ -1600,7 +1602,7 @@ switch (Session->MethodID)
 }
 }
 
-LogToFile(Settings.LogPath,"TRANSACTION COMPLETE: %s %s for %s@%s (%s) Reuse=%d",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP,Session->Flags & HTTP_REUSE_SESSION);
+LogToFile(Settings.LogPath,"TRANSACTION COMPLETE: %s %s for %s@%s (%s)",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP);
 
 STREAMFlush(Session->S);
 if (! (Session->Flags & HTTP_REUSE_SESSION)) break;
