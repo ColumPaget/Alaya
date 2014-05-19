@@ -82,7 +82,6 @@ Trans=(HTTPSession *) p_Trans;
 //Clear everything but HTTP_REUSE_SESSION, HTTP_AUTHENTICATED and HTTP_SSL, which are persistent
 Trans->Flags &= (HTTP_REUSE_SESSION | HTTP_AUTHENTICATED | HTTP_SSL);
 
-Trans->Protocol=CopyStr(Trans->Protocol,"");
 Trans->Method=CopyStr(Trans->Method,"");
 Trans->ResponseCode=CopyStr(Trans->ResponseCode,"");
 Trans->URL=CopyStr(Trans->URL,"");
@@ -101,6 +100,7 @@ Trans->SearchPath=CopyStr(Trans->SearchPath,"");
 
 //Do not clear these values, as 'SessionClear' is only called on persistent
 //'HTTP Keep-Alive' sessions
+//Trans->Protocol=CopyStr(Trans->Protocol,"");
 //Trans->Cipher=CopyStr(Trans->Cipher,"");
 //Trans->ClientIP=CopyStr(Trans->ClientIP,"");
 //Trans->ClientHost=CopyStr(Trans->ClientHost,"");

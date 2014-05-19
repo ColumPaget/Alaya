@@ -176,6 +176,7 @@ Tempstr=STREAMReadLine(Tempstr,S);
 if (! Tempstr) return(FALSE);
 
 HTTPSessionClear(Heads);
+StripTrailingWhitespace(Tempstr);
 
 GetSockDetails(S->in_fd,&Heads->ServerName,&Heads->ServerPort,&Heads->ClientIP,&val);
 if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrLen(Heads->ClientIP)) Heads->ClientHost=CopyStr(Heads->ClientHost,IPStrToHostName(Heads->ClientIP));
@@ -198,10 +199,17 @@ if (Settings.Flags & FLAG_SSL)
 	}
 }
 
+//Read Method (GET, POST, etc)
 ptr=GetToken(Tempstr,"\\S",&Heads->Method,0);
 Heads->MethodID=MatchTokenFromList(Heads->Method,HTTPMethods,0);
 
+//Read URL
 ptr=GetToken(ptr,"\\S",&Token,0);
+
+//Read Protocol (HTTP1.0, HTTP1.1, etc)
+ptr=GetToken(ptr,"\\S",&Heads->Protocol,0);
+if (! StrLen(Heads->Protocol)) Heads->Protocol=CopyStr(Heads->Protocol,"HTTP/1.0");
+
 tmp_ptr=Token;
 
 //Clip out arguments from URL
@@ -1491,11 +1499,11 @@ char *Tempstr=NULL, *Method=NULL, *URL=NULL, *ptr;
 int val, AuthOkay=TRUE, result;
 int NoOfConnections;
 
+Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 
 while (1)
 {
 if (! HTTPServerReadHeaders(Session,Session->S)) break;
-Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 
 ProcessEventTriggers(Session);
 
