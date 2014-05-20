@@ -333,7 +333,7 @@ while (StrLen(Tempstr) )
 	break;
 
 	case HEAD_CONNECTION:
-		if (strcasecmp(ptr,"Keep-Alive")==0) Heads->Flags |= HTTP_KEEP_ALIVE;
+		if ((Settings.Flags & FLAG_KEEP_ALIVES) && (strcasecmp(ptr,"Keep-Alive")==0)) Heads->Flags |= HTTP_KEEP_ALIVE;
 	break;
 
 	case HEAD_AGENT:
@@ -343,6 +343,7 @@ while (StrLen(Tempstr) )
 		{
 		if (fnmatch(Curr->Tag,Heads->UserAgent,0)==0) 
 		{
+			if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"Applying User Agent Settings: %s",Curr->Item);
 			ParseConfigItemList((char *) Curr->Item);
 		}
 		Curr=ListGetNext(Curr);
@@ -1499,6 +1500,7 @@ char *Tempstr=NULL, *Method=NULL, *URL=NULL, *ptr;
 int val, AuthOkay=TRUE, result;
 int NoOfConnections;
 
+STREAMSetTimeout(Session->S,5);
 Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 
 while (1)
@@ -1606,6 +1608,7 @@ switch (Session->MethodID)
 }
 
 LogToFile(Settings.LogPath,"TRANSACTION COMPLETE: %s %s for %s@%s (%s)",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP);
+LogFileFlushAll(TRUE);
 
 STREAMFlush(Session->S);
 if (! (Session->Flags & HTTP_REUSE_SESSION)) break;

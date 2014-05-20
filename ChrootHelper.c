@@ -290,7 +290,7 @@ return(result);
 
 
 
-void HandleExecRequest(STREAM *ClientCon, char *Data)
+int HandleExecRequest(STREAM *ClientCon, char *Data)
 {
 char *Tempstr=NULL, *Name=NULL, *Value=NULL, *ptr, *ptr2;
 char *ScriptPath=NULL;
@@ -375,19 +375,15 @@ HTTPSession *Response;
 }
 
 
-//Do this to ensure that connection closes
-//when scripts finishes. All processes having a pipe open
-//must close it for the pipe to be considered closed.
-close(ClientCon->out_fd);
-ClientCon->out_fd=-1;
-
-
-
 HTTPSessionDestroy(Response);
 DestroyString(ScriptPath);
 DestroyString(Tempstr);
 DestroyString(Name);
 DestroyString(Value);
+
+
+//Always return false, so that pipe gets closed
+return(FALSE);
 }
 
 
@@ -409,14 +405,6 @@ if (result==0)
 	STREAMFlush(ClientCon);
 	_exit(0);
 }
-
-/*
-//Do this to ensure that connection closes
-//when scripts finishes. All processes having a pipe open
-//must close it for the pipe to be considered closed.
-close(ClientCon->out_fd);
-ClientCon->out_fd=-1;
-*/
 
 DestroyString(Tempstr);
 }
@@ -475,7 +463,7 @@ DestroyString(Tempstr);
 
 
 
-void HandleProxyRequest(STREAM *ClientCon, char *Data)
+int HandleProxyRequest(STREAM *ClientCon, char *Data)
 {
 HTTPSession *Response;
 char *Tempstr=NULL;
@@ -493,13 +481,9 @@ if (result==0)
 	_exit(0);
 }
 
-//Do this to ensure that connection closes
-//when scripts finishes. All processes having a pipe open
-//must close it for the pipe to be considered closed.
-close(ClientCon->out_fd);
-ClientCon->out_fd=-1;
-
 DestroyString(Tempstr);
+
+return(FALSE);
 }
 
 
@@ -571,7 +555,7 @@ DestroyString(Host);
 int HandleChildProcessRequest(STREAM *S)
 {
 char *Tempstr=NULL, *Token=NULL, *ptr;
-int val;
+int result=TRUE;
 
 Tempstr=STREAMReadLine(Tempstr,S);
 
@@ -580,7 +564,7 @@ if (! Tempstr) return(FALSE);
 
 StripTrailingWhitespace(Tempstr);
 ptr=GetToken(Tempstr,"\\S",&Token,0);
-if (strcmp(Token,"EXEC")==0) HandleExecRequest(S,ptr);
+if (strcmp(Token,"EXEC")==0) result=HandleExecRequest(S,ptr);
 if (strcmp(Token,"LOG")==0) LogToFile(Settings.LogPath,ptr);
 if (strcmp(Token,"GETF")==0) HandleGetFileRequest(S,ptr);
 if (strcmp(Token,"GETIP")==0) HandleResolveIPRequest(S,ptr);
@@ -593,7 +577,7 @@ STREAMFlush(S);
 DestroyString(Tempstr);
 DestroyString(Token);
 
-return(TRUE);
+return(result);
 }
 
 

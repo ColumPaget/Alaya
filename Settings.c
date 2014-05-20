@@ -3,6 +3,17 @@
 #include <grp.h>
 
 
+int YesNoTrueFalse(char *String)
+{
+	if (! StrLen(String)) return(TRUE);
+	if (strcasecmp(String,"true")==0) return(TRUE);
+	if (strcasecmp(String,"yes")==0) return(TRUE);
+	if (strcasecmp(String,"y")==0) return(TRUE);
+
+	return(FALSE);
+}
+
+
 void PostProcessSettings(TSettings *Settings)
 {
 char *Tempstr=NULL, *Token=NULL, *ptr;
@@ -150,10 +161,10 @@ DestroyString(Token);
 
 void ParseConfigItem(char *ConfigLine)
 {
-char *ConfTokens[]={"Chroot","Chshare","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","StreamDir","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","HostConnections","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime",NULL};
-typedef enum {CT_CHROOT, CT_CHSHARE, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_STREAMDIR, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_HOSTCONNECTIONS, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME};
+char *ConfTokens[]={"Chroot","Chshare","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","StreamDir","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","HostConnections","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive",NULL};
+typedef enum {CT_CHROOT, CT_CHSHARE, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_STREAMDIR, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_HOSTCONNECTIONS, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_HTTP_KEEP_ALIVE};
 
-char *Token=NULL, *Value=NULL, *ptr;
+char *Token=NULL, *ptr;
 struct group *grent;
 struct stat Stat;
 int result;
@@ -164,9 +175,6 @@ ptr=GetToken(ConfigLine,"=|:",&Token,GETTOKEN_MULTI_SEPARATORS);
 StripLeadingWhitespace(Token);
 StripTrailingWhitespace(Token);
 result=MatchTokenFromList(Token,ConfTokens,0);
-
-//StripLeadingWhitespace(Value);
-//StripTrailingWhitespace(Value);
 
 switch(result)
 {
@@ -255,12 +263,12 @@ switch(result)
 	break;
 
 	case CT_COMPRESSION:
-		if (strcasecmp(ptr,"no")==0) Settings.Flags &= ~(FLAG_COMPRESS | FLAG_PARTIAL_COMPRESS);
-		else if (strcasecmp(ptr,"partial")==0) 
+		if (strcasecmp(ptr,"partial")==0) 
 		{
 			Settings.Flags &= ~FLAG_COMPRESS;
 			Settings.Flags |= FLAG_PARTIAL_COMPRESS;
 		}
+		else if (! YesNoTrueFalse(ptr)) Settings.Flags &= ~(FLAG_COMPRESS | FLAG_PARTIAL_COMPRESS);
 		else
 		{
 			Settings.Flags &= ~FLAG_PARTIAL_COMPRESS;
@@ -281,7 +289,8 @@ switch(result)
 	break;
 
 	case CT_LOG_VERBOSE:
-		Settings.Flags |= FLAG_LOG_VERBOSE;
+		if (YesNoTrueFalse(ptr)) Settings.Flags |= FLAG_LOG_VERBOSE;
+		else Settings.Flags &= ~FLAG_LOG_VERBOSE;
 	break;
 
 	case CT_MAXLOGSIZE:
@@ -316,7 +325,8 @@ switch(result)
 	break;
 
 	case CT_LOOKUPCLIENT:
-		Settings.Flags |= FLAG_LOOKUP_CLIENT;
+		if (YesNoTrueFalse(ptr)) Settings.Flags |= FLAG_LOOKUP_CLIENT;
+		else Settings.Flags &= ~FLAG_LOOKUP_CLIENT;
 	break;
 
 	case CT_USERAGENTSETTINGS:
@@ -348,10 +358,14 @@ switch(result)
 	case CT_FILE_CACHE_TIME:
 		Settings.DocumentCacheTime=strtol(ptr,NULL,10);
 	break;
+
+	case CT_HTTP_KEEP_ALIVE:
+		if (YesNoTrueFalse(ptr)) Settings.Flags |= FLAG_KEEP_ALIVES;
+		else Settings.Flags &= ~FLAG_KEEP_ALIVES;
+	break;
 }
 
 DestroyString(Token);
-//DestroyString(Value);
 }
 
 

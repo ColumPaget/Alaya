@@ -126,7 +126,7 @@ LookupClientName 	 If present then lookup client hostnames with DNS and use in l
 SanitizeAllowTags=<tag list>		List of HTML tags allowed to be used in 'POST' to cgi-scripts. If left blank, then all are allowed, if set, then all but the listed html elements will be stripped 
 UserAgentSettings=UserAgentString,Settings		Settings to be applied when a particular user agent string is seen.
 FileCacheTime=<seconds>		Amount of time to recommend the browser	caches documents for.
-
+HttpKeepAlives=<yes|no>		Use http keep-alive
 
 AUTHENTICATION
 
