@@ -6,7 +6,7 @@
 #include "Authenticate.h"
 
 TSettings Settings;
-char *Version="1.4.0";
+char *Version="1.4.1";
 
 
 

@@ -455,7 +455,7 @@ fprintf(stdout,"\nAlaya Webdav Server: version %s\n",Version);
 fprintf(stdout,"Author: Colum Paget\n");
 fprintf(stdout,"Email: colums.projects@gmail.com\n");
 fprintf(stdout,"Blog: http://idratherhack.blogspot.com \n");
-fprintf(stdout,"Credits: Thanks to Gregor Heuer and Maurice R Volaski for bug reports.\n");
+fprintf(stdout,"Credits: Thanks to Gregor Heuer, Helmut Schmid, and Maurice R Volaski for bug reports.\n");
 fprintf(stdout,"\n");
 
 fprintf(stdout,"Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-key <path>] [-cert <path>] [-client-cert <level>] [-verify-path <path>] [-ciphers <cipher list>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>]\n\n");

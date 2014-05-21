@@ -8,7 +8,7 @@ OBJ=string.o list.o socket.o unix_socket.o file.o tar.o ansi.o FileSystem.o Gene
 
 
 all: $(OBJ)
-	$(CC) $(FLAGS) $(LIBS) -shared -o libUseful-2.0.so $(OBJ)
+	$(CC) $(FLAGS) -shared -o libUseful-2.0.so $(OBJ) $(LIBS) 
 	#ld -i -o libUseful-2.0.a $(OBJ)
 	ar rcs libUseful-2.0.a $(OBJ)
 
