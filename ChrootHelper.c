@@ -569,7 +569,7 @@ if (strcmp(Token,"LOG")==0) LogToFile(Settings.LogPath,ptr);
 if (strcmp(Token,"GETF")==0) HandleGetFileRequest(S,ptr);
 if (strcmp(Token,"GETIP")==0) HandleResolveIPRequest(S,ptr);
 if (strcmp(Token,"REG")==0) HandleChildRegisterRequest(S,ptr);
-if (strcmp(Token,"PROXY")==0) HandleProxyRequest(S,ptr);
+if (strcmp(Token,"PROXY")==0) result=HandleProxyRequest(S,ptr);
 if (strcmp(Token,"MIMEICON")==0) HandleIconRequest(S, ptr);
 
 STREAMFlush(S);
