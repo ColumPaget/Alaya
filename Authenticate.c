@@ -473,14 +473,18 @@ if (S)
 	else
 	{
 		//WriteNew Entry
-		if (strcmp(PassType,"plain")==0) Token=CopyStr(Token,Pass);
+		if (strcmp(PassType,"plain")==0)
+		{
+			Token=CopyStr(Token,Pass);
+			Tempstr=MCopyStr(Tempstr,Name,":",PassType,":",Token,":",RealUser,":",HomeDir,":",Args,"\n",NULL);
+		}
 		else
 		{
 			Salt=GenerateSalt(Salt,16);
 			Tempstr=MCopyStr(Tempstr,Name,":",Pass,":",Salt,NULL);
 			HashBytes(&Token, PassType, Tempstr, StrLen(Tempstr), ENCODE_BASE64);
+			Tempstr=MCopyStr(Tempstr,Name,":",PassType,":",Salt,"$",Token,":",RealUser,":",HomeDir,":",Args,"\n",NULL);
 		}
-		Tempstr=MCopyStr(Tempstr,Name,":",PassType,":",Salt,"$",Token,":",RealUser,":",HomeDir,":",Args,"\n",NULL);
 	
 		STREAMWriteLine(Tempstr,S);
 
