@@ -119,7 +119,7 @@ struct group *grent;
 char *ptr;
  
 		grent=getgrnam(NewGroup);
-		if (! grent) return(FALSE);
+		if (! grent) 
 		{
 			syslog(LOG_ERR,"ERROR: Cannot switch to group '%s'. No such group",NewGroup);
 			ptr=LibUsefulGetValue("SwitchGroupAllowFail");
