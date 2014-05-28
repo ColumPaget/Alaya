@@ -7,7 +7,7 @@ exec_prefix=@exec_prefix@
 bindir=@sbindir@
 sysconfdir=@sysconfdir@
 FLAGS=$(CFLAGS) @DEFS@ 
-OBJ=Authenticate.o MimeType.o DavProps.o Settings.o common.o server.o directory_listing.o ChrootHelper.o ID3.o upload.o proxy.o libUseful-2.0/libUseful-2.0.a
+OBJ=Authenticate.o MimeType.o DavProps.o Settings.o common.o server.o FileProperties.o directory_listing.o FileDetailsPage.o ChrootHelper.o ID3.o upload.o proxy.o libUseful-2.0/libUseful-2.0.a
 
 all: $(OBJ)
 	@cd libUseful-2.0; $(MAKE)
@@ -39,6 +39,12 @@ server.o: server.c server.h
 
 directory_listing.o: directory_listing.c directory_listing.h
 	gcc $(FLAGS) -c directory_listing.c 
+
+FileDetailsPage.o: FileDetailsPage.c FileDetailsPage.h
+	gcc $(FLAGS) -c FileDetailsPage.c 
+
+FileProperties.o: FileProperties.c FileProperties.h
+	gcc $(FLAGS) -c FileProperties.c 
 
 ID3.o: ID3.c ID3.h
 	gcc $(FLAGS) -c ID3.c 

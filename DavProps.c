@@ -7,111 +7,6 @@ char *Props[]={"creationdate","displayname","getcontentlanguage","getcontentleng
 typedef enum {PROP_CREATE_DATE,PROP_DISPLAY_NAME,PROP_CONTENT_LANG, PROP_CONTENT_SIZE, PROP_CONTENT_TYPE,PROP_ETAG,PROP_LASTMODIFIED,PROP_LOCK_CHECK,PROP_RESOURCE_TYPE,PROP_SOURCE,PROP_SUPPORTEDLOCK, PROP_ISCOLLECTION,PROP_ISHIDDEN, PROP_ISREADONLY, PROP_EXECUTABLE};
 
 
-void LoadDirPropsFile(char *Dir, char *RequestedFile, ListNode *Props)
-{
-char *Tempstr=NULL, *Token=NULL, *FName=NULL, *ptr;
-STREAM *S;
-
-Tempstr=MCopyStr(Tempstr,Dir,"/.props",NULL);
-
-S=STREAMOpenFile(Tempstr,O_CREAT | O_RDWR);
-if (S)
-{
-	Tempstr=STREAMReadLine(Tempstr,S);
-	while (Tempstr)
-	{
-		StripTrailingWhitespace(Tempstr);
-		if (StrLen(Tempstr))
-		{
-			ptr=GetToken(Tempstr,"=",&Token,GETTOKEN_QUOTES);
-			GetToken(Token,":",&FName,GETTOKEN_QUOTES);
-
-			if ( (! StrLen(RequestedFile)) && (strcmp(RequestedFile,FName)==0))
-			{
-				if (! ListFindNamedItem(Props,Token)) ListAddNamedItem(Props,Token,CopyStr(NULL,ptr));
-			}
-		}
-		Tempstr=STREAMReadLine(Tempstr,S);
-	}
-STREAMClose(S);
-}
-
-DestroyString(Tempstr);
-DestroyString(Token);
-DestroyString(FName);
-}
-
-
-void SaveDirPropsFile(char *Dir,ListNode *Props)
-{
-char *Tempstr=NULL, *Token=NULL, *ptr;
-ListNode *Curr;
-STREAM *S;
-
-Tempstr=MCopyStr(Tempstr,Dir,"/.props",NULL);
-
-S=STREAMOpenFile(Tempstr,O_CREAT | O_WRONLY | O_TRUNC);
-if (S)
-{
-	Curr=ListGetNext(Props);
-	while (Curr)
-	{
-		Tempstr=MCopyStr(Tempstr,Curr->Tag,"=",Curr->Item,"\n",NULL);
-		STREAMWriteLine(Tempstr,S);
-
-	Curr=ListGetNext(Curr);
-	}
-STREAMClose(S);
-}
-
-DestroyString(Tempstr);
-DestroyString(Token);
-}
-
-
-
-void SetProperties(char *File, ListNode *Props)
-{
-char *Tempstr=NULL, *Token=NULL, *Dir=NULL, *FName=NULL, *ptr;
-ListNode *Curr, *FProps, *Node;
-
-ptr=strrchr(File,'/');
-if (ptr) 
-{
-	Dir=CopyStrLen(Dir,File,ptr-File);
-	ptr++;
-}
-else 
-{
-	Dir=CopyStr(Dir,"/");
-	ptr=File;
-}
-
-FName=CopyStr(FName,ptr);
-FProps=ListCreate();
-LoadDirPropsFile(Dir,"",FProps);
-
-Curr=ListGetNext(Props);
-while (Curr)
-{
-	Tempstr=MCopyStr(Tempstr,FName,":",Curr->Tag,NULL);
-	SetVar(FProps,Tempstr,(char *) Curr->Item);
-	Curr->Item=CopyStr(Curr->Item,"HTTP/1.1 200 OK");
-	Curr=ListGetNext(Curr);
-}
-
-SaveDirPropsFile(Dir,FProps);
-
-ListDestroy(FProps,DestroyString);
-DestroyString(Tempstr);
-DestroyString(Token);
-DestroyString(Dir);
-DestroyString(FName);
-}
-
-
-
-
 
 
 
@@ -338,26 +233,6 @@ Curr=ListGetNext(Curr);
 DestroyString(ValBuff);
 
 return(RetStr);
-}
-
-
-int LoadFileProperties(char *Path, ListNode *PropList)
-{
-char *Dir=NULL, *ptr;
-int FType;
-
-ptr=GetToken(Path,"/",&Dir,0);
-LoadDirPropsFile(Dir, ptr, PropList);
-FType=ExamineFile(Path,FALSE,PropList);
-
-//Translate Some Props  to DAV names
-SetVar(PropList,"creationdate",GetVar(PropList,"CTime-secs"));
-SetVar(PropList,"getlastmodified",GetVar(PropList,"MTime-secs"));
-SetVar(PropList,"getcontentlength",GetVar(PropList,"FileSize"));
-SetVar(PropList,"getcontenttype",GetVar(PropList,"ContentType"));
-SetVar(PropList,"executable",GetVar(PropList,"IsExecutable"));
-
-return(FType);
 }
 
 

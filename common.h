@@ -103,6 +103,7 @@ char *BindAddress;
 char *HttpMethods;
 char *IndexFiles;
 char *M3UFileTypes;
+char *AccessTokenKey;
 int DisplayNameLen;
 unsigned long DocumentCacheTime;
 ListNode *SSLKeys;

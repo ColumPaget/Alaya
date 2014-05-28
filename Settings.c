@@ -120,6 +120,7 @@ while (ptr)
 {
 	StripLeadingWhitespace(Token);
 	StripTrailingWhitespace(Token);
+
 	if (strcasecmp(Token,"None")==0) Settings.DirListFlags=DIR_REJECT;
 	if (strcasecmp(Token,"Basic")==0) Settings.DirListFlags=DIR_SHOWFILES;
 	if (strcasecmp(Token,"Fancy")==0) Settings.DirListFlags=DIR_SHOWFILES | DIR_FANCY;
@@ -131,9 +132,9 @@ while (ptr)
 	if (strcasecmp(Token,"ShowVPaths")==0) Settings.DirListFlags |= DIR_SHOW_VPATHS;
 	if (strcasecmp(Token,"TarDownloads")==0) Settings.DirListFlags |= DIR_TARBALLS;
 	if (strcasecmp(Token,"MimeIcons")==0) Settings.DirListFlags |= DIR_MIMEICONS;
+
 ptr=GetToken(ptr,",",&Token,0);
 }
-
 DestroyString(Token);
 }
 
@@ -161,8 +162,8 @@ DestroyString(Token);
 
 void ParseConfigItem(char *ConfigLine)
 {
-char *ConfTokens[]={"Chroot","Chshare","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","StreamDir","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","HostConnections","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive",NULL};
-typedef enum {CT_CHROOT, CT_CHSHARE, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_STREAMDIR, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_HOSTCONNECTIONS, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_HTTP_KEEP_ALIVE};
+char *ConfTokens[]={"Chroot","Chshare","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","StreamDir","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","HostConnections","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive","AccessTokenKey",NULL};
+typedef enum {CT_CHROOT, CT_CHSHARE, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_STREAMDIR, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_HOSTCONNECTIONS, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_HTTP_KEEP_ALIVE, CT_ACCESS_TOKEN_KEY};
 
 char *Token=NULL, *ptr;
 struct group *grent;
@@ -362,6 +363,10 @@ switch(result)
 	case CT_HTTP_KEEP_ALIVE:
 		if (YesNoTrueFalse(ptr)) Settings.Flags |= FLAG_KEEP_ALIVES;
 		else Settings.Flags &= ~FLAG_KEEP_ALIVES;
+	break;
+
+	case CT_ACCESS_TOKEN_KEY:
+		Settings.AccessTokenKey=CopyStr(Settings.AccessTokenKey,ptr);
 	break;
 }
 

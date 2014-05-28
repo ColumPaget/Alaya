@@ -190,7 +190,9 @@ char *URL=NULL, *Salt=NULL, *Token=NULL, *Token2=NULL;
 char *ptr;
 int result=FALSE;
 
-//if (! (Session->Flags & FLAG_AUTH_ACCESS_TOKEN)) return(FALSE);
+if (! (Session->Flags & FLAG_AUTH_ACCESS_TOKEN)) return(FALSE);
+if (StrLen(Settings.AccessTokenKey)==0) return(FALSE);
+
 URL=FormatURL(URL,Session,Session->Path);
 
 //Password will be in format <salt>:<access token>

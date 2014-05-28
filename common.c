@@ -6,7 +6,7 @@
 #include "Authenticate.h"
 
 TSettings Settings;
-char *Version="1.4.1";
+char *Version="1.4.2";
 
 
 
@@ -198,12 +198,13 @@ char *MakeAccessToken(char *Buffer, char *Salt, char *Method, char *RequestingHo
 char *Tempstr=NULL, *RetStr=NULL;
 
 
-
-Tempstr=MCopyStr(Tempstr,Salt,":",Method,":",RequestingHost,":",RequestURL,NULL);
-
 RetStr=CopyStr(Buffer,"");
 
-HashBytes(&RetStr,"sha1",Tempstr,StrLen(Tempstr),ENCODE_HEX);
+if (StrLen(Settings.AccessTokenKey))
+{
+	Tempstr=MCopyStr(Tempstr,Salt,":",Settings.AccessTokenKey,":",Method,":",RequestingHost,":",RequestURL,NULL);
+	HashBytes(&RetStr,"sha1",Tempstr,StrLen(Tempstr),ENCODE_HEX);
+}
 
 DestroyString(Tempstr);
 

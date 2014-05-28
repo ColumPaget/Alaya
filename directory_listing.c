@@ -19,8 +19,8 @@
 #define SORT_RTIME 7
 #define SORT_RSIZE 8
 
-char *DirActionTypes[]={"html","csv","m3u","rss","tar","tgz","tbz","txz","upload","edit","delete","rename","mkdir-query","mkdir",NULL};
-typedef enum {ACTION_HTML,ACTION_CSV,ACTION_M3U,ACTION_RSS,ACTION_TAR,ACTION_TGZ,ACTION_TBZ,ACTION_TXZ,ACTION_UPLOAD,ACTION_EDIT,ACTION_DELETE,ACTION_RENAME, ACTION_MKDIRQUERY, ACTION_MKDIR} TDIRFORMAT;
+char *DirActionTypes[]={"html","csv","m3u","rss","tar","tgz","tbz","txz","upload","edit","delete","rename","mkdir-query","mkdir","saveprops",NULL};
+typedef enum {ACTION_HTML,ACTION_CSV,ACTION_M3U,ACTION_RSS,ACTION_TAR,ACTION_TGZ,ACTION_TBZ,ACTION_TXZ,ACTION_UPLOAD,ACTION_EDIT,ACTION_DELETE,ACTION_RENAME, ACTION_MKDIRQUERY, ACTION_MKDIR, ACTION_SAVEPROPS} TDIRFORMAT;
 
 
 time_t Now;
@@ -273,8 +273,17 @@ return(FileType);
 char *FormatFancyDirItem(char *Buffer, int count, TPathItem *File)
 {
 char *Tempstr=NULL, *FileType=NULL, *DateStr=NULL, *DisplayName=NULL, *RetStr=NULL, *Interact=NULL;
+char *Comment=NULL, *ptr;
 char *bgcolor;
 TFileMagic *FM;
+ListNode *Vars;
+
+	Vars=ListCreate();
+	LoadFileProperties(File->Path, Vars);
+
+	ptr=GetVar(Vars,"comment");
+	if (StrLen(ptr)) Comment=MCopyStr(Comment," title=\"",ptr,"\" ",NULL);
+	else Comment=CopyStr(Comment,"");
 
 		if ((count % 2)==0) bgcolor="#FFFFFF";
 		else bgcolor="#CCCCCC";
@@ -301,7 +310,7 @@ TFileMagic *FM;
 		}
 		else Interact=CopyStr(Interact,"");
 
-		Tempstr=FormatStr(Tempstr,"<tr bgcolor=\"%s\"><td>%s</td><td><a href=\"%s\">%s</a></td><td align=right> &nbsp; %s</td><td align=right> &nbsp; %s</td>%s</tr>\r\n",bgcolor,FileType,File->URL,DisplayName,DateStr,GetHumanReadableDataQty((double) File->Size,0),Interact);
+		Tempstr=FormatStr(Tempstr,"<tr bgcolor=\"%s\"><td>%s</td><td><a href=\"%s\" %s >%s</a></td><td align=right> &nbsp; %s</td><td align=right> &nbsp; %s</td>%s</tr>\r\n",bgcolor,FileType,File->URL,Comment, DisplayName,DateStr,GetHumanReadableDataQty((double) File->Size,0),Interact);
 
 		RetStr=CatStr(Buffer,Tempstr);
 
@@ -310,6 +319,9 @@ TFileMagic *FM;
 		DestroyString(DateStr);
 		DestroyString(DisplayName);
 		DestroyString(Interact);
+		DestroyString(Comment);
+
+	ListDestroy(Vars,DestroyString);
 
 return(RetStr);
 }
@@ -587,6 +599,8 @@ ptr=GetToken(Settings.IndexFiles,",",&Token,0);
 while (ptr)
 {
 	Tempstr=MCopyStr(Tempstr,Path,Token,NULL);
+	if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"Checking for index page: [%s]\n",Tempstr);
+
 	if (access(Tempstr,F_OK)==0) 
 	{
 		Session->Path=CopyStr(Session->Path,Tempstr);
@@ -596,6 +610,13 @@ while (ptr)
 	}
 ptr=GetToken(ptr,",",&Token,0);
 }
+
+if (Settings.Flags & FLAG_LOG_VERBOSE)
+{
+	if (DirSent) LogToFile(Settings.LogPath,"Sent index page: [%s] for dir [%s]\n",Tempstr,Path);
+	else LogToFile(Settings.LogPath,"Failed to find index page for dir: [%s]\n",Path);
+}
+
 DestroyString(Tempstr);
 DestroyString(Token);
 
@@ -636,95 +657,6 @@ DestroyString(Value);
 return(Action);
 }
 
-
-
-
-char *FormatFileProperties(char *HTML, int FType, char *Path, ListNode *Vars)
-{
-ListNode *Curr;
-char *Tempstr=NULL, *ptr;
-char *IgnoreFields[]={"FileSize","ContentType","CTime-Secs","MTime-Secs", "IsExecutable", "creationdate", "getlastmodified", "getcontentlength", "getcontenttype", "executable",NULL};
-
-	if (FType != FILE_DIR) 
-	{
-		ptr=GetVar(Vars,"FileSize");
-		if (ptr) HTML=MCatStr(HTML,"<tr><td>Size</td><td>", GetHumanReadableDataQty(strtod(ptr, NULL),0), " - (",ptr," bytes)","</td></tr>",NULL);
-	}
-
-	ptr=GetVar(Vars,"MTime-Secs");
-	if (ptr)
-	{
-		HTML=MCatStr(HTML,"<tr><td>Modify Time</td><td>",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",atoi(ptr),NULL),"</td></tr>",NULL);
-	}
-
-	ptr=GetVar(Vars,"CTime-Secs");
-	if (ptr)
-	{
-		HTML=MCatStr(HTML,"<tr><td>Create Time</td><td>",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",atoi(ptr),NULL),"</td></tr>",NULL);
-	}
-
-	HTML=MCatStr(HTML,"<tr bgcolor=#CCFFCC><td>ContentType</td><td>",GetVar(Vars,"ContentType"),"</td></tr>",NULL);
-
-	if (FType != FILE_DIR)
-	{
-		Tempstr=CopyStr(Tempstr,"");
-	//	HashFile(&Tempstr,"md5",Path,ENCODE_HEX);
-		HTML=MCatStr(HTML,"<tr><td>MD5 Sum</td><td>",Tempstr,"</td></tr>",NULL);
-	}
-
-	Curr=ListGetNext(Vars);
-	while (Curr)
-	{
-		if (StrLen(Curr->Item) && (MatchTokenFromList(Curr->Tag,IgnoreFields,0)==-1))  HTML=MCatStr(HTML,"<tr bgcolor=#CCFFCC><td>",Curr->Tag,"</td><td>",(char *) Curr->Item,"</td></tr>",NULL);
-		Curr=ListGetNext(Curr);
-	}
-
-DestroyString(Tempstr);
-
-return(HTML);
-}
-
-//Path is the ACTUAL path to the item, not it's VPath or URL. Thus, use Session->URL
-//unless accessing the actual file
-void DirectoryItemEdit(STREAM *S, HTTPSession *Session, char *Path)
-{
-char *HTML=NULL, *Tempstr=NULL, *URL=NULL, *ptr;
-ListNode *Vars;
-int val, FType;
-
-
-HTML=MCopyStr(HTML,"<html>\r\n<head><title>Editing ",Session->URL,"</title></head>\r\n<body>\r\n<form>\r\n",NULL);
-
-Tempstr=ParentDirectory(Tempstr,Session->URL);
-URL=FormatURL(URL,Session,Tempstr);
-
-HTML=CatStr(HTML,"<table align=center width=90%% border=0>");
-	
-Vars=ListCreate();	
-FType=LoadFileProperties(Path, Vars);
-
-	HTML=MCatStr(HTML,"<tr><td><a href=\"",URL,"\">.. (Parent Directory)</a></td><td> &nbsp; </td></tr>",NULL);
-
-	HTML=MCatStr(HTML,"<tr bgcolor=#CCCCFF><td>Path</td><td>",Session->URL,"</td></tr>",NULL);
-
-
-	HTML=FormatFileProperties(HTML, FType, Path, Vars);
-
-	//We must use the URL that this file was asked under, not its directory path. The directory path may not be
-	//directly accessible to the user, and they may be accessing it via a VPATH
-	Tempstr=FormatURL(Tempstr,Session,Session->URL);
-	HTML=MCatStr(HTML,"<tr bgcolor=#FFCCCC><td>Actions</td><td><input type=submit name='get:",Tempstr,"' value=Get /> <input type=submit name='del:",Tempstr,"' value=Del /> <input type=text name=renameto /><input type=submit name='renm:",Tempstr,"' value=Rename /></td></tr>",NULL);
-	
-
-	HTML=CatStr(HTML,"</table>");
-	HTML=CatStr(HTML,"</form></body></html>");
-
-	HTTPServerSendResponse(S, Session, "200 OKAY", "text/html",HTML);
-
-DestroyString(Tempstr);
-DestroyString(HTML);
-ListDestroy(Vars,DestroyString);
-}
 
 
 void DirectoryMkDirQuery(STREAM *S, HTTPSession *Session, char *Path)
@@ -827,6 +759,7 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 				mkdir(Tempstr, 0770); 
       	HTTPServerSendResponse(S, Session, "302", "", Session->URL);
 			break;
+
 			case ACTION_DELETE:
 	      if (unlink(Path)!=0) 
 				{
@@ -854,6 +787,14 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 
 				HTTPServerSendToParentDir(S, Session);
 			break;
+
+			case ACTION_SAVEPROPS:
+				LogToFile(Settings.LogPath,"SAVEPROPS: [%s]\n",Path);
+				FileDetailsSaveProps(S, Session, Path);
+				Tempstr=MCopyStr(Tempstr,Session->URL,"?format=edit",NULL);
+      	HTTPServerSendResponse(S, Session, "302", "", Tempstr);
+			break;
+
 
 			default: HTTPServerSendHTML(S, Session, "403 Index Listing Forbidden","This server is not configured to list directories."); break;
 		}

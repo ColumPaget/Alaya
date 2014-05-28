@@ -3,6 +3,7 @@
 #include "MimeType.h"
 #include "DavProps.h"
 #include "directory_listing.h"
+#include "FileDetailsPage.h"
 #include "ID3.h"
 #include "upload.h"
 #include "proxy.h"
@@ -1355,9 +1356,9 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 
 int HTTPServerProcessActions(STREAM *S, HTTPSession *Session)
 {
-typedef enum{ACT_NONE, ACT_GET, ACT_DEL, ACT_RENAME, ACT_EDIT, ACT_MKDIR} TServerActs;
+typedef enum{ACT_NONE, ACT_GET, ACT_DEL, ACT_RENAME, ACT_EDIT, ACT_MKDIR, ACT_SAVE_PROPS} TServerActs;
 char *QName=NULL, *QValue=NULL, *Name=NULL, *Value=NULL, *ptr;
-char *Arg1=NULL, *Arg2=NULL;
+char *Arg1=NULL, *Arg2=NULL, *FileProperties=NULL;
 int Action=ACT_NONE;
 int result=FALSE;
 
@@ -1399,9 +1400,17 @@ int result=FALSE;
 			Arg1=CopyStr(Arg1,Name+4);
 		}
 
+		if (strncasecmp(Name,"sprops:",7)==0) 
+		{
+			Action=ACT_SAVE_PROPS;
+			Arg1=CopyStr(Arg1,Name+7);
+		}
+
+
 		if (strcasecmp(Name,"renameto")==0) Arg2=CopyStr(Arg2,Value);
 		if (strcasecmp(Name,"mkdir")==0) Arg2=CopyStr(Arg2,Value);
 
+		if (strncasecmp(Name,"fileproperty:",13)==0) FileProperties=MCatStr(FileProperties,"&",Name,"=",Value,NULL);
 		ptr=GetNameValuePair(ptr,"&","=",&QName,&QValue);
 	}
 
@@ -1446,6 +1455,12 @@ int result=FALSE;
 		case ACT_GET:
 		HTTPServerSendResponse(S, Session, "302", "", Arg1);
 		result=TRUE;
+		break;
+
+		case ACT_SAVE_PROPS:
+		Value=MCopyStr(Value,Arg1,"?format=saveprops",FileProperties,NULL);
+		Session->LastModified=0;
+		HTTPServerSendResponse(S, Session, "302", "", Value);
 		break;
 	}
 
