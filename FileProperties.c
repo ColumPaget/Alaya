@@ -227,7 +227,7 @@ if (! LoadFileXAttr(Path,PropList))
 	LoadDirPropsFile(Dir, ptr, PropList);
 }
 
-FType=LoadFileRealProperties(Path, FALSE, PropList);
+FType=LoadFileRealProperties(Path, TRUE, PropList);
 
 //Translate Some Props  to DAV names
 SetVar(PropList,"creationdate",GetVar(PropList,"CTime-secs"));

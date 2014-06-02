@@ -710,6 +710,7 @@ Settings.ScriptHandlers=ListCreate();
 Settings.LoginEntries=ListCreate();
 Settings.DocumentCacheTime=10;
 
+GenerateRandomBytes(&Settings.AccessTokenKey,32,ENCODE_BASE64);
 //this will be set to 80 or 443 in 'PostProcessSettings'
 Settings.Port=0;
 

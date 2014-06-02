@@ -118,27 +118,6 @@ HMAC->Key1Len=Len;
 }
 
 
-char *EncodeHash(char *Buffer, unsigned const char *Digest, int len, int Encoding)
-{
-char *Tempstr=NULL, *RetStr=NULL;
-int i;
-
-RetStr=SetStrLen(Buffer,128);
-if (Encoding==ENCODE_BASE64) to64frombits(RetStr,Digest,len);
-else
-{
-	for (i=0; i < len; i++)
-	{
-	Tempstr=FormatStr(Tempstr,"%02x",Digest[i] & 255);
-	RetStr=CatStr(RetStr,Tempstr);
-	}
-}
-
-DestroyString(Tempstr);
-return(RetStr);
-}
-
-
 
 
 #include "crc32.h"
@@ -162,7 +141,7 @@ free(Hash->Ctx);
 
 if (Encoding > 0) 
 {
-*HashStr=EncodeHash(*HashStr, (char *) &crc, len, Encoding);
+*HashStr=EncodeBytes(*HashStr, (char *) &crc, len, Encoding);
 return(StrLen(*HashStr));
 }
 else
@@ -204,7 +183,7 @@ free(Hash->Ctx);
 
 if (Encoding > 0)
 {
-*HashStr=EncodeHash(*HashStr, DigestBuff, MD5LEN, Encoding);
+*HashStr=EncodeBytes(*HashStr, DigestBuff, MD5LEN, Encoding);
 len=StrLen(*HashStr);
 }
 else
@@ -249,7 +228,7 @@ free(Hash->Ctx);
 
 if (Encoding > 0)
 {
-	 *HashStr=EncodeHash(*HashStr, DigestBuff, SHA1LEN, Encoding);
+	 *HashStr=EncodeBytes(*HashStr, DigestBuff, SHA1LEN, Encoding);
 	 len=StrLen(*HashStr);
 }
 else
@@ -289,7 +268,7 @@ free(Hash->Ctx);
 
 if (Encoding > 0)
 {
-	 *HashStr=EncodeHash(*HashStr, DigestBuff, SHA2_SHA256_DIGEST_LENGTH, Encoding);
+	 *HashStr=EncodeBytes(*HashStr, DigestBuff, SHA2_SHA256_DIGEST_LENGTH, Encoding);
 	 len=StrLen(*HashStr);
 }
 else
@@ -331,7 +310,7 @@ free(Hash->Ctx);
 
 if (Encoding > 0)
 {
-	 *HashStr=EncodeHash(*HashStr, DigestBuff, SHA2_SHA512_DIGEST_LENGTH, Encoding);
+	 *HashStr=EncodeBytes(*HashStr, DigestBuff, SHA2_SHA512_DIGEST_LENGTH, Encoding);
 	 len=StrLen(*HashStr);
 }
 else

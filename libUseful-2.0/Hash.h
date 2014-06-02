@@ -5,9 +5,6 @@
 #include "includes.h"
 
 
-#define ENCODE_HEX 1
-#define ENCODE_BASE64 2
-
 #ifdef __cplusplus
 extern "C" {
 #endif

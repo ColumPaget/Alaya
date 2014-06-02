@@ -955,6 +955,31 @@ return(* (S->InputBuff + S->InStart));
 }
 
 
+int STREAMPeekBytes(STREAM *S, char *Buffer, int Buffsize)
+{
+int len=0, result=0;
+
+if (S->InStart >= S->InEnd)
+{
+  result=STREAMReadCharsToBuffer(S);
+  if (S->InStart >= S->InEnd)
+  {
+    if (result==STREAM_CLOSED) return(EOF);
+    if (result==STREAM_TIMEOUT) return(STREAM_TIMEOUT);
+    if (result==STREAM_DATA_ERROR) return(STREAM_DATA_ERROR);
+  }
+}
+
+len=S->InEnd-S->InStart;
+if (len > Buffsize) len=Buffsize;
+
+if (len > 0) memcpy(Buffer,S->InputBuff + S->InStart,len);
+
+return(len);
+}
+
+
+
 int STREAMWriteChar(STREAM *S,unsigned char inchar)
 {
 char tmpchar;

@@ -19,23 +19,9 @@ int fd, len=32;
 char *Tempstr=NULL;
 
 
-Tempstr=SetStrLen(Tempstr,len);
-
-fd=open("/dev/random",O_RDONLY);
-if (fd > -1)
-{
-	len=read(fd,Tempstr,len);
-	close(fd);
-}
-else
-{
-//no /dev/random! Bad news. Seed as best we can from
-//pid, gettime of day, and time for sleep(0)
-len=GenerateRandomBytes(Tempstr, len);
-}
-
+len=GenerateRandomBytes(&Tempstr, len, ENCODE_NONE);
 RAND_seed(Tempstr,len);
-memset(Tempstr,0,len); //exra paranoid step
+memset(Tempstr,0,len); //extra paranoid step, don't keep those bytes in memory!
 
 DestroyString(Tempstr);
 }

@@ -82,6 +82,47 @@ return(len / 2);
 
 
 
+char *EncodeBytes(char *Buffer, unsigned const char *Bytes, int len, int Encoding)
+{
+char *Tempstr=NULL, *RetStr=NULL;
+int i;
+
+RetStr=CopyStr(Buffer,"");
+switch (Encoding)
+{
+	case ENCODE_BASE64: 
+	RetStr=SetStrLen(RetStr,len * 4);
+	to64frombits(RetStr,Bytes,len); break;
+	break;
+
+	case ENCODE_HEX:
+  for (i=0; i < len; i++)
+  {
+  Tempstr=FormatStr(Tempstr,"%02x",Bytes[i] & 255);
+  RetStr=CatStr(RetStr,Tempstr);
+  }
+	break;
+
+	case ENCODE_HEXUPPER:
+  for (i=0; i < len; i++)
+  {
+  Tempstr=FormatStr(Tempstr,"%02X",Bytes[i] & 255);
+  RetStr=CatStr(RetStr,Tempstr);
+  }
+	break;
+
+	default:
+	RetStr=SetStrLen(RetStr,len );
+	memcpy(RetStr,Bytes,len);
+	RetStr[len]='\0';
+	break;
+}
+
+DestroyString(Tempstr);
+return(RetStr);
+}
+
+
 
 #include <pwd.h>
 #include <grp.h>
@@ -354,39 +395,56 @@ ptr=strstr(ptr,Target);
 
 
 
-int GenerateRandomBytes(char *RetBuff, int ReqLen)
+int GenerateRandomBytes(char **RetBuff, int ReqLen, int Encoding)
 {
 struct utsname uts;
 int i, len;
 clock_t ClocksStart, ClocksEnd;
 struct timeval tv1, tv2;
-char *Tempstr=NULL, *Digest=NULL;
-
-ClocksStart=clock();
-gettimeofday(&tv1,NULL);
-//how many clock cycles used here will depend on overall
-//machine activity/performance/number of running processes
-for (i=0; i < 100; i++) sleep(0);
-uname(&uts);
-ClocksEnd=clock();
-gettimeofday(&tv2,NULL);
+char *Tempstr=NULL, *RandomBytes=NULL;
+int fd;
 
 
-Tempstr=FormatStr(Tempstr,"%lu:%lu:%lu:%lu:%lu:%lu\n",getpid(),getuid(),ClocksStart,ClocksEnd,tv1.tv_usec,tv2.tv_usec);
-//This stuff should be unique to a machine
-Tempstr=CatStr(Tempstr,uts.sysname);
-Tempstr=CatStr(Tempstr, uts.nodename);
-Tempstr=CatStr(Tempstr, uts.machine);
-Tempstr=CatStr(Tempstr, uts.release);
-Tempstr=CatStr(Tempstr, uts.version);
+fd=open("/dev/random",O_RDONLY);
+if (fd > -1)
+{
+	RandomBytes=SetStrLen(RandomBytes,ReqLen);
+  len=read(fd,RandomBytes,ReqLen);
+  close(fd);
+}
+else
+{
+	ClocksStart=clock();
+	gettimeofday(&tv1,NULL);
+	//how many clock cycles used here will depend on overall
+	//machine activity/performance/number of running processes
+	for (i=0; i < 100; i++) sleep(0);
+	uname(&uts);
+	ClocksEnd=clock();
+	gettimeofday(&tv2,NULL);
 
 
-len=HashBytes(&Digest, "sha256", Tempstr, StrLen(Tempstr), 0);
-if (len > ReqLen) len=ReqLen;
-memcpy(RetBuff,Digest,len);
+	Tempstr=FormatStr(Tempstr,"%lu:%lu:%lu:%lu:%lu:%lu\n",getpid(),getuid(),ClocksStart,ClocksEnd,tv1.tv_usec,tv2.tv_usec);
+	//This stuff should be unique to a machine
+	Tempstr=CatStr(Tempstr, uts.sysname);
+	Tempstr=CatStr(Tempstr, uts.nodename);
+	Tempstr=CatStr(Tempstr, uts.machine);
+	Tempstr=CatStr(Tempstr, uts.release);
+	Tempstr=CatStr(Tempstr, uts.version);
+
+
+	len=HashBytes(&RandomBytes, "sha256", Tempstr, StrLen(Tempstr), 0);
+	if (len > ReqLen) len=ReqLen;
+}
+
+
+*RetBuff=EncodeBytes(*RetBuff, RandomBytes, len, Encoding);
 
 DestroyString(Tempstr);
-DestroyString(Digest);
+DestroyString(RandomBytes);
 
 return(len);
 }
+
+
+

@@ -179,8 +179,11 @@ int result;
 Tempstr=SetStrLen(Tempstr,20);
 memset(Tempstr,0,20);
 STREAMReadBytes(S,Tempstr,20);
+
 result=MatchTokenFromList(Tempstr,TagTypes,MATCH_TOKEN_PART|MATCH_TOKEN_CASE);
 STREAMSeek(S,(double) 0, SEEK_SET); 
+
+LogToFile(Settings.LogPath,"TAGTYPE: %d [%s]\n",result,Tempstr);
 
 DestroyString(Tempstr);
 	
@@ -429,6 +432,7 @@ if (result==-1)
 	if (result==TAG_ID3) result=TAG_ID3_END;
 	else result=-1;
 }
+
 
 switch (result)
 {

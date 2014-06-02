@@ -58,22 +58,26 @@ return(HTML);
 //unless accessing the actual file
 void DirectoryItemEdit(STREAM *S, HTTPSession *Session, char *Path)
 {
-char *HTML=NULL, *Tempstr=NULL, *URL=NULL, *ptr;
+char *HTML=NULL, *Tempstr=NULL, *URL=NULL, *Salt=NULL, *AccessToken=NULL, *ptr;
 ListNode *Vars;
 int val, FType;
 
 
 HTML=MCopyStr(HTML,"<html>\r\n<head><title>Editing ",Session->URL,"</title></head>\r\n<body>\r\n<form>\r\n",NULL);
 
-Tempstr=ParentDirectory(Tempstr,Session->URL);
-URL=FormatURL(URL,Session,Tempstr);
+URL=FormatURL(URL,Session,Session->URL);
 
 HTML=CatStr(HTML,"<table align=center width=90%% border=0>");
 	
 Vars=ListCreate();	
 FType=LoadFileProperties(Path, Vars);
+GenerateRandomBytes(&Salt,10,ENCODE_HEX);
+AccessToken=MakeAccessToken(AccessToken, Salt, Session->UserName, "GET", "*", URL);
+Tempstr=MCatStr(Tempstr,URL,"?AccessToken=",AccessToken,"&Salt=",Salt,"&User=",Session->UserName,"\n",NULL);
+SetVar(Vars,"AccessToken",Tempstr);
 
-	HTML=MCatStr(HTML,"<tr><td><a href=\"",URL,"\">.. (Parent Directory)</a></td><td> &nbsp; </td></tr>",NULL);
+
+	HTML=MCatStr(HTML,"<tr><td colspan=2><a href=\"",URL,"\">.. (Parent Directory)</a></td><td> &nbsp; </td></tr>",NULL);
 
 	HTML=MCatStr(HTML,"<tr bgcolor=#CCCCFF><td>Path</td><td>",Session->URL,"</td></tr>",NULL);
 
@@ -87,7 +91,7 @@ FType=LoadFileProperties(Path, Vars);
 	Tempstr=CopyStr(Tempstr,GetVar(Vars,"Comment"));
 	HTML=MCatStr(HTML,"<tr><td>Comment</td><td><textarea rows=3 cols=40 name=fileproperty:comment>",Tempstr,"</textarea> <input type=submit name='sprops:",URL,"' value=change></td></tr>",NULL);
 
-	HTML=MCatStr(HTML,"<tr bgcolor=#FFCCCC><td>Actions</td><td><input type=submit name='get:",URL,"' value=Get /> <input type=submit name='del:",URL,"' value=Del /> <input type=text name=renameto /><input type=submit name='renm:",URL,"' value=Rename /></td></tr>",NULL);
+	HTML=MCatStr(HTML,"<tr bgcolor=#FFCCCC><td>Actions</td><td><input type=submit name='get:",URL,"' value=Get /> <input type=submit name='del:",URL,"' value=Del /> <input type=text name=renameto /><input type=submit name='renm:",URL,"' value=Rename /><input type=submit name='genaccess:",URL,"' value='Access Key'></td></tr>",NULL);
 	
 
 	HTML=CatStr(HTML,"</table>");
@@ -95,8 +99,12 @@ FType=LoadFileProperties(Path, Vars);
 
 	HTTPServerSendResponse(S, Session, "200 OKAY", "text/html",HTML);
 
+DestroyString(AccessToken);
 DestroyString(Tempstr);
+DestroyString(Salt);
 DestroyString(HTML);
+DestroyString(URL);
+
 ListDestroy(Vars,DestroyString);
 }
 
@@ -111,9 +119,9 @@ Props=ListCreate();
 ptr=GetNameValuePair(Session->Arguments,"&","=",&QuotedName,&QuotedValue);
 while (ptr)
 {
-Name=HTTPUnQuote(Name, QuotedName);
-Value=HTTPUnQuote(Value, QuotedValue);
-if (strncasecmp(Name,"fileproperty:",13)==0) SetVar(Props,Name+13,Value);
+	Name=HTTPUnQuote(Name, QuotedName);
+	Value=HTTPUnQuote(Value, QuotedValue);
+	if (strncasecmp(Name,"fileproperty:",13)==0) SetVar(Props,Name+13,Value);
 ptr=GetNameValuePair(ptr,"&","=",&QuotedName,&QuotedValue);
 }
 

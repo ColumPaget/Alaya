@@ -56,6 +56,10 @@
 #define SS_WRITE_ERROR 16
 #define SS_EMBARGOED 32
 #define SS_AUTH 8192
+#define SS_USER1 268435456
+#define SS_USER2 536870912
+#define SS_USER3 1073741824
+#define SS_USER4 2147483648
 
 #define STREAM_TYPE_FILE 0
 #define STREAM_TYPE_UNIX 1
@@ -133,6 +137,8 @@ STREAM *STREAMSpawnCommand(const char *Command, int type);
 
 int STREAMDisassociateFromFD(STREAM *Stream);
 int STREAMPeekChar(STREAM *);
+int STREAMPeekBytes(STREAM *S, char *Buffer, int Buffsize);
+
 
 int STREAMReadBytes(STREAM *, char *Buffer, int Bytes);
 int STREAMWriteBytes(STREAM *, const char *Buffer, int Bytes);

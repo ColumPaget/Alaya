@@ -183,32 +183,43 @@ return(FALSE);
 }
 
 
+int CheckAccessToken(HTTPSession *Session, char *Salt, char *URL, char *ClientIP, char *CorrectToken)
+{
+char *Token=NULL;
+int result=FALSE;
+
+
+Token=MakeAccessToken(Token, Salt, Session->UserName, Session->Method, ClientIP, URL);
+if (StrLen(Token) && (strcmp(Token, CorrectToken)==0)) result=TRUE; 
+
+DestroyString(Token);
+return(result);
+}
+
 
 int AuthAccessToken(HTTPSession *Session)
 {
-char *URL=NULL, *Salt=NULL, *Token=NULL, *Token2=NULL;
+char *URL=NULL, *Salt=NULL;
 char *ptr;
 int result=FALSE;
 
-if (! (Session->Flags & FLAG_AUTH_ACCESS_TOKEN)) return(FALSE);
+//if (! (Session->Flags & FLAG_AUTH_ACCESS_TOKEN)) return(FALSE);
 if (StrLen(Settings.AccessTokenKey)==0) return(FALSE);
 
 URL=FormatURL(URL,Session,Session->Path);
 
 //Password will be in format <salt>:<access token>
 ptr=GetToken(Session->Password,":",&Salt,0);
+
+
 if (StrLen(Salt) && (StrLen(ptr)))
 {
-	Token=MakeAccessToken(Token, Salt, Session->Method, Session->ClientIP, URL);
-	Token2=CopyStr(Token2,"");
-	if (strncmp(Session->ClientIP,"::ffff:",7)==0) Token2=MakeAccessToken(Token2, Salt, Session->Method, Session->ClientIP+7, URL);
+	if ((strncmp(Session->ClientIP,"::ffff:",7)==0) && (CheckAccessToken(Session, Salt, URL, Session->ClientIP+7, ptr))) result=TRUE;
+	else if (CheckAccessToken(Session, Salt, URL, Session->ClientIP, ptr)) result=TRUE;
+	else if (CheckAccessToken(Session, Salt, URL, "*", ptr)) result=TRUE;
 
-	if (
-			(StrLen(Token) && (strcmp(Token,ptr)==0)) ||
-			(StrLen(Token2) && (strcmp(Token2,ptr)==0))
-	)
+	if (result)
 	{ 
-		result=TRUE; 
 		LogToFile(Settings.LogPath,"AUTH: Client Authenticated with AccessToken for %s", Session->UserName);
 	}
 	else LogToFile(Settings.LogPath,"AUTH: AccessToken Failed for %s@%s", Session->UserName,Session->ClientIP);
@@ -216,8 +227,6 @@ if (StrLen(Salt) && (StrLen(ptr)))
 
 AuthenticationsTried=CatStr(AuthenticationsTried,"accesstoken ");
 
-DestroyString(Token2);
-DestroyString(Token);
 DestroyString(Salt);
 DestroyString(URL);
 
@@ -397,36 +406,6 @@ DestroyString(Token);
 }
 
 
-char *GenerateSalt(char *RetStr, int len)
-{
-int fd, result;
-char *Tempstr=NULL;
-struct timeval tv;
-
-Tempstr=SetStrLen(Tempstr,len);
-
-fd=open("/dev/random",O_RDONLY);
-if (fd > -1)
-{
-	result=read(fd,Tempstr,len);
-	close(fd);
-}
-else
-{
-	//if /dev/random is missing, then this should be 'better than nothing'
-	result=GenerateRandomBytes(Tempstr, len);
-
-	fprintf(stderr,"WARNING: Failed to open /dev/random. Using less secure 'generated' salt for password.\n");
-}
-
-RetStr=SetStrLen(RetStr,len*8);
-to64frombits(RetStr, Tempstr, result);
-
-DestroyString(Tempstr);
-
-return(RetStr);
-}
-
 
 int UpdateNativeFile(char *Path, char *Name, char *PassType, char *Pass, char *HomeDir, char *RealUser, char *Args)
 {
@@ -482,7 +461,7 @@ if (S)
 		}
 		else
 		{
-			Salt=GenerateSalt(Salt,16);
+			GenerateRandomBytes(&Salt,24, ENCODE_BASE64);
 			Tempstr=MCopyStr(Tempstr,Name,":",Pass,":",Salt,NULL);
 			HashBytes(&Token, PassType, Tempstr, StrLen(Tempstr), ENCODE_BASE64);
 			Tempstr=MCopyStr(Tempstr,Name,":",PassType,":",Salt,"$",Token,":",RealUser,":",HomeDir,":",Args,"\n",NULL);
