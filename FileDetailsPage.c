@@ -65,24 +65,33 @@ int val, FType;
 
 HTML=MCopyStr(HTML,"<html>\r\n<head><title>Editing ",Session->URL,"</title></head>\r\n<body>\r\n<form>\r\n",NULL);
 
-URL=FormatURL(URL,Session,Session->URL);
 
 HTML=CatStr(HTML,"<table align=center width=90%% border=0>");
 	
 Vars=ListCreate();	
 FType=LoadFileProperties(Path, Vars);
 GenerateRandomBytes(&Salt,10,ENCODE_HEX);
+URL=FormatURL(URL,Session,Session->URL);
 AccessToken=MakeAccessToken(AccessToken, Salt, Session->UserName, "GET", "*", URL);
 Tempstr=MCatStr(Tempstr,URL,"?AccessToken=",AccessToken,"&Salt=",Salt,"&User=",Session->UserName,"\n",NULL);
 SetVar(Vars,"AccessToken",Tempstr);
 
 
-	HTML=MCatStr(HTML,"<tr><td colspan=2><a href=\"",URL,"\">.. (Parent Directory)</a></td><td> &nbsp; </td></tr>",NULL);
+//Parent Directory Link
+Tempstr=MCopyStr(Tempstr,Session->URL);
+ptr=strrchr(Tempstr,'?');
+if (ptr) *ptr='\0';
+ptr=strrchr(Tempstr,'/');
+if (ptr) *ptr='\0';
+			
+URL=FormatURL(URL,Session,Tempstr);
+HTML=MCatStr(HTML,"<tr><td colspan=2><a href=\"",URL,"\">.. (Parent Directory)</a></td><td> &nbsp; </td></tr>",NULL);
 
-	HTML=MCatStr(HTML,"<tr bgcolor=#CCCCFF><td>Path</td><td>",Session->URL,"</td></tr>",NULL);
+
+HTML=MCatStr(HTML,"<tr bgcolor=#CCCCFF><td>Path</td><td>",Session->URL,"</td></tr>",NULL);
 
 
-	HTML=FormatFileProperties(HTML, FType, Path, Vars);
+HTML=FormatFileProperties(HTML, FType, Path, Vars);
 
 	//We must use the URL that this file was asked under, not its directory path. The directory path may not be
 	//directly accessible to the user, and they may be accessing it via a VPATH
