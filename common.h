@@ -144,6 +144,7 @@ char *Protocol;
 char *Method;
 int MethodID;
 char *ResponseCode;
+char *OriginalURL;
 char *URL;
 char *Path;
 char *Arguments;

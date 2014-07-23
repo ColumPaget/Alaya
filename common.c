@@ -45,6 +45,7 @@ Trans=(HTTPSession *) p_Trans;
 DestroyString(Trans->Protocol);
 DestroyString(Trans->Method);
 DestroyString(Trans->ResponseCode);
+DestroyString(Trans->OriginalURL);
 DestroyString(Trans->URL);
 DestroyString(Trans->Path);
 DestroyString(Trans->Cipher);

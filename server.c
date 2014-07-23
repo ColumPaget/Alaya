@@ -146,7 +146,7 @@ int result=TRUE;
 
 	ptr=STREAMGetValue(S,"SSL-Certificate-Verify");
 
-	if (StrLen(ptr) )
+	if (StrLen(ptr) && (strcmp(ptr,"no certificate") !=0)  )
 	{
 		if (strcmp(ptr,"OK")==0)
 		{
@@ -157,10 +157,10 @@ int result=TRUE;
 		{
 			if (Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED)
 			{
-				 LogToFile(Settings.LogPath,"AUTH: ERROR: SSL Certificate required, but client failed to provide a valid certificate. Error was: %s",ptr);
+				LogToFile(Settings.LogPath,"AUTH: ERROR: SSL Certificate required, but client failed to provide a valid certificate. Error was: %s",ptr);
 				result=FALSE;
 			}
-			else LogToFile(Settings.LogPath,"AUTH: SSL Certificate provided, but invalid. Error was: %s",ptr);
+			LogToFile(Settings.LogPath,"AUTH: SSL Certificate provided, but invalid. Error was: %s",ptr);
 
 			ptr=STREAMGetValue(S,"SSL-Certificate-Subject");
 			if (StrLen(ptr))
@@ -238,14 +238,14 @@ if (tmp_ptr)
 
 
 //URL with arguments removed is the 'true' URL
-Heads->URL=CopyStr(Heads->URL,Token);
-if (StrLen(Heads->URL)==0) Heads->URL=CopyStr(Heads->URL,"/");
-StripTrailingWhitespace(Heads->URL);
+Heads->OriginalURL=CopyStr(Heads->OriginalURL,Token);
+if (StrLen(Heads->OriginalURL)==0) Heads->OriginalURL=CopyStr(Heads->OriginalURL,"/");
+StripTrailingWhitespace(Heads->OriginalURL);
 
 if 
 (
-	(strncasecmp(Heads->URL,"http:",5)==0) ||
-	(strncasecmp(Heads->URL,"https:",6)==0)
+	(strncasecmp(Heads->OriginalURL,"http:",5)==0) ||
+	(strncasecmp(Heads->OriginalURL,"https:",6)==0)
 )
 {
 	if (Heads->MethodID==METHOD_GET) 
@@ -391,11 +391,11 @@ StripLeadingWhitespace(Tempstr);
 if (strstr(Heads->Arguments,"AccessToken")) Heads->AuthFlags |= FLAG_AUTH_PRESENT | FLAG_AUTH_ACCESS_TOKEN;
 
 
-Tempstr=HTTPUnQuote(Tempstr,Heads->URL);
-if (*Tempstr=='/') Heads->Path=CopyStr(Heads->Path,Tempstr);
-else Heads->Path=MCopyStr(Heads->Path,"/",Tempstr,NULL);
-StripTrailingWhitespace(Heads->Path);
+Heads->URL=HTTPUnQuote(Heads->URL,Heads->OriginalURL);
 
+if (*Heads->URL=='/') Heads->Path=CopyStr(Heads->Path,Heads->URL);
+else Heads->Path=MCopyStr(Heads->Path,"/",Heads->URL,NULL);
+StripTrailingWhitespace(Heads->Path);
 
 DestroyString(Tempstr);
 DestroyString(Token);
@@ -829,6 +829,8 @@ char *Path=NULL, *Tempstr=NULL, *ptr;
 int len;
 
 
+	
+	LogToFile(Settings.LogPath,"CHECL VPATH: [%s]",Session->Path);
 	Curr=ListGetNext(Settings.VPaths);
 	while (Curr)
 	{
@@ -1515,13 +1517,13 @@ int HTTPServerValidateURL(HTTPSession *Session, char **Token)
 char *ptr;
 
 
-LogToFile(Settings.LogPath,"VALID: %s",Session->URL);
 ptr=GetToken(Settings.ForbiddenURLStrings,",",Token,0);
 while (ptr)
 {
-	if (strstr(Session->URL,*Token)) 
+	if (strstr(Session->OriginalURL,*Token)) 
 	{
 		Session->Flags |= HTTP_ERR_BADURL;
+		LogToFile(Settings.LogPath,"INVALID URL: %s",Session->URL);
 		return(FALSE);
 	}
 	ptr=GetToken(ptr,",",Token,0);
