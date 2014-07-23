@@ -62,15 +62,15 @@ Tag=(TID3v1_TAG *) calloc(1,sizeof(TID3v1_TAG));
 STREAMReadBytes(S,(char *) Tag,sizeof(TID3v1_TAG));
 
 Tempstr=CopyStrLen(Tempstr,Tag->Artist,30);
-SetVar(Vars,"Media:Artist",Tempstr);
+SetVar(Vars,"Media-Artist",Tempstr);
 Tempstr=CopyStrLen(Tempstr,Tag->Album,30);
-SetVar(Vars,"Media:Album",Tempstr);
+SetVar(Vars,"Media-Album",Tempstr);
 Tempstr=CopyStrLen(Tempstr,Tag->Title,30);
-SetVar(Vars,"Media:Title",Tempstr);
+SetVar(Vars,"Media-Title",Tempstr);
 Tempstr=CopyStrLen(Tempstr,Tag->Comment,30);
-SetVar(Vars,"Media:Comment",Tempstr);
+SetVar(Vars,"Media-Comment",Tempstr);
 Tempstr=CopyStrLen(Tempstr,Tag->Year,4);
-SetVar(Vars,"Media:Year",Tempstr);
+SetVar(Vars,"Media-Year",Tempstr);
 
 result=TRUE;
 
@@ -143,28 +143,28 @@ if (result > 0)
 	{
 		case TAG_ARTIST:
 		case TAG_BAND:
-		case TAG_COMPOSER: SetVar(Vars,"Media:Artist",Tempstr+1); break;
-		case TAG_ALBUM: SetVar(Vars,"Media:Album",Tempstr+1); break;
-		case TAG_TITLE: SetVar(Vars,"Media:Title",Tempstr+1); break;
-		case TAG_COMMENT: SetVar(Vars,"Media:Comment",Tempstr+1); break;
-		case TAG_BPM: SetVar(Vars,"Media:BPM",Tempstr+1); break;
-		case TAG_YEAR: SetVar(Vars,"Media:Year",Tempstr+1); break;
-		case TAG_GENRE: SetVar(Vars,"Media:Genre",Tempstr+1); break;
-		case TAG_TRACK: SetVar(Vars,"Media:AlbumTrackNumber",Tempstr+1); break;
-		case TAG_USER_URL: SetVar(Vars,"Media:AssociatedURL",Tempstr+1); break;
-		case TAG_WEBPAGE_COM: SetVar(Vars,"Media:CommerialWebpage",Tempstr+1); break;
-		case TAG_WEBPAGE_COPYRIGHT: SetVar(Vars,"Media:Copyright/LegalWebpage",Tempstr+1); break;
-		case TAG_WEBPAGE_AUDIOFILE: SetVar(Vars,"Media:AudiofileWebpage",Tempstr+1); break;
-		case TAG_WEBPAGE_ARTIST: SetVar(Vars,"Media:ArtistWebpage",Tempstr+1); break;
-		case TAG_WEBPAGE_AUDIOSOURCE: SetVar(Vars,"Media:AudioSourceWebpage",Tempstr+1); break;
-		case TAG_WEBPAGE_STATION: SetVar(Vars,"Media:RadioStationWebpage",Tempstr+1); break;
-		case TAG_WEBPAGE_PUBLISHER: SetVar(Vars,"Media:PublisherWebpage",Tempstr+1); break;
+		case TAG_COMPOSER: SetVar(Vars,"Media-Artist",Tempstr+1); break;
+		case TAG_ALBUM: SetVar(Vars,"Media-Album",Tempstr+1); break;
+		case TAG_TITLE: SetVar(Vars,"Media-Title",Tempstr+1); break;
+		case TAG_COMMENT: SetVar(Vars,"Media-Comment",Tempstr+1); break;
+		case TAG_BPM: SetVar(Vars,"Media-BPM",Tempstr+1); break;
+		case TAG_YEAR: SetVar(Vars,"Media-Year",Tempstr+1); break;
+		case TAG_GENRE: SetVar(Vars,"Media-Genre",Tempstr+1); break;
+		case TAG_TRACK: SetVar(Vars,"Media-Track",Tempstr+1); break;
+		case TAG_USER_URL: SetVar(Vars,"Media-AssociatedURL",Tempstr+1); break;
+		case TAG_WEBPAGE_COM: SetVar(Vars,"Media-CommerialWebpage",Tempstr+1); break;
+		case TAG_WEBPAGE_COPYRIGHT: SetVar(Vars,"Media-Copyright/LegalWebpage",Tempstr+1); break;
+		case TAG_WEBPAGE_AUDIOFILE: SetVar(Vars,"Media-AudiofileWebpage",Tempstr+1); break;
+		case TAG_WEBPAGE_ARTIST: SetVar(Vars,"Media-ArtistWebpage",Tempstr+1); break;
+		case TAG_WEBPAGE_AUDIOSOURCE: SetVar(Vars,"Media-AudioSourceWebpage",Tempstr+1); break;
+		case TAG_WEBPAGE_STATION: SetVar(Vars,"Media-RadioStationWebpage",Tempstr+1); break;
+		case TAG_WEBPAGE_PUBLISHER: SetVar(Vars,"Media-PublisherWebpage",Tempstr+1); break;
 
 		case TAG_LEN: 
 			//convert from milliseconds
 			Len=atoi(Tempstr) / 1000;
 			Tempstr=FormatStr(Tempstr,"%d:%d",Len / 60, Len % 60);
-			SetVar(Vars,"Media:Duration",Tempstr); 
+			SetVar(Vars,"Media-Duration",Tempstr); 
 		break;
 
 		case TAG_IMAGE:
@@ -245,28 +245,28 @@ if (StrLen(Tempstr))
 	{
 		case TAG_ARTIST:
 		case TAG_BAND:
-		case TAG_COMPOSER: SetVar(Vars,"Media:Artist",Tempstr); break;
-		case TAG_ALBUM: SetVar(Vars,"Media:Album",Tempstr); break;
-		case TAG_TITLE: SetVar(Vars,"Media:Title",Tempstr); break;
-		case TAG_COMMENT: SetVar(Vars,"Media:Comment",Tempstr); break;
-		case TAG_BPM: SetVar(Vars,"Media:BPM",Tempstr); break;
-		case TAG_YEAR: SetVar(Vars,"Media:Year",Tempstr); break;
-		case TAG_GENRE: SetVar(Vars,"Media:Genre",Tempstr); break;
-		case TAG_TRACK: SetVar(Vars,"Media:AlbumTrackNumber",Tempstr); break;
-		case TAG_USER_URL: SetVar(Vars,"Media:AssociatedURL",Tempstr); break;
-		case TAG_WEBPAGE_COM: SetVar(Vars,"Media:CommerialWebpage",Tempstr); break;
-		case TAG_WEBPAGE_COPYRIGHT: SetVar(Vars,"Media:Copyright/LegalWebpage",Tempstr); break;
-		case TAG_WEBPAGE_AUDIOFILE: SetVar(Vars,"Media:AudiofileWebpage",Tempstr); break;
-		case TAG_WEBPAGE_ARTIST: SetVar(Vars,"Media:ArtistWebpage",Tempstr); break;
-		case TAG_WEBPAGE_AUDIOSOURCE: SetVar(Vars,"Media:AudioSourceWebpage",Tempstr); break;
-		case TAG_WEBPAGE_STATION: SetVar(Vars,"Media:RadioStationWebpage",Tempstr); break;
-		case TAG_WEBPAGE_PUBLISHER: SetVar(Vars,"Media:PublisherWebpage",Tempstr); break;
+		case TAG_COMPOSER: SetVar(Vars,"Media-Artist",Tempstr); break;
+		case TAG_ALBUM: SetVar(Vars,"Media-Album",Tempstr); break;
+		case TAG_TITLE: SetVar(Vars,"Media-Title",Tempstr); break;
+		case TAG_COMMENT: SetVar(Vars,"Media-Comment",Tempstr); break;
+		case TAG_BPM: SetVar(Vars,"Media-BPM",Tempstr); break;
+		case TAG_YEAR: SetVar(Vars,"Media-Year",Tempstr); break;
+		case TAG_GENRE: SetVar(Vars,"Media-Genre",Tempstr); break;
+		case TAG_TRACK: SetVar(Vars,"Media-AlbumTrackNumber",Tempstr); break;
+		case TAG_USER_URL: SetVar(Vars,"Media-AssociatedURL",Tempstr); break;
+		case TAG_WEBPAGE_COM: SetVar(Vars,"Media-CommerialWebpage",Tempstr); break;
+		case TAG_WEBPAGE_COPYRIGHT: SetVar(Vars,"Media-Copyright/LegalWebpage",Tempstr); break;
+		case TAG_WEBPAGE_AUDIOFILE: SetVar(Vars,"Media-AudiofileWebpage",Tempstr); break;
+		case TAG_WEBPAGE_ARTIST: SetVar(Vars,"Media-ArtistWebpage",Tempstr); break;
+		case TAG_WEBPAGE_AUDIOSOURCE: SetVar(Vars,"Media-AudioSourceWebpage",Tempstr); break;
+		case TAG_WEBPAGE_STATION: SetVar(Vars,"Media-RadioStationWebpage",Tempstr); break;
+		case TAG_WEBPAGE_PUBLISHER: SetVar(Vars,"Media-PublisherWebpage",Tempstr); break;
 
 		case TAG_LEN: 
 			//convert from milliseconds
 			len=atoi(Tempstr) / 1000;
 			Tempstr=FormatStr(Tempstr,"%d:%d",len / 60, len % 60);
-			SetVar(Vars,"Media:Duration",Tempstr); 
+			SetVar(Vars,"Media-Duration",Tempstr); 
 		break;
 
 	}
@@ -400,7 +400,7 @@ ptr=GetToken(Tempstr," ",&Token,GETTOKEN_QUOTES);
 while (ptr)
 {
 	Value=CopyStr(Value,GetToken(Token,"=",&Name,0));
-	Token=MCopyStr(Token,"Media:",Value,NULL);
+	Token=MCopyStr(Token,"Media-",Value,NULL);
 	SetVar(Vars,Token,Value);
 ptr=GetToken(ptr," ",&Token,GETTOKEN_QUOTES);
 }

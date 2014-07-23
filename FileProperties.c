@@ -142,9 +142,8 @@ DestroyString(Token);
 
 //Real Properties are things like file size, mtime, etc, that are not strings defined
 //by the user
-int LoadFileRealProperties(char *FName, int ExamineContents, ListNode *Vars)
+int PropertiesLoadFromStream(char *FName, STREAM *S, ListNode *Vars)
 {
-STREAM *S=NULL;
 char *Buffer=NULL;
 int result;
 TFileMagic *FM=NULL;
@@ -177,32 +176,20 @@ if ((FileStat.st_mode & S_IXUSR)) SetVar(Vars,"IsExecutable","T");
 else SetVar(Vars,"IsExecutable","F");
 
 
-if (ExamineContents)
+//This function can handle S being NULL
+FM=GetFileMagicForFile(FName, S);
+if (FM) 
 {
-	//First try to identify by file magic
-	S=STREAMOpenFile(FName,O_RDONLY);
+	SetVar(Vars,"ContentType",FM->ContentType);
+	// if 'S' open then ExamineContents WAS set
 	if (S) 
 	{
-		Buffer=SetStrLen(Buffer,21);
-		result=STREAMReadBytes(S,Buffer,20);
-		FM=GetFileMagic(Buffer,result);
-	}
-}
-
-// Do this even if S not open or ExamineContents not set
-if (! FM) FM=GetFileTypeInfo(FName);
-if (FM) SetVar(Vars,"ContentType",FM->ContentType);
-
-
-// if 'S' open then ExamineContents WAS set
-if (S) 
-{
 	if (FM->Flags & (FM_MEDIA_TAG | FM_IMAGE_TAG))
 	{
-		STREAMSeek(S,0,SEEK_SET);
 		MediaReadDetails(S, Vars);
+		STREAMSeek(S,0,SEEK_SET);
 	}
-	STREAMClose(S);
+	}
 }
 
 
@@ -212,6 +199,20 @@ return(TRUE);
 }
 
 
+
+int LoadFileRealProperties(char *FName, int ExamineContents, ListNode *Vars)
+{
+STREAM *S=NULL;
+int result;
+
+if (ExamineContents) S=STREAMOpenFile(FName,O_RDONLY);
+
+result=PropertiesLoadFromStream(FName, S, Vars);
+
+STREAMClose(S);
+
+return(result);
+}
 
 
 

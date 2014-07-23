@@ -232,73 +232,25 @@ DestroyString(ContentType);
 
 
 
-int ExamineFile(char *FName, int ExamineContents, ListNode *Vars)
+TFileMagic *GetFileMagicForFile(char *Path, STREAM *S)
 {
-STREAM *S=NULL;
-char *Buffer=NULL;
-int result;
 TFileMagic *FM=NULL;
-struct stat FileStat;
+int result;
+char *Buffer=NULL;
 
-if (stat(FName,&FileStat)==-1) return(FILE_NOSUCH);
-
-
-
-Buffer=FormatStr(Buffer,"%llu",(unsigned long long) FileStat.st_size);
-SetVar(Vars,"FileSize",Buffer);
-Buffer=FormatStr(Buffer,"%d",FileStat.st_ctime);
-SetVar(Vars,"CTime-Secs",Buffer);
-Buffer=FormatStr(Buffer,"%d",FileStat.st_mtime);
-SetVar(Vars,"MTime-Secs",Buffer);
-
-
-//if it's a directory, don't both doing any more examining
-if (S_ISDIR(FileStat.st_mode)) 
+if (S)
 {
-	SetVar(Vars,"IsCollection","1");
-	SetVar(Vars,"ContentType","Directory");
-	DestroyString(Buffer);
-	return(FILE_DIR);
+	Buffer=SetStrLen(Buffer,21);
+	result=STREAMReadBytes(S,Buffer,20);
+	FM=GetFileMagic(Buffer,result);
+	STREAMSeek(S,0,SEEK_SET);
 }
 
-
-if (! (FileStat.st_mode & S_IWUSR)) SetVar(Vars,"IsReadOnly","1");
-if ((FileStat.st_mode & S_IXUSR)) SetVar(Vars,"IsExecutable","T");
-else SetVar(Vars,"IsExecutable","F");
-
-
-if (ExamineContents)
-{
-	//First try to identify by file magic
-	S=STREAMOpenFile(FName,O_RDONLY);
-	if (S) 
-	{
-		Buffer=SetStrLen(Buffer,21);
-		result=STREAMReadBytes(S,Buffer,20);
-		FM=GetFileMagic(Buffer,result);
-	}
-}
-
-// Do this even if S not open or ExamineContents not set
-if (! FM) FM=GetFileTypeInfo(FName);
-if (FM) SetVar(Vars,"ContentType",FM->ContentType);
-
-
-// if 'S' open then ExamineContents WAS set
-if (S) 
-{
-	if (FM->Flags & (FM_MEDIA_TAG | FM_IMAGE_TAG))
-	{
-		STREAMSeek(S,0,SEEK_SET);
-		MediaReadDetails(S, Vars);
-	}
-	STREAMClose(S);
-}
-
+// Do this even if S not open 
+if (! FM) FM=GetFileTypeInfo(Path);
 
 DestroyString(Buffer);
-
-return(TRUE);
+return(FM);
 }
 
 

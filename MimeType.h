@@ -25,7 +25,6 @@ int Flags;
 void LoadFileMagics(char *MimeTypesPath, char *MagicsPath);
 TFileMagic *GetContentTypeInfo(char *ContentType);
 TFileMagic *GetFileTypeInfo(char *ContentType);
-
-int ExamineFile(char *FName, int Details, ListNode *Vars);
+TFileMagic *GetFileMagicForFile(char *Path, STREAM *S);
 
 #endif

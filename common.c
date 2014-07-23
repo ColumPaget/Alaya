@@ -420,7 +420,6 @@ while (Curr)
 		Tempstr=MCopyStr(Tempstr,Session->Method," ",Session->URL,NULL);
 		SafeStr=QuoteCharsInStr(SafeStr,Tempstr,"'$;");
 
-		LogToFile(Settings.LogPath, "EVENT Check: ClientIP='%s' REQUEST='%s' TriggeredScript='%s' %d",Session->ClientIP, SafeStr, (char *) Curr->Item, EventTriggerMatch(Curr,Session));
 	if (EventTriggerMatch(Curr, Session))
 	{
 			Tempstr=MCopyStr(Tempstr, (char *) Curr->Item, " '", Session->ClientIP,"' '", SafeStr, "' ",NULL);

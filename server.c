@@ -735,6 +735,28 @@ ListDestroy(Vars,DestroyString);
 }
 
 
+
+void HTTPServerFormatExtraHeaders(HTTPSession *Session,ListNode *Vars)
+{
+ListNode *Curr;
+char *Tempstr=NULL;
+
+Curr=ListGetNext(Vars);
+while (Curr)
+{
+	LogToFile(Settings.LogPath,"HEAD: %s -? %s", Curr->Tag, Curr->Item);
+	if (strncmp(Curr->Tag,"Media-",6)==0)
+	{
+		Tempstr=MCopyStr(Tempstr,"X-",Curr->Tag,NULL);
+		SetVar(Session->Headers,Tempstr,Curr->Item);
+	}
+Curr=ListGetNext(Curr);
+}
+
+DestroyString(Tempstr);
+}
+
+
 void HTTPServerSendFile(STREAM *S, HTTPSession *Session, char *Path, ListNode *Vars, int Flags)
 {
 STREAM *Doc;
@@ -757,6 +779,7 @@ int ICYInterval=4096000;
 		}
 
 		Response=FileSendCreateSession(Path, Session->Flags, Vars, ICYInterval);
+		HTTPServerFormatExtraHeaders(Response,Vars);
 		HTTPServerSendHeaders(S, Response, Flags);
 
 		if (Response->Flags & HTTP_ENCODE_GZIP) 
@@ -793,25 +816,27 @@ void HTTPServerSendDocument(STREAM *S, HTTPSession *Session, char *Path, int Fla
 int result;
 ListNode *Vars;
 
-Vars=ListCreate();
+	Vars=ListCreate();
 
+	if (StrLen(Path)==0) result=FILE_NOSUCH;
+	else result=LoadFileRealProperties(Path, TRUE, Vars);
 
-		if (StrLen(Path)==0) result=FILE_NOSUCH;
-		else result=ExamineFile(Path, FALSE, Vars);
-		if (result==FILE_NOSUCH) 
-		{
-			HTTPServerSendHTML(S, Session, "404 Not Found","Couldn't find that document.");
-			LogToFile(Settings.LogPath,"%s@%s (%s) 404 Not Found: %s", Session->UserName,Session->ClientHost,Session->ClientIP,Path);
-		}
-		else
-		{
-			//Set 'LastModified' so we can use it if the server sends 'If-Modified-Since'
-		  Session->LastModified=atoi(GetVar(Vars,"MTime-secs"));
+		
+	LogToFile(Settings.LogPath,"LOAD PROPS: %d %d", result, ListSize(Vars));
+	if (result==FILE_NOSUCH) 
+	{
+		HTTPServerSendHTML(S, Session, "404 Not Found","Couldn't find that document.");
+		LogToFile(Settings.LogPath,"%s@%s (%s) 404 Not Found: %s", Session->UserName,Session->ClientHost,Session->ClientIP,Path);
+	}
+	else
+	{
+		//Set 'LastModified' so we can use it if the server sends 'If-Modified-Since'
+	  Session->LastModified=atoi(GetVar(Vars,"MTime-secs"));
 
-			//If we are asking for details of a file then we treat that as a directory function
-			if ((result==FILE_DIR) || (strstr(Session->Arguments,"format="))) HTTPServerSendDirectory(S,Session,Path,Vars);
-			else HTTPServerSendFile(S, Session, Path, Vars, Flags);
-		}
+		//If we are asking for details of a file then we treat that as a directory function
+		if ((result==FILE_DIR) || (strstr(Session->Arguments,"format="))) HTTPServerSendDirectory(S,Session,Path,Vars);
+		else HTTPServerSendFile(S, Session, Path, Vars, Flags);
+	}
 
 ListDestroy(Vars,DestroyString);
 }
@@ -830,7 +855,6 @@ int len;
 
 
 	
-	LogToFile(Settings.LogPath,"CHECL VPATH: [%s]",Session->Path);
 	Curr=ListGetNext(Settings.VPaths);
 	while (Curr)
 	{
