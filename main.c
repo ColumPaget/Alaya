@@ -33,11 +33,17 @@ STREAM *ParentProcessPipe=NULL;
 
 void SetTimezoneEnv()
 {
+time_t Now;
+
+time(&Now);
+localtime(&Now);
+
+printf("TZ: %s %s\n",tzname[1],tzname[0]);
 if (StrLen(tzname[1]))
 {
    setenv("TZ",tzname[1],TRUE);
 }
-else
+else if (StrLen(tzname[0]))
 {
    setenv("TZ",tzname[0],TRUE);
 }
@@ -133,14 +139,14 @@ char *Tempstr=NULL;
 int result;
 
 
-SetGMT();
-
+SetTimezoneEnv();
 
 //Drop most capabilities
 DropCapabilities(CAPS_LEVEL_STARTUP);
 nice(10);
 InitSettings();
 
+if (StrLen(Settings.Timezone)) setenv("TZ",Settings.Timezone,TRUE);
 //LibUsefulMemFlags |= MEMORY_CLEAR_ONFREE;
 
 openlog("alaya",LOG_PID, LOG_DAEMON);

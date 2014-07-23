@@ -3,14 +3,6 @@
 
 #include "common.h"
 
-#define HTTP_ENCODE_GZIP 1
-#define HTTP_ENCODE_XGZIP 2
-#define HTTP_ICECAST 4
-#define HTTP_OVERWRITE 8
-#define HTTP_KEEP_ALIVE 16
-#define HTTP_REUSE_SESSION 32
-#define HTTP_AUTHENTICATED 64
-
 //Only used by 'HTTPServerSendHeaders'
 #define HEADERS_CGI 1 
 #define HEADERS_AUTH 2

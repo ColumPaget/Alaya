@@ -142,7 +142,7 @@ DestroyString(Token);
 
 void ParseEventConfig(char *ConfigLine)
 {
-char *EventTypeStrings[]={"Method","Path","User","ClientIP",NULL};
+char *EventTypeStrings[]={"Method","Path","User","ClientIP","BadURL",NULL};
 char *Token=NULL, *ptr;
 ListNode *Node;
 int Type;
@@ -162,8 +162,8 @@ DestroyString(Token);
 
 void ParseConfigItem(char *ConfigLine)
 {
-char *ConfTokens[]={"Chroot","Chshare","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","StreamDir","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","HostConnections","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive","AccessTokenKey",NULL};
-typedef enum {CT_CHROOT, CT_CHSHARE, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_STREAMDIR, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_HOSTCONNECTIONS, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_HTTP_KEEP_ALIVE, CT_ACCESS_TOKEN_KEY};
+char *ConfTokens[]={"Chroot","Chshare","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","StreamDir","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","HostConnections","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone",NULL};
+typedef enum {CT_CHROOT, CT_CHSHARE, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_STREAMDIR, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_HOSTCONNECTIONS, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_HTTP_KEEP_ALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE};
 
 char *Token=NULL, *ptr;
 struct group *grent;
@@ -368,6 +368,11 @@ switch(result)
 	case CT_ACCESS_TOKEN_KEY:
 		Settings.AccessTokenKey=CopyStr(Settings.AccessTokenKey,ptr);
 	break;
+
+	case CT_TIMEZONE:
+		Settings.Timezone=CopyStr(Settings.Timezone,ptr);
+	break;
+
 }
 
 DestroyString(Token);
@@ -463,7 +468,7 @@ fprintf(stdout,"Blog: http://idratherhack.blogspot.com \n");
 fprintf(stdout,"Credits: Thanks to Gregor Heuer, Helmut Schmid, and Maurice R Volaski for bug reports.\n");
 fprintf(stdout,"\n");
 
-fprintf(stdout,"Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-key <path>] [-cert <path>] [-client-cert <level>] [-verify-path <path>] [-ciphers <cipher list>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>]\n\n");
+fprintf(stdout,"Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-key <path>] [-cert <path>] [-client-cert <level>] [-verify-path <path>] [-ciphers <cipher list>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>] [-tz <timezone>]\n\n");
 fprintf(stdout,"	-v:		Verbose logging.\n");
 fprintf(stdout,"	-v -v:		Even more verbose logging.\n");
 fprintf(stdout,"	-a:		Specify the authentication file for 'built in' authentication.\n");
@@ -476,6 +481,7 @@ fprintf(stdout,"	-i:		Set interface listen on, allows running separate servers o
 fprintf(stdout,"	-l:		Path to log file, default is to use 'syslog' instead.\n");
 fprintf(stdout,"	-m:		HTTP Methods (GET, PUT, DELETE, PROPFIND) that are allowed.\nComma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for readonly DAV.\n'BASE' will set GET,POST,HEAD. 'DAV' will set everything needed for WebDAV. 'RGET' will allow proxy-server gets. 'PROXY' will enable CONNECT and RGET. 'DAV,PROXY' enables everything.\n");
 fprintf(stdout,"	-p:		Set port to listen on.\n");
+fprintf(stdout,"	-tz:		Set server's timezone.\n");
 fprintf(stdout,"	-r:		'ChRoot mode', chroot into directory and offer services from it\n");
 fprintf(stdout,"	-key:		Keyfile for SSL (HTTPS)\n");
 fprintf(stdout,"	-cert:		Certificate for SSL (HTTPS). This can be a certificate chain bundled in .pem format.\n");
@@ -640,6 +646,11 @@ for (i=1; i < argc; i++)
 		ParseConfigItem(Token);
 	}
 	else if (strcmp(argv[i],"-cache")==0) Settings->DocumentCacheTime=strtol(argv[++i],NULL,10);
+	else if (strcmp(argv[i],"-tz")==0) 
+	{
+		Token=MCopyStr(Token,"Timezone=",argv[++i],NULL);
+		ParseConfigItem(Token);
+	}
 	else if (
 						(strcmp(argv[i],"-version")==0) ||
 						(strcmp(argv[i],"--version")==0) 
@@ -704,6 +715,7 @@ Settings.AuthRealm=CopyStr(Settings.AuthRealm,UnameData.nodename);
 Settings.DirListFlags=DIR_SHOWFILES | DIR_FANCY;
 Settings.IndexFiles=CopyStr(Settings.IndexFiles,"index.html,dir.html");
 Settings.M3UFileTypes=CopyStr(Settings.M3UFileTypes,".mp3,.ogg,.mp4,.flv,.webm,.m4v,.m4a,.aac");
+Settings.ForbiddenURLStrings=CopyStr(Settings.ForbiddenURLStrings,"..,%00,%2e%2e");
 Settings.VPaths=ListCreate();
 Settings.HostConnections=ListCreate();
 Settings.ScriptHandlers=ListCreate();

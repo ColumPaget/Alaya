@@ -145,23 +145,34 @@ char *ptr;
 int result=TRUE;
 
 	ptr=STREAMGetValue(S,"SSL-Certificate-Verify");
-	if (StrLen(ptr) && (strcmp(ptr,"OK")==0))
+
+	if (StrLen(ptr) )
 	{
-	 LogToFile(Settings.LogPath,"CLIENT CERTIFIED BY: %s", STREAMGetValue(S,"SSL-Certificate-Issuer"));
-	 LogToFile(Settings.LogPath,"CLIENT CERTIFICATE SUBJECT: %s", STREAMGetValue(S,"SSL-Certificate-Subject"));
+		if (strcmp(ptr,"OK")==0)
+		{
+			LogToFile(Settings.LogPath,"CLIENT CERTIFIED BY: %s", STREAMGetValue(S,"SSL-Certificate-Issuer"));
+			LogToFile(Settings.LogPath,"CLIENT CERTIFICATE SUBJECT: %s", STREAMGetValue(S,"SSL-Certificate-Subject"));
+		}
+		else 
+		{
+			if (Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED)
+			{
+				 LogToFile(Settings.LogPath,"AUTH: ERROR: SSL Certificate required, but client failed to provide a valid certificate. Error was: %s",ptr);
+				result=FALSE;
+			}
+			else LogToFile(Settings.LogPath,"AUTH: SSL Certificate provided, but invalid. Error was: %s",ptr);
+
+			ptr=STREAMGetValue(S,"SSL-Certificate-Subject");
+			if (StrLen(ptr))
+			{
+				LogToFile(Settings.LogPath,"CLIENT CERTIFICATE ISSUER: %s", STREAMGetValue(S,"SSL-Certificate-Issuer"));
+				LogToFile(Settings.LogPath,"CLIENT CERTIFICATE SUBJECT: %s", STREAMGetValue(S,"SSL-Certificate-Subject"));
+			}
+			LogFileFlushAll(TRUE);
+		}
 	}
-	else if (Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED)
-	{
-	 result=FALSE;
-	 LogToFile(Settings.LogPath,"ERROR: SSL Certificate required, but client failed to provide a valid certificate. Error was: %s",ptr);
-	 ptr=STREAMGetValue(S,"SSL-Certificate-Subject");
-	if (StrLen(ptr))
-	{
-	 LogToFile(Settings.LogPath,"CLIENT CERTIFICATE ISSUER: %s", STREAMGetValue(S,"SSL-Certificate-Issuer"));
-	 LogToFile(Settings.LogPath,"CLIENT CERTIFICATE SUBJECT: %s", STREAMGetValue(S,"SSL-Certificate-Subject"));
-	}
-	LogFileFlushAll(TRUE);
-	}
+	else if (Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED) LogToFile(Settings.LogPath,"AUTH: ERROR: SSL Certificate required, but client failed to provide a valid certificate.");
+
 
 return(result);
 }
@@ -227,26 +238,14 @@ if (tmp_ptr)
 
 
 //URL with arguments removed is the 'true' URL
-Heads->URL=HTTPUnQuote(Heads->URL,Token);
+Heads->URL=CopyStr(Heads->URL,Token);
 if (StrLen(Heads->URL)==0) Heads->URL=CopyStr(Heads->URL,"/");
-
-
 StripTrailingWhitespace(Heads->URL);
-Tempstr=STREAMReadLine(Tempstr,S);
-
-if (StrLen(Tempstr))
-{
-	StripTrailingWhitespace(Tempstr);
-	StripLeadingWhitespace(Tempstr);
-}
-
-tmp_ptr=Heads->URL;
-while (*tmp_ptr=='/') tmp_ptr++;
 
 if 
 (
-	(strncasecmp(tmp_ptr,"http:",5)==0) ||
-	(strncasecmp(tmp_ptr,"https:",6)==0)
+	(strncasecmp(Heads->URL,"http:",5)==0) ||
+	(strncasecmp(Heads->URL,"https:",6)==0)
 )
 {
 	if (Heads->MethodID==METHOD_GET) 
@@ -263,9 +262,13 @@ if
 }
 
 
-if (*tmp_ptr=='/') Heads->Path=CopyStr(Heads->Path,tmp_ptr);
-else Heads->Path=MCopyStr(Heads->Path,"/",tmp_ptr,NULL);
+Tempstr=STREAMReadLine(Tempstr,S);
 
+if (Tempstr)
+{
+	StripTrailingWhitespace(Tempstr);
+	StripLeadingWhitespace(Tempstr);
+}
 
 while (StrLen(Tempstr) )
 {
@@ -386,6 +389,13 @@ StripLeadingWhitespace(Tempstr);
 
 
 if (strstr(Heads->Arguments,"AccessToken")) Heads->AuthFlags |= FLAG_AUTH_PRESENT | FLAG_AUTH_ACCESS_TOKEN;
+
+
+Tempstr=HTTPUnQuote(Tempstr,Heads->URL);
+if (*Tempstr=='/') Heads->Path=CopyStr(Heads->Path,Tempstr);
+else Heads->Path=MCopyStr(Heads->Path,"/",Tempstr,NULL);
+StripTrailingWhitespace(Heads->Path);
+
 
 DestroyString(Tempstr);
 DestroyString(Token);
@@ -785,16 +795,7 @@ ListNode *Vars;
 
 Vars=ListCreate();
 
-//Do not accept any paths containing '..', as these can be used to
-//access documents outside of the trusted path
-if (strstr(Path,"../"))
-{
-	LogToFile(Settings.LogPath,"ERR: '..' found in %s",Path);
-	 HTTPServerSendHTML(S, Session, "403 Forbidden","'..' pattern found in URL");
-	LogToFile(Settings.LogPath,"%s@%s (%s) 403 Forbidden: '..' found in URL %s", Session->UserName,Session->ClientHost,Session->ClientIP,Path);
-}
-else
-{
+
 		if (StrLen(Path)==0) result=FILE_NOSUCH;
 		else result=ExamineFile(Path, FALSE, Vars);
 		if (result==FILE_NOSUCH) 
@@ -811,7 +812,6 @@ else
 			if ((result==FILE_DIR) || (strstr(Session->Arguments,"format="))) HTTPServerSendDirectory(S,Session,Path,Vars);
 			else HTTPServerSendFile(S, Session, Path, Vars, Flags);
 		}
-}
 
 ListDestroy(Vars,DestroyString);
 }
@@ -1509,6 +1509,30 @@ DestroyString(Tempstr);
 
 
 
+
+int HTTPServerValidateURL(HTTPSession *Session, char **Token)
+{
+char *ptr;
+
+
+LogToFile(Settings.LogPath,"VALID: %s",Session->URL);
+ptr=GetToken(Settings.ForbiddenURLStrings,",",Token,0);
+while (ptr)
+{
+	if (strstr(Session->URL,*Token)) 
+	{
+		Session->Flags |= HTTP_ERR_BADURL;
+		return(FALSE);
+	}
+	ptr=GetToken(ptr,",",Token,0);
+}
+
+return(TRUE);
+}
+
+
+
+
 void HTTPServerHandleConnection(HTTPSession *Session)
 {
 char *Tempstr=NULL, *Method=NULL, *URL=NULL, *ptr;
@@ -1551,11 +1575,17 @@ if (! HTTPMethodAllowed(Session))
 	HTTPServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
 	LogToFile(Settings.LogPath,"%s@%s (%s) 503 Not Implemented. %s %s", Session->UserName,Session->ClientHost,Session->ClientIP,Session->Method,Session->Path);
 }
+else if (! HTTPServerValidateURL(Session, &Tempstr))
+{
+	LogToFile(Settings.LogPath,"ERR: '%s' found in %s",Tempstr,Session->URL);
+	HTTPServerSendHTML(Session->S, Session, "403 Forbidden","Bad pattern found in URL");
+	LogToFile(Settings.LogPath,"%s@%s (%s) 403 Forbidden: '%s' found in URL %s", Session->UserName, Session->ClientHost, Session->ClientIP, Tempstr, Session->URL);
+}
 else if (AuthOkay)
 {
 if (! (Session->Flags & HTTP_REUSE_SESSION)) HTTPServerSetUserContext(Session);
 
-StripTrailingWhitespace(Session->Path);
+
 
 switch (Session->MethodID)
 {

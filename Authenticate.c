@@ -20,7 +20,7 @@
 
 char *AuthenticationsTried=NULL;
 
-char *AuthMethods[]={"native","pam","passwd","shadow","digest","accesstoken","open",NULL};
+char *AuthMethods[]={"native","pam","passwd","shadow","digest","accesstoken","open","none","deny",NULL};
 
 #define AUTH_NONE 0
 #define AUTH_STD 1
@@ -800,6 +800,16 @@ while (ptr)
 	else if (strcasecmp(Token,"accesstoken")==0) result=AuthAccessToken(Session);
 	#ifdef HAVE_LIBPAM
 	else if (strcasecmp(Token,"pam")==0) result=AuthPAM(Session);
+	else if (strcasecmp(Token,"none")==0) 
+	{
+		result=FALSE;
+		break;
+	}
+	else if (strcasecmp(Token,"deny")==0) 
+	{
+		result=FALSE;
+		break;
+	}
 	#endif
 
 	if (result==TRUE) break;

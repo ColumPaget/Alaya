@@ -96,6 +96,7 @@ ptr=GetNameValuePair(Data,"&","=",&Name,&Value);
 while (ptr)
 {
 	Token=HTTPUnQuote(Token, Value);
+	StripTrailingWhitespace(Token);
 	Value=SanitizeStr(Value,Token);
 
 	if (RetStr && (*RetStr != '\0')) RetStr=MCatStr(RetStr,"&",Name,"=",Value,NULL);
@@ -124,7 +125,6 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 	Response->ContentSize=0;
 	Response->LastModified=0;
 
-	
 	ptr=GetNameValuePair(Data," ","=",&Name,&Tempstr);
 	while (ptr)
 	{
@@ -154,6 +154,9 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		ptr=GetNameValuePair(ptr," ","=",&Name,&Tempstr);
 	}
 
+
+LogToFile(Settings.LogPath,"Arguments: [%s]",Response->Arguments);
+
 DestroyString(Name);
 DestroyString(Value);
 DestroyString(Tempstr);
@@ -164,7 +167,7 @@ return(Response);
 
 void SetupEnvironment(HTTPSession *Session)
 {
-char *Tempstr=NULL;
+char *Tempstr=NULL, *ptr;
 
 	setenv("GATEWAY_INTERFACE","CGI/1.1",TRUE);
 	setenv("REMOTE_USER",Session->UserName,TRUE);
@@ -176,7 +179,10 @@ char *Tempstr=NULL;
 	Tempstr=FormatStr(Tempstr,"%d",Session->ContentSize);
 	setenv("CONTENT_LENGTH",Tempstr,TRUE);
 	setenv("CONTENT_TYPE",Session->ContentType,TRUE);
-	setenv("SCRIPT_NAME",Session->URL,TRUE);
+	ptr=strrchr(Session->Path,'/');
+	if (ptr) ptr++;
+	else ptr=Session->Path;
+	setenv("SCRIPT_NAME",ptr,TRUE);
 	setenv("QUERY_STRING",Session->Arguments,TRUE);
 	setenv("HTTP_USER_AGENT",Session->UserAgent,TRUE);
 	setenv("HTTP_REFERER",Session->ClientReferrer,TRUE);

@@ -391,6 +391,10 @@ while (ptr)
 			case EVENT_PEERIP:
 			if (fnmatch(Token,Session->ClientIP,0) ==0) result=TRUE;
 			break;
+
+			case EVENT_BADURL:
+			if (Session->Flags & HTTP_ERR_BADURL) result=TRUE;
+			break;
 	}
 	ptr=GetToken(ptr,",",&Token,0);
 }
@@ -406,20 +410,22 @@ return(result);
 int ProcessEventTriggers(HTTPSession *Session)
 {
 ListNode *Curr;
-char *Tempstr=NULL, *SafeStr=NULL;
+char *Tempstr=NULL, *SafeStr=NULL, *Path=NULL;
+
 
 Curr=ListGetNext(Settings.Events);
 while (Curr)
-{
+{	
+		Tempstr=MCopyStr(Tempstr,Session->Method," ",Session->URL,NULL);
+		SafeStr=QuoteCharsInStr(SafeStr,Tempstr,"'$;");
+
+		LogToFile(Settings.LogPath, "EVENT Check: ClientIP='%s' REQUEST='%s' TriggeredScript='%s' %d",Session->ClientIP, SafeStr, (char *) Curr->Item, EventTriggerMatch(Curr,Session));
 	if (EventTriggerMatch(Curr, Session))
 	{
-			Tempstr=MCopyStr(Tempstr,Session->Method," ",Session->URL,NULL);
-			SafeStr=QuoteCharsInStr(SafeStr,Tempstr,"'$;");
 			Tempstr=MCopyStr(Tempstr, (char *) Curr->Item, " '", Session->ClientIP,"' '", SafeStr, "' ",NULL);
-			
 			LogToFile(Settings.LogPath, "EVENT TRIGGERED: ClientIP='%s' REQUEST='%s' TriggeredScript='%s'",Session->ClientIP, SafeStr, (char *) Curr->Item);
 
-			if (Spawn(Tempstr,Settings.DefaultUser,Settings.DefaultGroup,NULL) ==-1)
+			if (Spawn(Tempstr,"","",NULL) ==-1)
 			{
 				LogToFile(Settings.LogPath, "ERROR: Failed to run event script '%s'. Error was: %s",(char *) Curr->Item, strerror(errno));
 			}

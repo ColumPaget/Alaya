@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <pwd.h>
 
+//Flag values for Settings->Flags
 #define FLAG_NODEMON 1
 #define FLAG_CHROOT 2
 #define FLAG_CHHOME 4
@@ -22,6 +23,7 @@
 #define FLAG_KEEP_ALIVES 32768
 
 
+//Flag values for Settings->AuthFlags and Session->AuthFlags
 #define FLAG_AUTH_REQUIRED 1
 #define FLAG_AUTH_PRESENT  2
 #define FLAG_AUTH_DIGEST   4
@@ -29,6 +31,16 @@
 #define FLAG_AUTH_CERT_REQUIRED 16
 #define FLAG_AUTH_CERT_SUFFICIENT 32
 #define FLAG_AUTH_CERT_ASK 64
+
+//Flag values for Session->Flags
+#define HTTP_ENCODE_GZIP 1
+#define HTTP_ENCODE_XGZIP 2
+#define HTTP_ICECAST 4
+#define HTTP_OVERWRITE 8
+#define HTTP_KEEP_ALIVE 16
+#define HTTP_REUSE_SESSION 32
+#define HTTP_AUTHENTICATED 64
+#define HTTP_ERR_BADURL 4096
 
 
 
@@ -45,6 +57,7 @@
 #define LOGIN_CHANGE 8
 #define LOGIN_CHECK_ALLOWED 16
 
+//Flag Values for Settings->DirListFlags
 #define DIR_REJECT      -1
 #define DIR_SHOWFILES   1
 #define DIR_INDEX_FILES 2
@@ -59,6 +72,7 @@
 #define DIR_TARBALLS		524288
 
 
+//Flag values for the DropCapabilities function
 #define CAPS_LEVEL_STARTUP  1
 #define CAPS_LEVEL_NETBOUND 2
 #define CAPS_LEVEL_CHROOTED 3
@@ -66,7 +80,7 @@
 
 typedef enum {PATHTYPE_EXTFILE, PATHTYPE_CGI, PATHTYPE_STREAM, PATHTYPE_LOGOUT, PATHTYPE_PROXY, PATHTYPE_MIMEICONS, PATHTYPE_URL, PATHTYPE_FILE, PATHTYPE_DIR} TPathTypes;
 
-typedef enum {EVENT_METHOD, EVENT_PATH, EVENT_USER, EVENT_PEERIP} TEventTypes; 	
+typedef enum {EVENT_METHOD, EVENT_PATH, EVENT_USER, EVENT_PEERIP, EVENT_BADURL} TEventTypes; 	
 
 
 typedef struct
@@ -104,6 +118,8 @@ char *HttpMethods;
 char *IndexFiles;
 char *M3UFileTypes;
 char *AccessTokenKey;
+char *ForbiddenURLStrings;
+char *Timezone;
 int DisplayNameLen;
 unsigned long DocumentCacheTime;
 ListNode *SSLKeys;

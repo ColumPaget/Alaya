@@ -1,8 +1,8 @@
 #include "ID3.h"
 
 #define ID3v1_LEN 128
-char *TagTypes[]={"ID31TAGEND","TAG","ID3","Ogg","\x89PNG","\xFF\xD8\xFF",NULL};
-typedef enum {TAG_ID3_END,TAG_ID3,TAG_ID3v2,TAG_OGG,TAG_PNG,TAG_JPEG};
+char *TagTypes[]={"ID31TAGEND","TAG","ID3\x02","ID3\x03","ID3\0x4","Ogg","\x89PNG","\xFF\xD8\xFF",NULL};
+typedef enum {TAG_ID3_END,TAG_ID3,TAG_ID3v2,TAG_ID3v3,TAG_ID3v4,TAG_OGG,TAG_PNG,TAG_JPEG};
 
 
 typedef struct
@@ -62,15 +62,15 @@ Tag=(TID3v1_TAG *) calloc(1,sizeof(TID3v1_TAG));
 STREAMReadBytes(S,(char *) Tag,sizeof(TID3v1_TAG));
 
 Tempstr=CopyStrLen(Tempstr,Tag->Artist,30);
-SetVar(Vars,"Artist",Tempstr);
+SetVar(Vars,"Media:Artist",Tempstr);
 Tempstr=CopyStrLen(Tempstr,Tag->Album,30);
-SetVar(Vars,"Album",Tempstr);
+SetVar(Vars,"Media:Album",Tempstr);
 Tempstr=CopyStrLen(Tempstr,Tag->Title,30);
-SetVar(Vars,"Title",Tempstr);
+SetVar(Vars,"Media:Title",Tempstr);
 Tempstr=CopyStrLen(Tempstr,Tag->Comment,30);
-SetVar(Vars,"Comment",Tempstr);
+SetVar(Vars,"Media:Comment",Tempstr);
 Tempstr=CopyStrLen(Tempstr,Tag->Year,4);
-SetVar(Vars,"Year",Tempstr);
+SetVar(Vars,"Media:Year",Tempstr);
 
 result=TRUE;
 
@@ -80,25 +80,127 @@ free(Tag);
 return(result);
 }
 
-int ConvertSyncsafeBytes(uint8_t High, uint8_t Low)
+int ConvertSyncsafeBytes(uint8_t Top, uint8_t High, uint8_t Low)
 {
 int val;
 
+/*
 val=High;
 val >> 1;
 val |= Low;
+*/
 
-return(val);
+return((Top * 65536) + (High * 256) + Low);
 }
 
+typedef enum {TAG_COMPOSER,TAG_ALBUM,TAG_TITLE,TAG_COMMENT,TAG_BPM,TAG_ARTIST,TAG_BAND,TAG_YEAR,TAG_LEN,TAG_GENRE,TAG_TRACK,TAG_WEBPAGE_COM,TAG_WEBPAGE_COPYRIGHT,TAG_WEBPAGE_AUDIOFILE, TAG_WEBPAGE_ARTIST, TAG_WEBPAGE_AUDIOSOURCE, TAG_WEBPAGE_STATION,TAG_WEBPAGE_PUBLISHER,TAG_USER_URL,TAG_IMAGE} TID3Tags;
 
 int ID3v2ReadTag(STREAM *S, ListNode *Vars)
 {
+char *Tempstr=NULL, *TagName=NULL, *ptr;
+uint8_t Version, Revision;
+uint32_t Len;
+int TagNameLen=3, result;
+
+//Some of these don't exist, but are left as placeholders to match against TID3Tags
+char *ID3v2Fields[]={"TCM","TAL","TT2","COM","BPM","TP1","TP2","TYE","TLE","TCO","TRK","WCOM","WCP","WAF","WAR","WAS","WORS","WPB","WXX","PIC",NULL};
+
+Tempstr=SetStrLen(Tempstr,100);
+
+//Read 'ID3'
+STREAMReadBytes(S,Tempstr,3);
+
+//ReadTag Version
+STREAMReadBytes(S,(char *) &Version,1);
+STREAMReadBytes(S,(char *) &Revision,1);
+
+//Other info
+STREAMReadBytes(S,Tempstr,5);
+
+//Read Tag Frames
+while (1)
+{
+TagName=SetStrLen(TagName,TagNameLen);
+result=STREAMReadBytes(S,TagName,TagNameLen);
+TagName[result]='\0';
+if (*TagName=='\0') break;
+
+//Flags
+STREAMReadBytes(S,Tempstr,3);
+Len=ConvertSyncsafeBytes(0, Tempstr[1], Tempstr[2]);
+if (Len < 1) break;
+
+
+Tempstr=SetStrLen(Tempstr,Len);
+result=STREAMReadBytes(S,Tempstr,Len);
+Tempstr[result]='\0';
+
+if (result > 0)
+{
+	result=MatchTokenFromList(TagName,ID3v2Fields,0);
+	LogToFile(Settings.LogPath,"v2 TAG: [%s] [%s] %d\n",TagName,Tempstr,result);
+	switch (result)
+	{
+		case TAG_ARTIST:
+		case TAG_BAND:
+		case TAG_COMPOSER: SetVar(Vars,"Media:Artist",Tempstr+1); break;
+		case TAG_ALBUM: SetVar(Vars,"Media:Album",Tempstr+1); break;
+		case TAG_TITLE: SetVar(Vars,"Media:Title",Tempstr+1); break;
+		case TAG_COMMENT: SetVar(Vars,"Media:Comment",Tempstr+1); break;
+		case TAG_BPM: SetVar(Vars,"Media:BPM",Tempstr+1); break;
+		case TAG_YEAR: SetVar(Vars,"Media:Year",Tempstr+1); break;
+		case TAG_GENRE: SetVar(Vars,"Media:Genre",Tempstr+1); break;
+		case TAG_TRACK: SetVar(Vars,"Media:AlbumTrackNumber",Tempstr+1); break;
+		case TAG_USER_URL: SetVar(Vars,"Media:AssociatedURL",Tempstr+1); break;
+		case TAG_WEBPAGE_COM: SetVar(Vars,"Media:CommerialWebpage",Tempstr+1); break;
+		case TAG_WEBPAGE_COPYRIGHT: SetVar(Vars,"Media:Copyright/LegalWebpage",Tempstr+1); break;
+		case TAG_WEBPAGE_AUDIOFILE: SetVar(Vars,"Media:AudiofileWebpage",Tempstr+1); break;
+		case TAG_WEBPAGE_ARTIST: SetVar(Vars,"Media:ArtistWebpage",Tempstr+1); break;
+		case TAG_WEBPAGE_AUDIOSOURCE: SetVar(Vars,"Media:AudioSourceWebpage",Tempstr+1); break;
+		case TAG_WEBPAGE_STATION: SetVar(Vars,"Media:RadioStationWebpage",Tempstr+1); break;
+		case TAG_WEBPAGE_PUBLISHER: SetVar(Vars,"Media:PublisherWebpage",Tempstr+1); break;
+
+		case TAG_LEN: 
+			//convert from milliseconds
+			Len=atoi(Tempstr) / 1000;
+			Tempstr=FormatStr(Tempstr,"%d:%d",Len / 60, Len % 60);
+			SetVar(Vars,"Media:Duration",Tempstr); 
+		break;
+
+		case TAG_IMAGE:
+			ptr=NULL;
+			if (strcmp(Tempstr+1,"JPG")==0) ptr="image/jpeg";
+			if (strcmp(Tempstr+1,"PNG")==0) ptr="image/png";
+			if (ptr)
+			{
+				TagName=EncodeBytes(TagName,Tempstr+5,Len-5,ENCODE_BASE64);
+				Tempstr=MCopyStr(Tempstr,"<img src='data:",ptr,";base64,",TagName,"'>",NULL);
+				SetVar(Vars,"Thumbnail",Tempstr); break;
+			}
+		break;
+	}
+}
+
+}
+
+DestroyString(TagName);
+DestroyString(Tempstr);
+
+return(TRUE);
+}
+
+
+
+int ID3v3ReadTag(STREAM *S, ListNode *Vars)
+{
 char *Tempstr=NULL, *TagName=NULL;
 uint8_t Version, Revision;
+uint16_t ShortVal;
 int TagNameLen=4, len, result;
-char *ID3v2Fields[]={"TCOM","TALB","TIT2","COMM","TBPM","TPE1","TPE2","TYER","TLEN","TCON","TRCK",NULL};
-typedef enum {TAG_COMPOSER,TAG_ALBUM,TAG_TITLE,TAG_COMMENT,TAG_BPM,TAG_ARTIST,TAG_BAND,TAG_YEAR,TAG_LEN,TAG_GENRE,TAG_TRACK};
+
+//WPUB	Publishers official webpage
+char *ID3v3Fields[]={"TCOM","TALB","TIT2","COMM","TBPM","TPE1","TPE2","TYER","TLEN","TCON","TRCK","WCOM","WCOP","WOAF","WOAR","WOAS","WORS","WPUB","WXXX",NULL};
+typedef enum {TAG_COMPOSER,TAG_ALBUM,TAG_TITLE,TAG_COMMENT,TAG_BPM,TAG_ARTIST,TAG_BAND,TAG_YEAR,TAG_LEN,TAG_GENRE,TAG_TRACK,TAG_WEBPAGE_COM,TAG_WEBPAGE_COPYRIGHT,TAG_WEBPAGE_AUDIOFILE, TAG_WEBPAGE_ARTIST, TAG_WEBPAGE_AUDIOSOURCE, TAG_WEBPAGE_STATION,TAG_WEBPAGE_PUBLISHER,TAG_USER_URL};
 
 Tempstr=SetStrLen(Tempstr,100);
 
@@ -123,10 +225,9 @@ if (*TagName=='\0') break;
 //Flags
 STREAMReadBytes(S,Tempstr,2);
 
-
-//Data len, stored in a crazy 'syncsafe' format
 STREAMReadBytes(S,Tempstr,4);
-len=ConvertSyncsafeBytes(Tempstr[1], Tempstr[0]);
+//Data len, stored in a crazy 'syncsafe' format
+len=ConvertSyncsafeBytes(0, Tempstr[0], Tempstr[1]);
 if (len < 1) break;
 
 //Encoding Byte, this counts as part of the data, so we read len-1
@@ -138,24 +239,34 @@ Tempstr[result]='\0';
 
 if (StrLen(Tempstr))
 {
-	result=MatchTokenFromList(TagName,ID3v2Fields,0);
+	result=MatchTokenFromList(TagName,ID3v3Fields,0);
+	LogToFile(Settings.LogPath,"v3 TAG: [%s] [%s] %d %d\n",TagName,Tempstr,result,len);
 	switch (result)
 	{
 		case TAG_ARTIST:
 		case TAG_BAND:
-		case TAG_COMPOSER: SetVar(Vars,"Artist",Tempstr); break;
-		case TAG_ALBUM: SetVar(Vars,"Album",Tempstr); break;
-		case TAG_TITLE: SetVar(Vars,"Title",Tempstr); break;
-		case TAG_COMMENT: SetVar(Vars,"Comment",Tempstr); break;
-		case TAG_BPM: SetVar(Vars,"BPM",Tempstr); break;
-		case TAG_YEAR: SetVar(Vars,"Year",Tempstr); break;
-		case TAG_GENRE: SetVar(Vars,"Genre",Tempstr); break;
-		case TAG_TRACK: SetVar(Vars,"AlbumTrackNumber",Tempstr); break;
+		case TAG_COMPOSER: SetVar(Vars,"Media:Artist",Tempstr); break;
+		case TAG_ALBUM: SetVar(Vars,"Media:Album",Tempstr); break;
+		case TAG_TITLE: SetVar(Vars,"Media:Title",Tempstr); break;
+		case TAG_COMMENT: SetVar(Vars,"Media:Comment",Tempstr); break;
+		case TAG_BPM: SetVar(Vars,"Media:BPM",Tempstr); break;
+		case TAG_YEAR: SetVar(Vars,"Media:Year",Tempstr); break;
+		case TAG_GENRE: SetVar(Vars,"Media:Genre",Tempstr); break;
+		case TAG_TRACK: SetVar(Vars,"Media:AlbumTrackNumber",Tempstr); break;
+		case TAG_USER_URL: SetVar(Vars,"Media:AssociatedURL",Tempstr); break;
+		case TAG_WEBPAGE_COM: SetVar(Vars,"Media:CommerialWebpage",Tempstr); break;
+		case TAG_WEBPAGE_COPYRIGHT: SetVar(Vars,"Media:Copyright/LegalWebpage",Tempstr); break;
+		case TAG_WEBPAGE_AUDIOFILE: SetVar(Vars,"Media:AudiofileWebpage",Tempstr); break;
+		case TAG_WEBPAGE_ARTIST: SetVar(Vars,"Media:ArtistWebpage",Tempstr); break;
+		case TAG_WEBPAGE_AUDIOSOURCE: SetVar(Vars,"Media:AudioSourceWebpage",Tempstr); break;
+		case TAG_WEBPAGE_STATION: SetVar(Vars,"Media:RadioStationWebpage",Tempstr); break;
+		case TAG_WEBPAGE_PUBLISHER: SetVar(Vars,"Media:PublisherWebpage",Tempstr); break;
+
 		case TAG_LEN: 
 			//convert from milliseconds
 			len=atoi(Tempstr) / 1000;
 			Tempstr=FormatStr(Tempstr,"%d:%d",len / 60, len % 60);
-			SetVar(Vars,"Duration",Tempstr); 
+			SetVar(Vars,"Media:Duration",Tempstr); 
 		break;
 
 	}
@@ -289,7 +400,8 @@ ptr=GetToken(Tempstr," ",&Token,GETTOKEN_QUOTES);
 while (ptr)
 {
 	Value=CopyStr(Value,GetToken(Token,"=",&Name,0));
-	SetVar(Vars,Name,Value);
+	Token=MCopyStr(Token,"Media:",Value,NULL);
+	SetVar(Vars,Token,Value);
 ptr=GetToken(ptr," ",&Token,GETTOKEN_QUOTES);
 }
 
@@ -439,6 +551,8 @@ switch (result)
 case TAG_ID3: result=ID3v1ReadTag(S,Vars); break;
 case TAG_ID3_END: STREAMSeek(S,(double) 0 - ID3v1_LEN,SEEK_END); result=ID3v1ReadTag(S,Vars); break;
 case TAG_ID3v2: result=ID3v2ReadTag(S,Vars); break;
+case TAG_ID3v3: result=ID3v3ReadTag(S,Vars); break;
+case TAG_ID3v4: result=ID3v3ReadTag(S,Vars); break;
 case TAG_OGG: result=OggReadTag(S,Vars); break;
 case TAG_JPEG: result=JPEGReadHeader(S,Vars); break;
 case TAG_PNG: result=PNGReadHeader(S,Vars); break;
