@@ -509,7 +509,7 @@ for (i=0; i < NoOfFiles; i++)
 	if (InFileTypeList(Files[i]->Path,Settings.M3UFileTypes))
 	{
 		GenerateRandomBytes(&Salt,24,ENCODE_HEX);
-		AccessToken=MakeAccessToken(AccessToken, Salt, Session->UserName, "GET", Session->ClientIP, Files[i]->URL);
+		AccessToken=MakeAccessToken(AccessToken, Salt, Session->UserName, Session->ClientIP, Files[i]->URL);
 		M3U=MCatStr(M3U,Files[i]->URL,"?AccessToken=",AccessToken,"&Salt=",Salt,"&User=",Session->UserName,"\n",NULL);
 	}	
 }

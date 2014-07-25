@@ -1631,7 +1631,7 @@ switch (Session->MethodID)
 		break;
 
 	case METHOD_HEAD:
-		HTTPServerFindAndSendDocument(Session->S,Session,HEADERS_SENDFILE|HEADERS_KEEPALIVE);
+		HTTPServerFindAndSendDocument(Session->S,Session,HEADERS_KEEPALIVE);
 		break;
 
 	case METHOD_PUT:

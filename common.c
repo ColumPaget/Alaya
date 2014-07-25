@@ -194,7 +194,7 @@ return(Tempstr);
 
 
 
-char *MakeAccessToken(char *Buffer, char *Salt, char *User, char *Method, char *RequestingHost, char *RequestURL)
+char *MakeAccessToken(char *Buffer, char *Salt, char *User, char *RequestingHost, char *RequestURL)
 {
 char *Tempstr=NULL, *RetStr=NULL;
 
@@ -203,7 +203,7 @@ RetStr=CopyStr(Buffer,"");
 
 if (StrLen(Settings.AccessTokenKey))
 {
-	Tempstr=MCopyStr(Tempstr,Salt,":",User,":",Settings.AccessTokenKey,":",Method,":",RequestingHost,":",RequestURL,NULL);
+	Tempstr=MCopyStr(Tempstr,Salt,":",User,":",Settings.AccessTokenKey,":",RequestingHost,":",RequestURL,NULL);
 	HashBytes(&RetStr,"sha1",Tempstr,StrLen(Tempstr),ENCODE_HEX);
 }
 

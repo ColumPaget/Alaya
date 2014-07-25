@@ -155,7 +155,6 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 	}
 
 
-LogToFile(Settings.LogPath,"Arguments: [%s]",Response->Arguments);
 
 DestroyString(Name);
 DestroyString(Value);

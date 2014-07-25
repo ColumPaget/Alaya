@@ -188,8 +188,9 @@ int CheckAccessToken(HTTPSession *Session, char *Salt, char *URL, char *ClientIP
 char *Token=NULL;
 int result=FALSE;
 
-
-Token=MakeAccessToken(Token, Salt, Session->UserName, Session->Method, ClientIP, URL);
+if (strcmp(Session->Method, "PUT")==0) return(FALSE);
+if (strcmp(Session->Method, "POST")==0) return(FALSE);
+Token=MakeAccessToken(Token, Salt, Session->UserName, ClientIP, URL);
 if (StrLen(Token) && (strcmp(Token, CorrectToken)==0)) result=TRUE; 
 
 DestroyString(Token);

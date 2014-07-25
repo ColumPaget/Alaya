@@ -200,7 +200,7 @@ TPathItem *PathItemCreate(int Type, char *URL, char *Path);
 void PathItemDestroy(void *pi_ptr);
 
 char *FormatURL(char *Buff, HTTPSession *Session, char *ItemPath);
-char *MakeAccessToken(char *Buffer, char *User, char *Salt, char *Method, char *RequestingHost, char *RequestURL);
+char *MakeAccessToken(char *Buffer, char *User, char *Salt, char *RequestingHost, char *RequestURL);
 
 char *ParentDirectory(char *RetBuff, char *Path);
 
