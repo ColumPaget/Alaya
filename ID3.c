@@ -133,6 +133,9 @@ if (Len < 1) break;
 
 Tempstr=SetStrLen(Tempstr,Len);
 result=STREAMReadBytes(S,Tempstr,Len);
+
+if (result < 1) break;
+
 Tempstr[result]='\0';
 
 if (result > 0)
@@ -235,6 +238,8 @@ STREAMReadBytes(S,Tempstr,1);
 
 Tempstr=SetStrLen(Tempstr,len);
 result=STREAMReadBytes(S,Tempstr,len-1);
+if (result < 1) break;
+
 Tempstr[result]='\0';
 
 if (StrLen(Tempstr))
