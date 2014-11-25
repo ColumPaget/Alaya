@@ -313,7 +313,6 @@ char *Tempstr=NULL, *XML=NULL;
 int BuffSize=4096, result;
 ListNode *PropList;
 
-//sleep(30);
 
 PropList=ListCreate();
 if (Heads->ContentSize > 0) HTTPServerReadProps(S, Heads, PropList);

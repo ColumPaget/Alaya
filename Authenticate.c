@@ -58,6 +58,9 @@ void AuthenticateExamineMethods(char *Methods)
 char *ptr, *Token=NULL;
 int MethodFound=AUTH_NONE;
 
+
+LogToFile(Settings.LogPath,"CONSIDER AUTH METHODS: %s",Methods);
+
 ptr=GetToken(Methods,",",&Token,0);
 while (ptr)
 {
@@ -460,6 +463,13 @@ if (S)
 			Token=CopyStr(Token,Pass);
 			Tempstr=MCopyStr(Tempstr,Name,":",PassType,":",Token,":",RealUser,":",HomeDir,":",Args,"\n",NULL);
 		}
+		else if (strcmp(PassType,"htdigest-md5")==0)
+		{
+			//Calc 'HA1'
+			Tempstr=MCopyStr(Tempstr,Name,":",Settings.AuthRealm,":",Pass,NULL);
+			HashBytes(&Token,"md5",Tempstr,StrLen(Tempstr),ENCODE_HEX);
+			Tempstr=MCopyStr(Tempstr,Name,":",PassType,":",Token,":",RealUser,":",HomeDir,":",Args,"\n",NULL);
+		}
 		else
 		{
 			GenerateRandomBytes(&Salt,24, ENCODE_BASE64);
@@ -525,7 +535,13 @@ else
 
 if (StrLen(PassType) && StrLen(ProvidedPass))
 {
-	if (StrLen(Salt))
+	if (strcmp(PassType,"htdigest-md5")==0)
+	{
+		Tempstr=MCopyStr(Tempstr,Name,":",Settings.AuthRealm,":",ProvidedPass,NULL);
+		HashBytes(&Digest,"md5",Tempstr,StrLen(Tempstr),ENCODE_HEX);
+		LogToFile(Settings.LogPath,"DIG1: [%s] [%s]",Tempstr,Digest);
+	}
+	else if (StrLen(Salt))
 	{
 			//Salted passwords as of version 1.1.1
 			Tempstr=MCopyStr(Tempstr,Name,":",ProvidedPass,":",Salt,NULL);
@@ -535,6 +551,7 @@ if (StrLen(PassType) && StrLen(ProvidedPass))
 	else HashBytes(&Digest,PassType,ProvidedPass,StrLen(ProvidedPass),ENCODE_HEX);
 		
 	if (StrLen(Digest) && (strcmp(Password,Digest)==0)) result=TRUE;
+	LogToFile(Settings.LogPath,"DIG2: [%s] [%s]",Password,Digest);
 }
 
 DestroyString(Tempstr);
@@ -546,21 +563,41 @@ return(result);
 }
 
 
-int NativeFileCheckHTTPDigestAuth(HTTPSession *Session, char *Password,char *ProvidedPass)
+
+/* HTTP Digest format uses the algorithm MD5(H1,H2) where:
+
+ H1 is MD5(<username>:<auth realm>:password)
+ H2 is MD5(<http method>:<extra details>:<request URI>)
+
+ <extra details> contains a number of values sent by the server and echoed back by the client
+*/
+int NativeFileCheckHTTPDigestAuth(HTTPSession *Session, char *PasswordType, char *Password,char *ProvidedPass)
 {
 char *Tempstr=NULL, *Digest1=NULL, *Digest2=NULL;
 char *Algo=NULL, *URI=NULL, *p_AuthDetails;
 int result=FALSE;
 
+
 if (! ProvidedPass) return(FALSE);
+if (! StrLen(PasswordType)) return(FALSE);
+if (
+			(strcmp(PasswordType, "plain") !=0) &&
+			(strcmp(PasswordType, "htdigest-md5") !=0) 
+	) return(FALSE);
+	
 
 	p_AuthDetails=GetToken(Session->AuthDetails,":",&URI,0);
 	p_AuthDetails=GetToken(p_AuthDetails,":",&Algo,0);
 	if (! StrLen(URI)) URI=CopyStr(URI,Session->Path);
 
-	//Calc 'HA1'
-	Tempstr=MCopyStr(Tempstr,Session->UserName,":",Settings.AuthRealm,":",Password,NULL);
-	HashBytes(&Digest1,"md5",Tempstr,StrLen(Tempstr),ENCODE_HEX);
+	if (strcmp(PasswordType,"htdigest-md5")==0) Digest1=CopyStr(Digest1, Password);
+	else
+	{
+		//Calc 'HA1'
+		Tempstr=MCopyStr(Tempstr,Session->UserName,":",Settings.AuthRealm,":",Password,NULL);
+		HashBytes(&Digest1,"md5",Tempstr,StrLen(Tempstr),ENCODE_HEX);
+	}
+
 
 	//Calc 'HA2'
 
@@ -572,6 +609,7 @@ if (! ProvidedPass) return(FALSE);
 	HashBytes(&Digest1,"md5",Tempstr,StrLen(Tempstr),ENCODE_HEX);
 		
 	if (strcasecmp(ProvidedPass,Digest1)==0) result=TRUE;
+
 
 DestroyString(Tempstr);
 DestroyString(Digest1);
@@ -613,7 +651,7 @@ while (Tempstr)
 		RetVal=FALSE;
 
 		if (CheckSSLAuthentication(Session, Name)) RetVal=TRUE;
-		else if (HTTPDigest) RetVal=NativeFileCheckHTTPDigestAuth(Session, Pass,Session->Password);
+		else if (HTTPDigest) RetVal=NativeFileCheckHTTPDigestAuth(Session, PasswordType, Pass, Session->Password);
 		else RetVal=NativeFileCheckPassword(Name,PasswordType,Pass,Session->Password);
 
 		if (RetVal)

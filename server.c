@@ -438,14 +438,14 @@ if (Flags & HEADERS_AUTH)
 	if (IsProxyMethod(Session->MethodID) ) HTTPServerSendHeader(S,"Proxy-Authenticate",Tempstr);
 	else
 	{
+		Tempstr=MCopyStr(Tempstr,"Basic realm=\"",Settings.AuthRealm,"\"",NULL);
+		HTTPServerSendHeader(S,"WWW-Authenticate",Tempstr);
+
 		if (Settings.AuthFlags & FLAG_AUTH_DIGEST)
 		{
 			Tempstr=FormatStr(Tempstr,"Digest realm=\"%s\", qop=\"auth\", nonce=\"%x\"", Settings.AuthRealm, rand());
 			HTTPServerSendHeader(S,"WWW-Authenticate",Tempstr);
 		}
-
-		Tempstr=MCopyStr(Tempstr,"Basic realm=\"",Settings.AuthRealm,"\"",NULL);
-		HTTPServerSendHeader(S,"WWW-Authenticate",Tempstr);
 	}
 }
 
@@ -1355,7 +1355,7 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 	if (Session->AuthFlags & FLAG_AUTH_PRESENT)
 	{
 		if (StrLen(Session->UserName) && Authenticate(Session)) result=TRUE;
-		else LogToFile(Settings.LogPath,"AUTH: FAILED TO AUTHENTICATED: [%s]",Session->UserName);
+		else LogToFile(Settings.LogPath,"AUTH: FAILED TO AUTHENTICATE: [%s]",Session->UserName);
 
 		//If authentication provided any users settings, then apply those
 		if (StrLen(Session->UserSettings)) ParseConfigItemList(Session->UserSettings);

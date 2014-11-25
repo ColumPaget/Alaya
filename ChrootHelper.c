@@ -115,6 +115,32 @@ return(RetStr);
 
 
 
+//This function cleans certain bad strings out of environment variables, including the 
+//shellshock ()
+void SetEnvironmentVariable(const char *Name, const char *Value)
+{
+char *Tempstr=NULL, *ptr;
+char *ForbiddenStrings[]={"()",NULL};
+int i;
+
+Tempstr=CopyStr(Tempstr, Value);
+for (i=0; i < ForbiddenStrings[i] !=NULL; i++)
+{
+	ptr=strstr(Tempstr, ForbiddenStrings[i]);
+	while (ptr)
+	{
+		memset(ptr,' ',StrLen(ForbiddenStrings[i]));
+		ptr=strstr(ptr, ForbiddenStrings[i]);
+	}
+}
+
+setenv(Name, Tempstr, TRUE);
+
+DestroyString(Tempstr);
+}
+
+
+
 HTTPSession *ParseSessionInfo(char *Data)
 {
 HTTPSession *Response=NULL;
@@ -168,28 +194,28 @@ void SetupEnvironment(HTTPSession *Session)
 {
 char *Tempstr=NULL, *ptr;
 
-	setenv("GATEWAY_INTERFACE","CGI/1.1",TRUE);
-	setenv("REMOTE_USER",Session->UserName,TRUE);
-	setenv("REMOTE_HOST",Session->ClientHost,TRUE);
-	setenv("REMOTE_ADDR",Session->ClientIP,TRUE);
-	setenv("SERVER_NAME",Session->ServerName,TRUE);
+	SetEnvironmentVariable("GATEWAY_INTERFACE","CGI/1.1");
+	SetEnvironmentVariable("REMOTE_USER",Session->UserName);
+	SetEnvironmentVariable("REMOTE_HOST",Session->ClientHost);
+	SetEnvironmentVariable("REMOTE_ADDR",Session->ClientIP);
+	SetEnvironmentVariable("SERVER_NAME",Session->ServerName);
 	Tempstr=FormatStr(Tempstr,"%d",Session->ServerPort);
-	setenv("SERVER_PORT",Tempstr,TRUE);
+	SetEnvironmentVariable("SERVER_PORT",Tempstr);
 	Tempstr=FormatStr(Tempstr,"%d",Session->ContentSize);
-	setenv("CONTENT_LENGTH",Tempstr,TRUE);
-	setenv("CONTENT_TYPE",Session->ContentType,TRUE);
+	SetEnvironmentVariable("CONTENT_LENGTH",Tempstr);
+	SetEnvironmentVariable("CONTENT_TYPE",Session->ContentType);
 	ptr=strrchr(Session->Path,'/');
 	if (ptr) ptr++;
 	else ptr=Session->Path;
-	setenv("SCRIPT_NAME",ptr,TRUE);
-	setenv("QUERY_STRING",Session->Arguments,TRUE);
-	setenv("HTTP_USER_AGENT",Session->UserAgent,TRUE);
-	setenv("HTTP_REFERER",Session->ClientReferrer,TRUE);
-	setenv("HTTP_COOKIES",Session->Cookies,TRUE);
-	setenv("REQUEST_METHOD",Session->Method,TRUE);
-	setenv("REQUEST_URI",Session->URL,TRUE);
-	setenv("SERVER_PROTOCOL","HTTP/1.1",TRUE);
-	if (StrLen(Session->Cipher)) setenv("SLL",Session->Cipher,TRUE);
+	SetEnvironmentVariable("SCRIPT_NAME",ptr);
+	SetEnvironmentVariable("QUERY_STRING",Session->Arguments);
+	SetEnvironmentVariable("HTTP_USER_AGENT",Session->UserAgent);
+	SetEnvironmentVariable("HTTP_REFERER",Session->ClientReferrer);
+	SetEnvironmentVariable("HTTP_COOKIES",Session->Cookies);
+	SetEnvironmentVariable("REQUEST_METHOD",Session->Method);
+	SetEnvironmentVariable("REQUEST_URI",Session->URL);
+	SetEnvironmentVariable("SERVER_PROTOCOL","HTTP/1.1");
+	if (StrLen(Session->Cipher)) SetEnvironmentVariable("SLL",Session->Cipher);
 
 DestroyString(Tempstr);
 }
@@ -771,7 +797,7 @@ int result=FALSE;
 		ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
 		while (ptr)
 		{
-			if (strcmp(Name,"Logout")==0) Tempstr=MCopyStr(Tempstr,"REG ",Value,":",FlagChar,"\n",NULL);
+			if (Name && (strcmp(Name,"Logout")==0)) Tempstr=MCopyStr(Tempstr,"REG ",Value,":",FlagChar,"\n",NULL);
 			ptr=GetNameValuePair(ptr,"&","=",&Name,&Value);
 		}
 	}
