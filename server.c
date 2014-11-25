@@ -4,6 +4,7 @@
 #include "DavProps.h"
 #include "directory_listing.h"
 #include "FileDetailsPage.h"
+#include "Events.h"
 #include "ID3.h"
 #include "upload.h"
 #include "proxy.h"
@@ -107,15 +108,15 @@ else Heads->AuthDetails=CopyStr(Heads->AuthDetails,nonce);
 
 }
 
-DestroyString(algo);
-DestroyString(uri);
-DestroyString(nonce);
-DestroyString(cnonce);
-DestroyString(request_count);
 DestroyString(qop);
+DestroyString(uri);
+DestroyString(algo);
 DestroyString(Name);
 DestroyString(Value);
+DestroyString(nonce);
+DestroyString(cnonce);
 DestroyString(Tempstr);
+DestroyString(request_count);
 }
 
 
@@ -527,6 +528,8 @@ long ResponseCode=0;
 
 ResponseCode=strtol(ResponseLine,NULL,10);
 
+
+
 //Create 'Response' rather than using session, because things set by the client in 'Session' might
 //get copied into the response and interfere with the response otherwise
 Response=HTTPSessionCreate();
@@ -537,6 +540,10 @@ if (Session)
 	Response->MethodID=Session->MethodID;
 	Response->LastModified=Session->LastModified;
 	Response->Flags |= Session->Flags & HTTP_KEEP_ALIVE;
+	Response->ClientIP=CopyStr(Response->ClientIP,Session->ClientIP);
+	Response->Path=CopyStr(Response->Path,Session->Path);
+	Response->Method=CopyStr(Response->Method,Session->Method);
+	Response->URL=CopyStr(Response->URL,Session->URL);
 }
 
 Response->ResponseCode=CopyStr(Response->ResponseCode,ResponseLine);
@@ -564,6 +571,7 @@ STREAMFlush(S);
 if (Response->Flags & HTTP_REUSE_SESSION) Session->Flags |= HTTP_REUSE_SESSION;
 else Session->Flags &= ~HTTP_REUSE_SESSION;
 
+ProcessSessionEventTriggers(Response);
 HTTPSessionDestroy(Response);
 
 DestroyString(Tempstr);
@@ -1262,23 +1270,6 @@ return(TRUE);
 }
 
 
-int ActivateSSL(STREAM *S,ListNode *Keys)
-{
-ListNode *Curr;
-int Flags=0;
-
-Curr=ListGetNext(Keys);
-while (Curr)
-{
-STREAMSetValue(S,Curr->Tag,(char *) Curr->Item);
-Curr=ListGetNext(Curr);
-}
-
-Flags |= LU_SSL_PFS;
-if (Settings.AuthFlags & (FLAG_AUTH_CERT_REQUIRED | FLAG_AUTH_CERT_SUFFICIENT | FLAG_AUTH_CERT_ASK)) Flags |= LU_SSL_VERIFY_PEER;
-
-DoSSLServerNegotiation(S,Flags);
-}
 
 
 int HTTPMethodAllowed(HTTPSession *Session) 
@@ -1557,6 +1548,24 @@ return(TRUE);
 }
 
 
+int ActivateSSL(STREAM *S,ListNode *Keys)
+{
+ListNode *Curr;
+int Flags=0;
+
+Curr=ListGetNext(Keys);
+while (Curr)
+{
+STREAMSetValue(S,Curr->Tag,(char *) Curr->Item);
+Curr=ListGetNext(Curr);
+}
+
+Flags |= LU_SSL_PFS;
+if (Settings.AuthFlags & (FLAG_AUTH_CERT_REQUIRED | FLAG_AUTH_CERT_SUFFICIENT | FLAG_AUTH_CERT_ASK)) Flags |= LU_SSL_VERIFY_PEER;
+
+return(DoSSLServerNegotiation(S,Flags));
+}
+
 
 
 void HTTPServerHandleConnection(HTTPSession *Session)
@@ -1565,14 +1574,20 @@ char *Tempstr=NULL, *Method=NULL, *URL=NULL, *ptr;
 int val, AuthOkay=TRUE, result;
 int NoOfConnections;
 
-STREAMSetTimeout(Session->S,5);
-Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
+if (Settings.Flags & FLAG_SSL)
+{
+	if (! ActivateSSL(Session->S,Settings.SSLKeys))
+	{
+		LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed.");
+		return;
+	}
+}
 
 while (1)
 {
 if (! HTTPServerReadHeaders(Session,Session->S)) break;
 
-ProcessEventTriggers(Session);
+ProcessSessionEventTriggers(Session);
 
 LogToFile(Settings.LogPath,"PREAUTH: %s against %s %s\n",Session->UserName,Settings.AuthPath,Settings.AuthMethods);
 if (Settings.AuthFlags & FLAG_AUTH_REQUIRED)

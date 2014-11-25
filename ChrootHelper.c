@@ -115,8 +115,8 @@ return(RetStr);
 
 
 
-//This function cleans certain bad strings out of environment variables, including the 
-//shellshock ()
+//This function cleans certain bad strings out of environment variables, 
+//including the shellshock ()
 void SetEnvironmentVariable(const char *Name, const char *Value)
 {
 char *Tempstr=NULL, *ptr;
@@ -231,20 +231,19 @@ ptr=strrchr(ScriptPath,'.');
 Handler=CopyStr(RetStr,"");
 if (ptr)
 {
-Curr=ListGetNext(Settings.ScriptHandlers);
-while (Curr)
-{
-if (
-			(strcmp(Curr->Tag,ptr)==0) ||
-			(strcmp(Curr->Tag,ptr+1)==0)
-	) 
+	Curr=ListGetNext(Settings.ScriptHandlers);
+	while (Curr)
 	{
-		Handler=CopyStr(Handler,(char *) Curr->Item);
-		break;
+		if (
+				(strcmp(Curr->Tag,ptr)==0) ||
+				(strcmp(Curr->Tag,ptr+1)==0)
+			) 
+		{
+			Handler=CopyStr(Handler,(char *) Curr->Item);
+			break;
+		}
+		Curr=ListGetNext(Curr);
 	}
-Curr=ListGetNext(Curr);
-}
-
 }
 
 return(Handler);
@@ -582,6 +581,15 @@ DestroyString(Host);
 }
 
 
+void RunEventScript(STREAM *S, const char *Script)
+{
+	if (Spawn(Script,Settings.CgiUser,"",NULL) ==-1)
+	{
+        LogToFile(Settings.LogPath, "ERROR: Failed to run event script '%s'. Error was: %s",Script, strerror(errno));
+	}
+	STREAMWriteLine("okay\n",S);
+}
+
 
 int HandleChildProcessRequest(STREAM *S)
 {
@@ -594,15 +602,18 @@ Tempstr=STREAMReadLine(Tempstr,S);
 if (! Tempstr) return(FALSE);
 
 StripTrailingWhitespace(Tempstr);
+LogToFile(Settings.LogPath, "HCPR: %s",Tempstr);
+
 ptr=GetToken(Tempstr,"\\S",&Token,0);
 if (strcmp(Token,"EXEC")==0) result=HandleExecRequest(S,ptr);
-if (strcmp(Token,"LOG")==0) LogToFile(Settings.LogPath,ptr);
-if (strcmp(Token,"GETF")==0) HandleGetFileRequest(S,ptr);
-if (strcmp(Token,"GETIP")==0) HandleResolveIPRequest(S,ptr);
-if (strcmp(Token,"REG")==0) HandleChildRegisterRequest(S,ptr);
-if (strcmp(Token,"PROXY")==0) result=HandleProxyRequest(S,ptr);
-if (strcmp(Token,"MIMEICON")==0) HandleIconRequest(S, ptr);
-
+else if (strcmp(Token,"LOG")==0) LogToFile(Settings.LogPath,ptr);
+else if (strcmp(Token,"GETF")==0) HandleGetFileRequest(S,ptr);
+else if (strcmp(Token,"GETIP")==0) HandleResolveIPRequest(S,ptr);
+else if (strcmp(Token,"REG")==0) HandleChildRegisterRequest(S,ptr);
+else if (strcmp(Token,"PROXY")==0) result=HandleProxyRequest(S,ptr);
+else if (strcmp(Token,"MIMEICON")==0) HandleIconRequest(S, ptr);
+else if (strcmp(Token,"EVENT")==0) RunEventScript(S, ptr);
+ 
 STREAMFlush(S);
 
 DestroyString(Tempstr);

@@ -51,14 +51,17 @@ else if (StrLen(tzname[0]))
 
 
 
+
 int ChildFunc(void *Data)
 {
 HTTPSession *Session;
 
 		ParentProcessPipe=STREAMFromDualFD(0,1);
 		Session=(HTTPSession *) Data;
+		Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 		STREAMSetFlushType(Session->S,FLUSH_FULL,4096);
-		if (Settings.Flags & FLAG_SSL) ActivateSSL(Session->S,Settings.SSLKeys);
+		STREAMSetTimeout(Session->S,5);
+
 		HTTPServerHandleConnection(Session);
 
 		STREAMClose(Session->S);

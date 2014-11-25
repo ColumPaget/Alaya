@@ -142,7 +142,7 @@ DestroyString(Token);
 
 void ParseEventConfig(char *ConfigLine)
 {
-char *EventTypeStrings[]={"Method","Path","User","ClientIP","BadURL","Header",NULL};
+char *EventTypeStrings[]={"Method","Path","User","ClientIP","BadURL","Header","ResponseCode",NULL};
 char *Token=NULL, *ptr;
 ListNode *Node;
 int Type;
@@ -220,7 +220,6 @@ switch(result)
 
 	case CT_AUTHMETHODS:
 		Settings.AuthMethods=CopyStr(Settings.AuthMethods,ptr);
-		LogToFile(Settings.LogPath,"AT: %s",Settings.AuthMethods);
 	break;
 
 	case CT_HTTPMETHODS:

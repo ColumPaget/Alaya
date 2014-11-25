@@ -539,7 +539,6 @@ if (StrLen(PassType) && StrLen(ProvidedPass))
 	{
 		Tempstr=MCopyStr(Tempstr,Name,":",Settings.AuthRealm,":",ProvidedPass,NULL);
 		HashBytes(&Digest,"md5",Tempstr,StrLen(Tempstr),ENCODE_HEX);
-		LogToFile(Settings.LogPath,"DIG1: [%s] [%s]",Tempstr,Digest);
 	}
 	else if (StrLen(Salt))
 	{
@@ -551,7 +550,6 @@ if (StrLen(PassType) && StrLen(ProvidedPass))
 	else HashBytes(&Digest,PassType,ProvidedPass,StrLen(ProvidedPass),ENCODE_HEX);
 		
 	if (StrLen(Digest) && (strcmp(Password,Digest)==0)) result=TRUE;
-	LogToFile(Settings.LogPath,"DIG2: [%s] [%s]",Password,Digest);
 }
 
 DestroyString(Tempstr);
