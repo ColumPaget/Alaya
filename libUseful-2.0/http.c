@@ -2,35 +2,15 @@
 #include "DataProcessing.h"
 #include "Hash.h"
 #include "ParseURL.h"
+#include "Time.h"
 
+const char *HTTP_AUTH_BY_TOKEN="AuthTokenType";
 ListNode *Cookies=NULL;
+ListNode *HTTPVars=NULL;
 int g_Flags=0;
 
-void HTTPAuthSet(HTTPAuthStruct *Auth, char *Logon, char *Password, int Type)
-{
-	Auth->Logon=CopyStr(Auth->Logon,Logon);
-	Auth->Password=CopyStr(Auth->Password,Password);
-	Auth->Flags |= Type;
-}
 
 
-
-void HTTPAuthDestroy(void *p_Auth)
-{
-HTTPAuthStruct *Auth;
-
-if (! p_Auth) return;
-Auth=(HTTPAuthStruct *) p_Auth;
-
-DestroyString(Auth->AuthRealm);
-DestroyString(Auth->AuthQOP);
-DestroyString(Auth->AuthNonce);
-DestroyString(Auth->AuthOpaque);
-DestroyString(Auth->Logon);
-DestroyString(Auth->Password);
-
-free(Auth);
-}
 
 void HTTPInfoDestroy(void *p_Info)
 {
@@ -50,12 +30,20 @@ DestroyString(Info->Timestamp);
 DestroyString(Info->PostData);
 DestroyString(Info->PostContentType);
 DestroyString(Info->Proxy);
+DestroyString(Info->Authorization);
+DestroyString(Info->ProxyAuthorization);
 
 ListDestroy(Info->ServerHeaders,DestroyString);
 ListDestroy(Info->CustomSendHeaders,DestroyString);
-if (Info->Authorization) HTTPAuthDestroy(Info->Authorization);
-if (Info->ProxyAuthorization) HTTPAuthDestroy(Info->ProxyAuthorization);
 free(Info);
+}
+
+
+
+void HTTPSetVar(char *Name, char *Var)
+{
+	if (! HTTPVars) HTTPVars=ListCreate();
+	SetVar(HTTPVars,Name,Var);
 }
 
 
@@ -78,7 +66,7 @@ Mod->Data=(THTTPChunk *) calloc(1, sizeof(THTTPChunk));
 return(TRUE);
 }
 
-int HTTPChunkedRead(TProcessingModule *Mod, const char *InBuff, int InLen, char **OutBuff, int *OutLen)
+int HTTPChunkedRead(TProcessingModule *Mod, const char *InBuff, int InLen, char **OutBuff, int *OutLen, int Flush)
 {
 int len=0, val=0;
 THTTPChunk *Chunk;
@@ -309,8 +297,13 @@ return(RetStr);
 
 void HTTPInfoSetAuth(HTTPInfoStruct *Info, char *Logon, char *Password, int Type)
 {
-if (! Info->Authorization) Info->Authorization=(HTTPAuthStruct *) calloc(1,sizeof(HTTPAuthStruct));
-HTTPAuthSet(Info->Authorization,Logon, Password, Type);
+char **p_Auth;
+
+if (Type & HTTP_AUTH_PROXY) p_Auth=&Info->ProxyAuthorization;
+else p_Auth=&Info->Authorization;
+
+*p_Auth=MCopyStr(*p_Auth,":",Logon,":",Password, NULL);
+
 }
 
 
@@ -388,11 +381,7 @@ if (strcasecmp(Method,"POST")==0) ParseURL(URL, &Proto, &Info->Host, &Token, &Us
 else ParseURL(URL, &Proto, &Info->Host, &Token, &User, &Pass,&Info->Doc, NULL);
 if (StrLen(Token)) Info->Port=atoi(Token);
 
-if (StrLen(User) || StrLen(Pass))
-{
-	Info->Authorization=(HTTPAuthStruct *) calloc(1,sizeof(HTTPAuthStruct));
-	HTTPAuthSet(Info->Authorization,User, Pass, HTTP_AUTH_BASIC);
-}
+if (StrLen(User) || StrLen(Pass)) HTTPInfoSetAuth(Info,User, Pass, HTTP_AUTH_BASIC);
 
 if (StrLen(Proto) && (strcmp(Proto,"https")==0)) Info->Flags |= HTTP_SSL;
 
@@ -482,17 +471,18 @@ void HTTPHandleWWWAuthenticate(HTTPInfoStruct *Info, char *Line)
 {
 char *ptr, *ptr2, *Token=NULL, *Name=NULL, *Value=NULL;
 char *AuthTypeStrings[]={"Basic","Digest",NULL};
+char *Realm=NULL, *QOP=NULL, *Nonce=NULL, *Opaque=NULL;
 typedef enum {AUTH_BASIC, AUTH_DIGEST} TAuthTypes;
 int result;
 
-if (! Info->Authorization) Info->Authorization=(HTTPAuthStruct *) calloc(1,sizeof(HTTPAuthStruct));
 ptr=Line;
 while (isspace(*ptr)) ptr++;
 ptr=GetToken(ptr," ",&Token,0);
 
-result=MatchTokenFromList(Token,AuthTypeStrings,0);
-if (result==AUTH_BASIC) Info->Authorization->Flags |=HTTP_AUTH_BASIC;
-if (result==AUTH_DIGEST) Info->Authorization->Flags |=HTTP_AUTH_DIGEST;
+QOP=CopyStr(QOP,"");
+Realm=CopyStr(Realm,"");
+Nonce=CopyStr(Nonce,"");
+Opaque=CopyStr(Opaque,"");
 
 while (ptr)
 {
@@ -503,15 +493,26 @@ ptr2=GetToken(Token,"=",&Name,GETTOKEN_QUOTES);
 ptr2=GetToken(ptr2,"=",&Value,GETTOKEN_QUOTES);
 
 
-if (strcasecmp(Name,"realm")==0) Info->Authorization->AuthRealm=CopyStr(Info->Authorization->AuthRealm,Value);
-if (strcasecmp(Name,"qop")==0)  Info->Authorization->AuthQOP=CopyStr(Info->Authorization->AuthQOP,Value);
-if (strcasecmp(Name,"nonce")==0) Info->Authorization->AuthNonce=CopyStr(Info->Authorization->AuthNonce,Value);
-if (strcasecmp(Name,"opaque")==0) Info->Authorization->AuthOpaque=CopyStr(Info->Authorization->AuthOpaque,Value);
+if (strcasecmp(Name,"realm")==0) Realm=CopyStr(Realm,Value);
+if (strcasecmp(Name,"qop")==0)  QOP=CopyStr(QOP,Value);
+if (strcasecmp(Name,"nonce")==0) Nonce=CopyStr(Nonce,Value);
+if (strcasecmp(Name,"opaque")==0) Opaque=CopyStr(Opaque,Value);
+}
+
+result=MatchTokenFromList(Token,AuthTypeStrings,0);
+switch (result)
+{
+case AUTH_BASIC: Info->AuthFlags |= HTTP_AUTH_BASIC; break;
+//case AUTH_DIGEST: Info->Authorization=MCopyStr(Info->Authorization,"digest:",Realm,":", QOP, ":", Nonce, ":", Opaque, ":", NULL); break;
 }
 
 DestroyString(Token);
-DestroyString(Name);
 DestroyString(Value);
+DestroyString(Name);
+DestroyString(Realm);
+DestroyString(QOP);
+DestroyString(Nonce);
+DestroyString(Opaque);
 }
 
 
@@ -555,6 +556,8 @@ if (StrLen(Token) && StrLen(ptr))
 				if (! (Info->Flags & HTTP_NODECODE))
 				{
 					strlwr(ptr);
+
+
 					if (
 							(strcmp(ptr,"gzip")==0) ||
 							(strcmp(ptr,"x-gzip")==0)
@@ -635,18 +638,26 @@ DestroyString(Tempstr);
 
 
 
-char *HTTPHeadersAppendAuth(char *RetStr, char *AuthHeader, HTTPInfoStruct *Info, HTTPAuthStruct *AuthInfo)
+char *HTTPHeadersAppendAuth(char *RetStr, char *AuthHeader, HTTPInfoStruct *Info, char *AuthInfo)
 {
-char *SendStr=NULL, *Tempstr=NULL;
+char *SendStr=NULL, *Tempstr=NULL, *ptr;
 char *HA1=NULL, *HA2=NULL, *ClientNonce=NULL, *Digest=NULL;
 int i, AuthCounter;
 
-if (! AuthInfo) return(RetStr);
+	if (! StrLen(AuthInfo)) return(RetStr);
 
-SendStr=CatStr(RetStr,"");
+	SendStr=CatStr(RetStr,"");
 
-  if (AuthInfo->Flags & HTTP_AUTH_DIGEST)
+	//Authentication by an opaque authentication token that is handled 
+	//elsewhere, and is set as the 'Password'
+	if (Info->AuthFlags & HTTP_AUTH_TOKEN)
+	{
+    SendStr=MCatStr(SendStr,AuthHeader,": ",AuthInfo,"\r\n",NULL);
+    Info->AuthFlags |= HTTP_AUTH_SENT;
+	}
+  else if (Info->AuthFlags & HTTP_AUTH_DIGEST)
   {
+		/*
     AuthCounter++;
     Tempstr=FormatStr(Tempstr,"%s:%s:%s",AuthInfo->Logon,AuthInfo->AuthRealm,AuthInfo->Password);
     HashBytes(&HA1,"md5",Tempstr,StrLen(Tempstr),0);
@@ -663,19 +674,22 @@ SendStr=CatStr(RetStr,"");
     HashBytes(&Digest,"md5",Tempstr,StrLen(Tempstr),0);
     Tempstr=FormatStr(Tempstr,"%s: Digest username=\"%s\",realm=\"%s\",nonce=\"%s\",uri=\"%s\",qop=auth,nc=%08d,cnonce=\"%s\",response=\"%s\"\r\n",AuthHeader,AuthInfo->Logon,AuthInfo->AuthRealm,AuthInfo->AuthNonce,Info->Doc,AuthCounter,ClientNonce,Digest);
     SendStr=CatStr(SendStr,Tempstr);
-    AuthInfo->Flags |= HTTP_SENT_AUTH;
+    Info->AuthFlags |= HTTP_AUTH_SENT;
+		*/
   }
-  else 
+	else
   {
-    Tempstr=CopyStr(Tempstr,AuthInfo->Logon);
-    Tempstr=CatStr(Tempstr,":");
-    Tempstr=CatStr(Tempstr,AuthInfo->Password);
-    Digest=SetStrLen(Digest,StrLen(Tempstr) *2);
-    to64frombits(Digest,Tempstr,strlen(Tempstr));
-    Tempstr=FormatStr(Tempstr,"%s: %s %s\r\n",AuthHeader,"Basic",Digest);
-    SendStr=CatStr(SendStr,Tempstr);
-    AuthInfo->Flags |= HTTP_SENT_AUTH;
+		//Realm
+		ptr=GetToken(AuthInfo,":",&Tempstr,0);
+
+		//We should now have Logon:Password
+    Digest=SetStrLen(Digest,StrLen(ptr) *2);
+
+    to64frombits(Digest,ptr,strlen(ptr));
+    SendStr=MCatStr(SendStr,AuthHeader,": Basic ",Digest,"\r\n",NULL);
+    Info->AuthFlags |= HTTP_AUTH_SENT;
   }
+
 
 DestroyString(HA1);
 DestroyString(HA2);
@@ -763,8 +777,8 @@ if (
 
 	if (! (Info->Flags & HTTP_NOCOMPRESS))
 	{
-		if (DataProcessorAvailable("Compression","gzip")) Tempstr=CatStr(Tempstr,"gzip");
-		if (DataProcessorAvailable("Compression","zlib")) 
+		if (DataProcessorAvailable("compress","gzip")) Tempstr=CatStr(Tempstr,"gzip");
+		if (DataProcessorAvailable("compress","zlib")) 
 		{
 			if (StrLen(Tempstr)) Tempstr=CatStr(Tempstr,", deflate");
 			else Tempstr=CatStr(Tempstr,"deflate");
@@ -861,12 +875,12 @@ if (StrLen(Info->ResponseCode))
 
 		if (strcmp(Info->ResponseCode,"401")==0) 
 		{
-			if (Info->Authorization) Info->Authorization->Flags |= HTTP_AUTH_BASIC;
+			if (Info->AuthFlags) Info->AuthFlags |= HTTP_AUTH_BASIC;
 		}
 
 		if (strcmp(Info->ResponseCode,"407")==0) 
 		{
-			if (Info->ProxyAuthorization) Info->ProxyAuthorization->Flags |= HTTP_PROXY_AUTH;
+			if (Info->AuthFlags) Info->AuthFlags |= HTTP_AUTH_PROXY;
 		}
 
 }
@@ -946,7 +960,7 @@ switch (RCode)
 	break;
 
 	case 407:
-	result=HTTP_PROXY_AUTH;
+	result=HTTP_AUTH_PROXY;
 	break;
 
 	default:
@@ -964,7 +978,8 @@ return(result);
 
 STREAM *HTTPSetupConnection(HTTPInfoStruct *Info, int ForceHTTPS)
 {
-char *Proto=NULL, *Host=NULL, *Token=NULL;
+char *Tempstr=NULL, *Host=NULL, *Token=NULL, *ptr;
+char *Logon=NULL, *Pass=NULL;
 int Port=0, Flags=0;
 STREAM *S;
 
@@ -972,17 +987,14 @@ S=STREAMCreate();
 
 if (Info->Flags & HTTP_PROXY)
 {
-	if (! Info->ProxyAuthorization) 
-	{
-		Info->ProxyAuthorization=(HTTPAuthStruct *) calloc(1,sizeof(HTTPAuthStruct));
-	}
-	ParseURL(Info->Proxy, &Proto, &Host, &Token, &Info->ProxyAuthorization->Logon, &Info->ProxyAuthorization->Password,NULL,NULL);
+	ParseURL(Info->Proxy, &Tempstr, &Host, &Token, &Logon, &Pass, NULL,NULL);
+	//&Info->ProxyAuthorization->Logon,
 	Port=atoi(Token);
 	
 	
-	if (ForceHTTPS) Proto=CopyStr(Proto,"https");
+	if (ForceHTTPS) Tempstr=CopyStr(Tempstr,"https");
 
-	if (strcasecmp(Proto,"https")==0) Flags |= CONNECT_SSL; 
+	if (strcasecmp(Tempstr,"https")==0) Flags |= CONNECT_SSL; 
 }
 else
 {
@@ -1002,6 +1014,14 @@ else
 	}
 }
 
+Tempstr=CopyStr(Tempstr,GetVar(HTTPVars,"Tunnel"));
+ptr=GetToken(Tempstr,",",&Token,0);
+while (ptr)
+{
+	STREAMAddConnectionHop(S,Token);
+	ptr=GetToken(ptr,",",&Token,0);
+}
+
 if (Info->Flags & HTTP_TUNNEL) STREAMAddConnectionHop(S,Info->Proxy);
 if (STREAMConnectToHost(S,Host,Port,Flags))
 {
@@ -1015,8 +1035,8 @@ else
 
 Info->S=S;
 
+DestroyString(Tempstr);
 DestroyString(Token);
-DestroyString(Proto);
 DestroyString(Host);
 
 return(S);
@@ -1085,9 +1105,12 @@ while (1)
 
 		if (Info->Flags & HTTP_GZIP) 
 		{
-			STREAMAddStandardDataProcessor(Info->S,"compression","gzip","");
+			STREAMAddStandardDataProcessor(Info->S,"uncompress","gzip","");
 		}
-		else if (Info->Flags & HTTP_DEFLATE) STREAMAddStandardDataProcessor(Info->S,"compression","zlib","");
+		else if (Info->Flags & HTTP_DEFLATE) 
+		{
+			STREAMAddStandardDataProcessor(Info->S,"uncompress","zlib","");
+		}
 
 		if (result == HTTP_OKAY) break;
 		if (result == HTTP_NOTFOUND) break;
@@ -1099,12 +1122,8 @@ while (1)
 		if (result == HTTP_AUTH_BASIC) 
 		{
 					if (
-							(! Info->Authorization) ||
-								(
-									(Info->Authorization->Flags & HTTP_SENT_AUTH) ||
-									(! Info->Authorization->Logon) || 
-									(StrLen(Info->Authorization->Logon)==0) 
-								)
+									(Info->AuthFlags & HTTP_AUTH_SENT) ||
+									(StrLen(Info->Authorization)==0) 
 			 			)
 					{
 						if (result == HTTP_AUTH_BASIC) break;
@@ -1113,12 +1132,8 @@ while (1)
 		}
 
 		if (
-					(result == HTTP_PROXY_AUTH) && 
-					(
-						(Info->ProxyAuthorization->Flags & HTTP_SENT_AUTH) ||
-						(! Info->ProxyAuthorization->Logon) || 
-						(StrLen(Info->ProxyAuthorization->Logon)==0) 
-					)
+					(result == HTTP_AUTH_PROXY) && 
+					(StrLen(Info->ProxyAuthorization)==0) 
 			 )
 		{
 			 break;
@@ -1136,17 +1151,25 @@ return(Info->S);
 
 
 
-STREAM *HTTPMethod(char *Method, char *URL, char *Logon, char *Password)
+STREAM *HTTPMethod(char *Method, char *URL, char *Logon, char *Password, char *ContentType, char *ContentData, int ContentLength)
 {
 HTTPInfoStruct *Info;
 STREAM *S;
 
 
 Info=HTTPInfoFromURL(Method, URL);
+
+if (StrLen(ContentType))
+{
+Info->PostContentType=CopyStr(Info->PostContentType,ContentType);
+Info->PostData=CopyStr(Info->PostData,ContentData);
+Info->PostContentLength=ContentLength;
+}
+
 if (StrLen(Logon) || StrLen(Password))
 {
-	if (! Info->Authorization) Info->Authorization=(HTTPAuthStruct *) calloc(1,sizeof(HTTPAuthStruct));
-	HTTPAuthSet(Info->Authorization,Logon, Password, HTTP_AUTH_BASIC);
+	if (Logon==HTTP_AUTH_BY_TOKEN) HTTPInfoSetAuth(Info,"", Password, HTTP_AUTH_TOKEN);
+	else HTTPInfoSetAuth(Info,Logon, Password, HTTP_AUTH_BASIC);
 }
 S=HTTPTransact(Info);
 
@@ -1157,29 +1180,13 @@ return(S);
 
 STREAM *HTTPGet(char *URL, char *Logon, char *Password)
 {
-return(HTTPMethod("GET", URL, Logon, Password));
+return(HTTPMethod("GET", URL, Logon, Password,"","",0));
 }
 
 
 STREAM *HTTPPost(char *URL, char *Logon, char *Password, char *ContentType, char *Content)
 {
-HTTPInfoStruct *Info;
-STREAM *S;
-
-
-Info=HTTPInfoFromURL("POST", URL);
-Info->PostContentType=CopyStr(Info->PostContentType,ContentType);
-Info->PostData=CopyStr(Info->PostData,Content);
-Info->PostContentLength=StrLen(Content);
-if (StrLen(Logon) || StrLen(Password))
-{
-  if (! Info->Authorization) Info->Authorization=(HTTPAuthStruct *) calloc(1,sizeof(HTTPAuthStruct));
-  HTTPAuthSet(Info->Authorization,Logon, Password, HTTP_AUTH_BASIC);
-}
-S=HTTPTransact(Info);
-
-HTTPInfoDestroy(Info);
-return(S);
+return(HTTPMethod("POST", URL, Logon, Password, ContentType, Content, StrLen(Content)));
 }
 
 

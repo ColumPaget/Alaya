@@ -32,19 +32,19 @@ int result=FALSE;
 ptr=GetToken(Node->Tag,",",&Token,0);
 while (ptr)
 {
-	if (StrLen(Session->ResponseCode))
+	switch (Node->ItemType)
 	{
-		if (Node->ItemType == EVENT_RESPONSE)
-		{
+			case EVENT_RESPONSE:
+			if (StrLen(Session->ResponseCode))
+			{
 			if (strncmp(Token,Session->ResponseCode,3) ==0) 
 			{
 				*MatchStr=MCatStr(*MatchStr, "Response: ",Session->ResponseCode,", ",NULL);
 				result=TRUE;
 			}
-		}
-	}
-	else switch (Node->ItemType)
-	{
+			}
+			break;
+		
 			case EVENT_METHOD:
 			if (strcmp(Token,Session->Method) ==0) 
 			{
@@ -104,11 +104,11 @@ void ProcessEventTrigger(HTTPSession *Session, char *URL, char *TriggerScript, c
 {
 	char *Tempstr=NULL;
 
-		LogToFile(Settings.LogPath, "EVENT TRIGGERED: ClientIP='%s' REQUEST='%s' TriggeredScript='%s' MatchInfo=%s",Session->ClientIP, URL, TriggerScript, ExtraInfo);
+		LogToFile(Settings.LogPath, "EVENT TRIGGERED: ClientIP='%s' REQUEST='%s' TriggeredScript='%s' MatchInfo='%s'",Session->ClientIP, URL, TriggerScript, ExtraInfo);
 	
 		if (ParentProcessPipe)
 		{
-			Tempstr=MCopyStr(Tempstr, "EVENT ", TriggerScript, " '", Session->ClientIP,"' '", URL, "'\n",NULL);
+			Tempstr=MCopyStr(Tempstr, "EVENT ", TriggerScript, " '", Session->ClientIP,"' '", URL, "' '", ExtraInfo, "'\n",NULL);
 			STREAMWriteLine(Tempstr,ParentProcessPipe);
 			STREAMFlush(ParentProcessPipe);
 			Tempstr=STREAMReadLine(Tempstr,ParentProcessPipe);
@@ -127,10 +127,14 @@ void ProcessEventTrigger(HTTPSession *Session, char *URL, char *TriggerScript, c
 
 
 
+//This function will always be called by the process handling a particular session, so changes
+//to values like "Settings.AuthMethods" will only effect that session
 int ProcessSessionEventTriggers(HTTPSession *Session)
 {
 ListNode *Curr;
 char *Tempstr=NULL, *URL=NULL, *MatchStr=NULL;
+char *Token=NULL, *ptr;
+int RetVal=0;
 
 Curr=ListGetNext(Settings.Events);
 while (Curr)
@@ -140,13 +144,25 @@ while (Curr)
 
 	if (EventTriggerMatch(Curr, Session, &MatchStr))
 	{
-		ProcessEventTrigger(Session, Tempstr, Curr->Item, MatchStr);
+		ptr=GetToken((char *) Curr->Item,";",&Token,GETTOKEN_QUOTES);
+		while (ptr)
+		{
+    	if (strcasecmp(Token,"ignore")==0) break;
+			else if (strcasecmp(Token,"deny") ==0)
+			{
+				LogToFile(Settings.LogPath,"WARN: 'Deny' Event Rule encountered (%s on %s). Denying Authentication",MatchStr,Tempstr);
+				Settings.AuthMethods=CopyStr(Settings.AuthMethods, "deny");
+			}
+			else ProcessEventTrigger(Session, Tempstr, Token, MatchStr);
+			ptr=GetToken(ptr,";",&Token,GETTOKEN_QUOTES);
+		}
 	}
 	Curr=ListGetNext(Curr);
 }
 
 DestroyString(MatchStr);
 DestroyString(Tempstr);
+DestroyString(Token);
 DestroyString(URL);
 }
 

@@ -1,5 +1,6 @@
 #include "DataProcessing.h"
 #include "SpawnPrograms.h"
+#include "FileSystem.h"
 
 #ifdef HAVE_LIBSSL
 
@@ -726,7 +727,7 @@ ZData=(zlibData *) ProcMod->Data;
 
 
 	ZData->z_out.avail_in=InLen;
-	ZData->z_out.next_in=InData;
+	ZData->z_out.next_in=(char *) InData;
 	ZData->z_out.avail_out=*OutLen;
 	ZData->z_out.next_out=*OutData;
 
@@ -744,7 +745,6 @@ ZData=(zlibData *) ProcMod->Data;
 
 		if ((ZData->z_out.avail_in > 0) || Flush)
 		{
-			printf("Grow output buff!\n");
 			*OutLen+=BUFSIZ;
 			*OutData=(char *) realloc(*OutData,*OutLen);
 			ZData->z_out.avail_out+=BUFSIZ;
@@ -770,7 +770,7 @@ ZData=(zlibData *) ProcMod->Data;
 
 
 	ZData->z_in.avail_in=InLen;
-	ZData->z_in.next_in=InData;
+	ZData->z_in.next_in=(char *) InData;
 	ZData->z_in.avail_out=*OutLen;
 	ZData->z_in.next_out=*OutData;
 
@@ -781,14 +781,17 @@ ZData=(zlibData *) ProcMod->Data;
 
 		wrote=(*OutLen)-ZData->z_in.avail_out;
 
+		fprintf(stderr,"result=%d %d %d\n",result,InLen,Flush);
 
-		if (result==Z_DATA_ERROR) inflateSync(&ZData->z_in);
-		if (result==Z_STREAM_END) 
+		switch (result)
 		{
-			ProcMod->Flags |= DPM_READ_FINAL;
-			break;
+		case Z_DATA_ERROR: inflateSync(&ZData->z_in); break;
+		case Z_ERRNO: if (Flush) ProcMod->Flags |= DPM_READ_FINAL; break;
+		case Z_STREAM_ERROR:
+		case Z_STREAM_END: ProcMod->Flags |= DPM_READ_FINAL; break;
 		}
 
+		if (ProcMod->Flags & DPM_READ_FINAL) break;
 		if ((ZData->z_in.avail_in > 0) || Flush)
 		{
 			(*OutLen)+=BUFSIZ;
@@ -798,7 +801,6 @@ ZData=(zlibData *) ProcMod->Data;
 		}
 
 	}
-
 
 
 #endif

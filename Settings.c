@@ -1,4 +1,5 @@
 #include "Settings.h"
+#include "Authenticate.h" //(For GetDefaultUser)
 #include <sys/utsname.h>
 #include <grp.h>
 

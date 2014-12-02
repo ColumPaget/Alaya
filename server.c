@@ -16,6 +16,16 @@ typedef enum {HEAD_AUTH, HEAD_PROXYAUTH, HEAD_HOST, HEAD_DEST, HEAD_CONTENT_TYPE
 
 
 
+char *DecodeBase64(char *Return, int *len, char *Text)
+{
+char *RetStr;
+
+RetStr=SetStrLen(Return,StrLen(Text) *2);
+*len=from64tobits(RetStr,Text);
+
+return(RetStr);
+}
+
 char *HTMLQuote(char *RetBuff, char *Str)
 {
 char *RetStr=NULL, *Token=NULL, *ptr;
@@ -912,7 +922,8 @@ int len;
 			if (StrLen(Session->UserName)) 
 			{
 				Path=MCopyStr(Path,Session->UserName,":",Session->Password,NULL);
-				Tempstr=EncodeBase64(Tempstr, Path, StrLen(Path));
+				char *EncodeBytes(char *Buffer, unsigned const char *Bytes, int len, int Encoding);
+				Tempstr=EncodeBytes(Tempstr, Path, StrLen(Path), ENCODE_BASE64);
 				Session->RemoteAuthenticate=MCopyStr(Session->RemoteAuthenticate,"Basic ",Tempstr,NULL);	
 			}
       Path=MCopyStr(Path,PI->Path,Session->Path+StrLen(PI->URL),NULL);
@@ -1578,7 +1589,7 @@ if (Settings.Flags & FLAG_SSL)
 {
 	if (! ActivateSSL(Session->S,Settings.SSLKeys))
 	{
-		LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed.");
+		LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed. %s",STREAMGetValue(Session->S,"SSL-Error"));
 		return;
 	}
 }

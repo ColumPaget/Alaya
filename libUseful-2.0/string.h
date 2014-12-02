@@ -4,9 +4,6 @@
 #include <stdarg.h>
 #include <string.h> //for strlen, used below in StrLen
 
-#define GETTOKEN_QUOTES 1
-#define GETTOKEN_MULTI_SEPARATORS 2
-
 #define MATCH_TOKEN_PART 1
 #define MATCH_TOKEN_CASE 2
 
@@ -21,20 +18,20 @@ extern "C" {
 #define StrEnd(str) if ((! str) || (*str == '\0') || (str > __builtin_frame_address (0)) return(TRUE); return(FALSE);
 
 //size_t StrLen(const char *Str);
-char *DestroyString(char *);
+void DestroyString(void *);
 int CompareStr(const char *S1, const char *S2);
-char *CopyStrLen(char *,const char *,int);
+char *CopyStrLen(char *,const char *,size_t);
 char *CopyStr(char *, const char *);
 char *MCatStr(char *, const char *, ...);
 char *MCopyStr(char *, const char *, ...);
 char *CatStr(char *, const char *);
-char *CatStrLen(char *,const char *,int);
+char *CatStrLen(char *,const char *,size_t);
 char *VFormatStr(char *,const char *,va_list);
 char *FormatStr(char *,const char *,...);
 char *AddCharToStr(char *,char);
-char *AddCharToBuffer(char *Buffer, int BuffLen, char Char);
-char *AddBytesToBuffer(char *Buffer, int BuffLen, char *Bytes, int Len);
-char *SetStrLen(char *,int);
+char *AddCharToBuffer(char *Buffer, size_t BuffLen, char Char);
+char *AddBytesToBuffer(char *Buffer, size_t BuffLen, char *Bytes, size_t Len);
+char *SetStrLen(char *,size_t);
 char *strupr(char *);
 char *strlwr(char *);
 char *strrep(char *,char, char);
@@ -49,7 +46,6 @@ char *DeQuoteStr(char *Buffer, const char *Line);
 char *EnquoteStr(char *Out, const char *In);
 int MatchTokenFromList(const char *Token,char **List, int Flags);
 int MatchLineStartFromList(const char *Token,char **List);
-char *GetToken(const char *SearchStr, const char *Delim, char **Token, int Flags);
 
 #ifdef __cplusplus
 }

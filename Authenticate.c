@@ -722,7 +722,7 @@ int PAMConvFunc(int NoOfMessages, const struct pam_message **messages,
          struct pam_response **responses, void *appdata)
 {
 int count;
-struct pam_message *mess;
+const struct pam_message *mess;
 struct pam_response *resp;
 
 *responses=(struct pam_response *) calloc(NoOfMessages,sizeof(struct pam_response));

@@ -21,6 +21,7 @@
 #define FLAG_LOGOUT_AVAILABLE 8192
 #define FLAG_LOOKUP_CLIENT 16384
 #define FLAG_KEEP_ALIVES 32768
+#define FLAG_SIGHUP_RECV 65536
 
 
 //Flag values for Settings->AuthFlags and Session->AuthFlags

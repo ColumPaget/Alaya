@@ -120,11 +120,11 @@ return(RetStr);
 void SetEnvironmentVariable(const char *Name, const char *Value)
 {
 char *Tempstr=NULL, *ptr;
-char *ForbiddenStrings[]={"()",NULL};
+char *ForbiddenStrings[]={"() {",";","`",NULL};
 int i;
 
 Tempstr=CopyStr(Tempstr, Value);
-for (i=0; i < ForbiddenStrings[i] !=NULL; i++)
+for (i=0; ForbiddenStrings[i] !=NULL; i++)
 {
 	ptr=strstr(Tempstr, ForbiddenStrings[i]);
 	while (ptr)
@@ -707,7 +707,7 @@ while (Tempstr)
 Tempstr=MCopyStr(Tempstr, ResponseLine,"\r\n",Headers,"\r\n",NULL);
 STREAMWriteLine(Tempstr,S);
 
-if (Settings.Flags & FLAG_VERBOSE) LogToFile(Settings.LogPath,"CGI HEADERS: [%s]",Tempstr);
+if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"CGI HEADERS: [%s]",Tempstr);
 
 
 //Read remaining data from CGI

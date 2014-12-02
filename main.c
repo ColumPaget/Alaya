@@ -31,6 +31,12 @@ ListNode *MimeTypes=NULL;
 ListNode *Connections=NULL;
 STREAM *ParentProcessPipe=NULL;
 
+void SigHandler(int sig)
+{
+if (sig==SIGHUP) Settings.Flags |= FLAG_SIGHUP_RECV;
+signal(SIGHUP, SigHandler);
+}
+
 void SetTimezoneEnv()
 {
 time_t Now;
@@ -38,7 +44,6 @@ time_t Now;
 time(&Now);
 localtime(&Now);
 
-printf("TZ: %s %s\n",tzname[1],tzname[0]);
 if (StrLen(tzname[1]))
 {
    setenv("TZ",tzname[1],TRUE);
@@ -134,6 +139,14 @@ localtime(&Now);
 }
 
 
+void ReopenLogFile(char *Msg)
+{
+LogFileClose(Settings.LogPath);
+LogFileSetValues(Settings.LogPath, LOGFILE_LOGPID|LOGFILE_LOCK|LOGFILE_MILLISECS, Settings.MaxLogSize, 10);
+LogToFile(Settings.LogPath, "%s",Msg);
+}
+
+
 main(int argc, char *argv[])
 {
 STREAM *ServiceSock, *S;
@@ -171,8 +184,10 @@ if (Settings.Flags & FLAG_SSL_PFS)
 if (! (Settings.Flags & FLAG_NODEMON)) demonize();
 
 
-LogFileSetValues(Settings.LogPath, LOGFILE_LOGPID|LOGFILE_LOCK|LOGFILE_MILLISECS, Settings.MaxLogSize, 10);
-LogToFile(Settings.LogPath, "Alaya starting up. Version %s",Version);
+Tempstr=MCopyStr(Tempstr, "Alaya Starting up. Version: ",Version,NULL);
+ReopenLogFile(Tempstr);
+
+signal(SIGHUP, SigHandler);
 
 LoadFileMagics("/etc/mime.types","/etc/magic");
 
@@ -212,6 +227,11 @@ if (S)
 	}
 }
 
+if (Settings.Flags & FLAG_SIGHUP_RECV) 
+{
+	ReopenLogFile("Reopening Log File");
+	Settings.Flags &= ~FLAG_SIGHUP_RECV;
+}
 CollectChildProcesses();
 }
 

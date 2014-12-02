@@ -8,9 +8,11 @@
 
 
 #define ENCODE_NONE 0
-#define ENCODE_HEX  1
-#define ENCODE_BASE64 2
-#define ENCODE_HEXUPPER 3
+#define ENCODE_OCTAL 1
+#define ENCODE_DECIMAL 2
+#define ENCODE_HEX  3
+#define ENCODE_HEXUPPER 4
+#define ENCODE_BASE64 5
 
 
 #define SUBS_QUOTE_VARS 1

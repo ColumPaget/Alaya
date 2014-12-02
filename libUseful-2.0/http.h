@@ -7,8 +7,10 @@
 
 #define HTTP_AUTH_BASIC  1
 #define HTTP_AUTH_DIGEST 2
-#define HTTP_SENT_AUTH 4
-#define HTTP_PROXY_AUTH 8
+#define HTTP_AUTH_TOKEN 4
+#define HTTP_AUTH_OAUTH 8
+#define HTTP_AUTH_PROXY 64
+#define HTTP_AUTH_SENT 128
 
 
 #define HTTP_OKAY 0
@@ -44,16 +46,8 @@
 #define HTTP_CLIENTDATA_SENT 2
 #define HTTP_HEADERS_READ 4
 
-typedef struct
-{
-int Flags;
-char *AuthRealm;
-char *AuthQOP;
-char *AuthNonce;
-char *AuthOpaque;
-char *Logon;
-char *Password;
-} HTTPAuthStruct;
+extern const char *HTTP_AUTH_BY_TOKEN;
+
 
 
 typedef struct
@@ -65,6 +59,7 @@ char *Doc;
 char *Destination;
 char *ResponseCode;
 int Flags;
+int AuthFlags;
 int State;
 char *RedirectPath;
 char *PreviousRedirect;
@@ -79,8 +74,8 @@ char *Proxy;
 time_t IfModifiedSince;
 ListNode *ServerHeaders;
 ListNode *CustomSendHeaders;
-HTTPAuthStruct *Authorization;
-HTTPAuthStruct *ProxyAuthorization;
+char *Authorization;
+char *ProxyAuthorization;
 STREAM *S;
 } HTTPInfoStruct;
 
@@ -92,6 +87,8 @@ char *HTTPQuote(char *, char*);
 char *HTTPQuoteChars(char *RetBuff, char *Str, char *CharList);
 char *HTTPUnQuote(char *, char*);
 
+void HTTPSetVar(char *Name, char *Var);
+
 
 void HTTPInfoDestroy(void *p_Info);
 void HTTPInfoSetValues(HTTPInfoStruct *Info, char *Host, int Port, char *Logon, char *Password, char *Method, char *Doc, char *ContentType, int ContentLength);
@@ -100,7 +97,7 @@ HTTPInfoStruct *HTTPInfoCreate(char *Host, int Port, char *Logon, char *Password
 STREAM *HTTPConnect(HTTPInfoStruct *Info);
 STREAM *HTTPTransact(HTTPInfoStruct *Info);
 HTTPInfoStruct *HTTPInfoFromURL(char *Method, char *URL);
-STREAM *HTTPMethod(char *Method, char *URL, char *Logon, char *Password);
+STREAM *HTTPMethod(char *Method, char *URL, char *Logon, char *Password, char *ContentType, char *ContentData, int ContentLength);
 STREAM *HTTPGet(char *URL, char *Logon, char *Password);
 STREAM *HTTPPost(char *URL, char *Logon, char *Password, char *ContentType, char *Content);
 int HTTPReadBytes(STREAM *Con, char **Buffer);
@@ -110,7 +107,6 @@ void HTTPSetUserAgent(char *AgentName);
 void HTTPSetProxy(char *Proxy);
 void HTTPSetFlags(int Flags);
 int HTTPGetFlags();
-char *HTTPParseURL(char *URL, char **Proto, char **Host, int *Port, char **Login, char **Password);
 
 
 #ifdef __cplusplus

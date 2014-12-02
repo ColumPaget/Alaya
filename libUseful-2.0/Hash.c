@@ -3,25 +3,11 @@
 
 #define HMAC_BLOCKSIZE 64
 
-char *EncodeBase64(char *Return, char *Text, int len)
-{
-char *RetStr;
 
-RetStr=SetStrLen(Return,len *2);
-to64frombits(RetStr,Text,len);
+typedef void (*HASH_INIT_FUNC)(THash *Hash, int Len);
 
-return(RetStr);
-}
 
-char *DecodeBase64(char *Return, int *len, char *Text)
-{
-char *RetStr;
-
-RetStr=SetStrLen(Return,StrLen(Text) *2);
-*len=from64tobits(RetStr,Text);
-
-return(RetStr);
-}
+char *HashTypes[]={"md5","sha1","sha256","sha512","whirlpool","jh-224","jh-256","jh-384","jh-512",NULL};
 
 
 void HMACUpdate(THash *HMAC, char *Data, int Len)
@@ -120,11 +106,25 @@ HMAC->Key1Len=Len;
 
 
 
+
 #include "crc32.h"
 
 void HashUpdateCRC(THash *Hash, char *Data, int Len)
 {
 crc32Update((unsigned long *) &Hash->Ctx, Data, Len);
+}
+
+
+THash *HashCloneCRC(THash *Hash)
+{
+THash *NewHash;
+
+NewHash=(THash *) calloc(1,sizeof(THash));
+NewHash->Type=CopyStr(NewHash->Type,Hash->Type);
+NewHash->Ctx=(void *) calloc(1,sizeof(unsigned long));
+memcpy(NewHash->Ctx, Hash->Ctx, sizeof(unsigned long));
+
+return(NewHash);
 }
 
 
@@ -136,8 +136,6 @@ int len;
 len=sizeof(unsigned long);
 crc32Finish((unsigned long *) Hash->Ctx);
 //crc=htonl((unsigned long *) Hash->Ctx);
-
-free(Hash->Ctx);
 
 if (Encoding > 0) 
 {
@@ -153,12 +151,13 @@ return(len);
 }
 
 
-void HashInitCRC(THash *Hash)
+void HashInitCRC(THash *Hash, int Len)
 {
 Hash->Ctx=(void *) calloc(1,sizeof(unsigned long));
 crc32Init((unsigned long *) Hash->Ctx);
 Hash->Update=HashUpdateCRC;
 Hash->Finish=HashFinishCRC;
+Hash->Clone=HashCloneCRC;
 }
 
 
@@ -171,6 +170,22 @@ MD5Update((MD5_CTX *) Hash->Ctx, Data, Len);
 }
 
 
+THash *HashCloneMD5(THash *Hash)
+{
+THash *NewHash;
+
+NewHash=(THash *) calloc(1,sizeof(THash));
+NewHash->Type=CopyStr(NewHash->Type,Hash->Type);
+NewHash->Ctx=(void *) calloc(1,sizeof(MD5_CTX));
+memcpy(NewHash->Ctx, Hash->Ctx, sizeof(MD5_CTX));
+NewHash->Update=Hash->Update;
+NewHash->Finish=Hash->Finish;
+NewHash->Clone=Hash->Clone;
+
+return(NewHash);
+}
+
+
 int HashFinishMD5(THash *Hash, int Encoding, char **HashStr)
 {
 int count, len;
@@ -179,18 +194,16 @@ char *Tempstr=NULL, *DigestBuff=NULL;
 DigestBuff=(char *) calloc(1,MD5LEN+1);
 MD5Final(DigestBuff, (MD5_CTX *) Hash->Ctx);
 
-free(Hash->Ctx);
-
 if (Encoding > 0)
 {
-*HashStr=EncodeBytes(*HashStr, DigestBuff, MD5LEN, Encoding);
-len=StrLen(*HashStr);
+	*HashStr=EncodeBytes(*HashStr, DigestBuff, MD5LEN, Encoding);
+	len=StrLen(*HashStr);
 }
 else
 {
-len=MD5LEN;
-*HashStr=SetStrLen(*HashStr,len);
-memcpy(*HashStr,DigestBuff,len);
+	len=MD5LEN;
+	*HashStr=SetStrLen(*HashStr,len);
+	memcpy(*HashStr,DigestBuff,len);
 }
 
 DestroyString(DigestBuff);
@@ -200,12 +213,13 @@ return(len);
 }
 
 
-void HashInitMD5(THash *Hash)
+void HashInitMD5(THash *Hash, int Len)
 {
 Hash->Ctx=(void *) calloc(1,sizeof(MD5_CTX));
 MD5Init((MD5_CTX *) Hash->Ctx);
 Hash->Update=HashUpdateMD5;
 Hash->Finish=HashFinishMD5;
+Hash->Clone=HashCloneMD5;
 }
 
 #include "sha1.h"
@@ -217,6 +231,19 @@ sha1_process_bytes(Data,Len,(struct sha1_ctx *) Hash->Ctx);
 }
 
 
+THash *HashCloneSHA1(THash *Hash)
+{
+THash *NewHash;
+
+NewHash=(THash *) calloc(1,sizeof(THash));
+NewHash->Type=CopyStr(NewHash->Type,Hash->Type);
+NewHash->Ctx=(void *) calloc(1,sizeof(struct sha1_ctx));
+memcpy(NewHash->Ctx, Hash->Ctx, sizeof(struct sha1_ctx));
+
+return(NewHash);
+}
+
+
 int HashFinishSHA1(THash *Hash, int Encoding, char **HashStr)
 {
 int count, len;
@@ -224,7 +251,6 @@ char *Tempstr=NULL, *DigestBuff=NULL;
 
 DigestBuff=(char *) calloc(1,SHA1LEN+1);
 sha1_finish_ctx((struct sha1_ctx *) Hash->Ctx, DigestBuff);
-free(Hash->Ctx);
 
 if (Encoding > 0)
 {
@@ -245,14 +271,6 @@ return(len);
 }
 
 
-void HashInitSHA1(THash *Hash)
-{
-Hash->Ctx=(void *) calloc(1,sizeof(struct sha1_ctx));
-sha1_init_ctx((struct sha1_ctx *) Hash->Ctx);
-Hash->Update=HashUpdateSHA1;
-Hash->Finish=HashFinishSHA1;
-}
-
 
 #include "sha2.h"
 
@@ -264,7 +282,6 @@ uint8_t *DigestBuff=NULL;
 
 DigestBuff=(uint8_t *) calloc(1,SHA2_SHA256_DIGEST_LENGTH+1);
 SHA2_SHA256_Final(DigestBuff, (SHA2_SHA256_CTX *) Hash->Ctx);
-free(Hash->Ctx);
 
 if (Encoding > 0)
 {
@@ -273,9 +290,9 @@ if (Encoding > 0)
 }
 else
 {
-len=SHA2_SHA256_DIGEST_LENGTH;
-*HashStr=SetStrLen(*HashStr,len);
-memcpy(*HashStr,DigestBuff,len);
+	len=SHA2_SHA256_DIGEST_LENGTH;
+	*HashStr=SetStrLen(*HashStr,len);
+	memcpy(*HashStr,DigestBuff,len);
 }
 
 DestroyString(DigestBuff);
@@ -285,17 +302,22 @@ return(len);
 }
 
 
+THash *HashCloneSHA256(THash *Hash)
+{
+THash *NewHash;
+
+NewHash=(THash *) calloc(1,sizeof(THash));
+NewHash->Type=CopyStr(NewHash->Type,Hash->Type);
+NewHash->Ctx=(void *) calloc(1,sizeof(SHA2_SHA256_CTX));
+memcpy(NewHash->Ctx, Hash->Ctx, sizeof(SHA2_SHA256_CTX));
+
+return(NewHash);
+}
+
+
 void HashUpdateSHA256(THash *Hash, char *Data, int Len)
 {
 SHA2_SHA256_Update((SHA2_SHA256_CTX *) Hash->Ctx, Data, Len);
-}
-
-void HashInitSHA256(THash *Hash)
-{
-Hash->Ctx=(void *) calloc(1,sizeof(SHA2_SHA256_CTX));
-SHA2_SHA256_Init((SHA2_SHA256_CTX *) Hash->Ctx);
-Hash->Update=HashUpdateSHA256;
-Hash->Finish=HashFinishSHA256;
 }
 
 
@@ -306,7 +328,6 @@ char *Tempstr=NULL, *DigestBuff=NULL;
 
 DigestBuff=(char *) calloc(1,SHA2_SHA512_DIGEST_LENGTH+1);
 SHA2_SHA512_Final(DigestBuff, (SHA2_SHA512_CTX *) Hash->Ctx);
-free(Hash->Ctx);
 
 if (Encoding > 0)
 {
@@ -332,13 +353,192 @@ void HashUpdateSHA512(THash *Hash, char *Data, int Len)
 SHA2_SHA512_Update((SHA2_SHA512_CTX *) Hash->Ctx, Data, Len);
 }
 
-void HashInitSHA512(THash *Hash)
+
+THash *HashCloneSHA512(THash *Hash)
 {
+THash *NewHash;
+
+NewHash=(THash *) calloc(1,sizeof(THash));
+NewHash->Type=CopyStr(NewHash->Type,Hash->Type);
+NewHash->Ctx=(void *) calloc(1,sizeof(SHA2_SHA512_CTX));
+memcpy(NewHash->Ctx, Hash->Ctx, sizeof(SHA2_SHA512_CTX));
+
+return(NewHash);
+}
+
+
+
+
+void HashInitSHA(THash *Hash, int Len)
+{
+
+switch (Len)
+{
+case 512:
 Hash->Ctx=(void *) calloc(1,sizeof(SHA2_SHA512_CTX));
 SHA2_SHA512_Init((SHA2_SHA512_CTX *) Hash->Ctx);
 Hash->Update=HashUpdateSHA512;
 Hash->Finish=HashFinishSHA512;
+Hash->Clone=HashCloneSHA512;
+break;
+
+case 256:
+Hash->Ctx=(void *) calloc(1,sizeof(SHA2_SHA256_CTX));
+SHA2_SHA256_Init((SHA2_SHA256_CTX *) Hash->Ctx);
+Hash->Update=HashUpdateSHA256;
+Hash->Finish=HashFinishSHA256;
+Hash->Clone=HashCloneSHA256;
+break;
+
+default:
+Hash->Ctx=(void *) calloc(1,sizeof(struct sha1_ctx));
+sha1_init_ctx((struct sha1_ctx *) Hash->Ctx);
+Hash->Update=HashUpdateSHA1;
+Hash->Finish=HashFinishSHA1;
+Hash->Clone=HashCloneSHA1;
+break;
 }
+
+}
+
+
+
+#include "whirlpool.h"
+
+int HashFinishWhirlpool(THash *Hash, int Encoding, char **HashStr)
+{
+int count, len;
+char *Tempstr=NULL, *DigestBuff=NULL;
+
+DigestBuff=(char *) calloc(1,WHIRLPOOL_DIGESTBYTES+1);
+WHIRLPOOLfinalize((WHIRLPOOLstruct *) Hash->Ctx, DigestBuff);
+
+if (Encoding > 0)
+{
+	 *HashStr=EncodeBytes(*HashStr, DigestBuff, WHIRLPOOL_DIGESTBYTES, Encoding);
+	 len=StrLen(*HashStr);
+}
+else
+{
+len=WHIRLPOOL_DIGESTBYTES;
+*HashStr=SetStrLen(*HashStr,len);
+memcpy(*HashStr,DigestBuff,len);
+}
+
+DestroyString(DigestBuff);
+DestroyString(Tempstr);
+
+return(len);
+}
+
+
+void HashUpdateWhirlpool(THash *Hash, char *Data, int Len)
+{
+WHIRLPOOLadd(Data, Len * 8, (WHIRLPOOLstruct *) Hash->Ctx);
+}
+
+
+THash *HashCloneWhirlpool(THash *Hash)
+{
+THash *NewHash;
+
+NewHash=(THash *) calloc(1,sizeof(THash));
+NewHash->Type=CopyStr(NewHash->Type,Hash->Type);
+NewHash->Ctx=(void *) calloc(1,sizeof(WHIRLPOOLstruct *));
+memcpy(NewHash->Ctx, Hash->Ctx, sizeof(WHIRLPOOLstruct *));
+
+return(NewHash);
+}
+
+
+
+void HashInitWhirlpool(THash *Hash, int Len)
+{
+Hash->Ctx=(void *) calloc(1,sizeof(WHIRLPOOLstruct));
+WHIRLPOOLinit((WHIRLPOOLstruct *) Hash->Ctx);
+Hash->Update=HashUpdateWhirlpool;
+Hash->Finish=HashFinishWhirlpool;
+Hash->Clone=HashCloneWhirlpool;
+}
+
+
+#include "jh_ref.h"
+
+int HashFinishJH(THash *Hash, int Encoding, char **HashStr)
+{
+int count, len;
+char *Tempstr=NULL, *DigestBuff=NULL;
+
+DigestBuff=(char *) calloc(1,1024);
+
+len=JHFinal((hashState *) Hash->Ctx, DigestBuff);
+
+if (Encoding > 0)
+{
+	 *HashStr=EncodeBytes(*HashStr, DigestBuff, len, Encoding);
+	 len=StrLen(*HashStr);
+}
+else
+{
+	*HashStr=SetStrLen(*HashStr,len);
+	memcpy(*HashStr,DigestBuff,len);
+}
+
+DestroyString(DigestBuff);
+DestroyString(Tempstr);
+
+return(len);
+}
+
+
+
+void HashUpdateJH(THash *Hash, char *Data, int Len)
+{
+	JHUpdate( (hashState *) Hash->Ctx, Data, Len);
+}
+
+
+THash *HashCloneJH(THash *Hash)
+{
+THash *NewHash;
+
+NewHash=(THash *) calloc(1,sizeof(THash));
+NewHash->Type=CopyStr(NewHash->Type,Hash->Type);
+NewHash->Ctx=(void *) calloc(1,sizeof(hashState *));
+memcpy(NewHash->Ctx, Hash->Ctx, sizeof(hashState *));
+
+return(NewHash);
+}
+
+
+
+int HashInitJH(THash *Hash, int Length)
+{
+
+switch (Length)
+{
+	case 224:
+	case 256:
+	case 384:
+	case 512:
+		Hash->Ctx=(void *) calloc(1,sizeof(hashState));
+		JHInit((hashState *) Hash->Ctx, Length);
+		Hash->Update=HashUpdateJH;
+		Hash->Finish=HashFinishJH;
+		Hash->Clone=HashCloneJH;
+	break;
+
+	default:
+	return(FALSE);
+	break;
+}
+
+return(TRUE);
+}
+
+
+
+
 
 
 
@@ -348,9 +548,18 @@ void HashDestroy(THash *Hash)
 DestroyString(Hash->Key1);
 DestroyString(Hash->Key2);
 DestroyString(Hash->Type);
+if (Hash->Ctx) free(Hash->Ctx);
 free(Hash);
 }
 
+
+void HashAvailableTypes(ListNode *Vars)
+{
+int i;
+
+for (i=0; HashTypes[i] !=NULL; i++) SetVar(Vars,HashTypes[i], HashTypes[i]);
+
+}
 
 
 THash *HashInit(char *Type)
@@ -359,12 +568,18 @@ THash *Hash=NULL;
 
 Hash=(THash *) calloc(1,sizeof(THash));
 Hash->Type=CopyStr(Hash->Type,Type);
-if (strcasecmp(Type,"md5")==0) HashInitMD5(Hash);
-else if (strcasecmp(Type,"sha")==0) HashInitSHA1(Hash);
-else if (strcasecmp(Type,"sha1")==0) HashInitSHA1(Hash);
-else if (strcasecmp(Type,"sha256")==0) HashInitSHA256(Hash);
-else if (strcasecmp(Type,"sha512")==0) HashInitSHA512(Hash);
-else if (strcasecmp(Type,"crc32")==0) HashInitCRC(Hash);
+if (strcasecmp(Type,"md5")==0) HashInitMD5(Hash, 0);
+else if (strcasecmp(Type,"sha")==0) HashInitSHA(Hash, 0);
+else if (strcasecmp(Type,"sha1")==0) HashInitSHA(Hash, 0);
+else if (strcasecmp(Type,"sha256")==0) HashInitSHA(Hash, 256);
+else if (strcasecmp(Type,"sha512")==0) HashInitSHA(Hash, 512);
+else if (strcasecmp(Type,"whirl")==0) HashInitWhirlpool(Hash, 0);
+else if (strcasecmp(Type,"whirlpool")==0) HashInitWhirlpool(Hash, 0);
+else if (strcasecmp(Type,"jh-224")==0) HashInitJH(Hash,224);
+else if (strcasecmp(Type,"jh-256")==0) HashInitJH(Hash,256);
+else if (strcasecmp(Type,"jh-384")==0) HashInitJH(Hash,384);
+else if (strcasecmp(Type,"jh-512")==0) HashInitJH(Hash,512);
+//else if (strcasecmp(Type,"crc32")==0) HashInitCRC(Hash, 0);
 else if (strncasecmp(Type,"hmac-",5)==0) HMACInit(Hash);
 else 
 {
@@ -374,6 +589,8 @@ else
 
 return(Hash);
 }
+
+
 
 
 int HashBytes(char **Return, char *Type, char *text, int len, int Encoding)
@@ -414,7 +631,7 @@ result=STREAMReadBytes(S,Tempstr,4096);
 while (result !=EOF)
 {
 	Hash->Update(Hash, Tempstr, result);
-result=STREAMReadBytes(S,Tempstr,4096);
+	result=STREAMReadBytes(S,Tempstr,4096);
 }
 
 DestroyString(Tempstr);

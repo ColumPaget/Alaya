@@ -95,6 +95,22 @@ switch (Encoding)
 	to64frombits(RetStr,Bytes,len); break;
 	break;
 
+	case ENCODE_OCTAL:
+  for (i=0; i < len; i++)
+  {
+  Tempstr=FormatStr(Tempstr,"%03o",Bytes[i] & 255);
+  RetStr=CatStr(RetStr,Tempstr);
+  }
+	break;
+
+	case ENCODE_DECIMAL:
+  for (i=0; i < len; i++)
+  {
+  Tempstr=FormatStr(Tempstr,"%03d",Bytes[i] & 255);
+  RetStr=CatStr(RetStr,Tempstr);
+  }
+	break;
+
 	case ENCODE_HEX:
   for (i=0; i < len; i++)
   {
@@ -110,6 +126,7 @@ switch (Encoding)
   RetStr=CatStr(RetStr,Tempstr);
   }
 	break;
+	
 
 	default:
 	RetStr=SetStrLen(RetStr,len );
@@ -215,25 +232,6 @@ if (result==-1)
   return(-1);
 }
 return(fd);
-}
-
-
-
-
-char *GetNameValuePair(const char *Input, const char *PairDelim, const char *NameValueDelim, char **Name, char **Value)
-{
-char *ptr, *ptr2;
-char *Token=NULL;
-
-ptr=GetToken(Input,PairDelim,&Token,GETTOKEN_QUOTES);
-if (StrLen(Token) && strstr(Token,NameValueDelim))
-{
-ptr2=GetToken(Token,NameValueDelim,Name,GETTOKEN_QUOTES);
-ptr2=GetToken(ptr2,PairDelim,Value,GETTOKEN_QUOTES);
-}
-
-DestroyString(Token);
-return(ptr);
 }
 
 
