@@ -120,6 +120,8 @@ char *M3UFileTypes;
 char *AccessTokenKey;
 char *ForbiddenURLStrings;
 char *Timezone;
+char *AddressSpace;
+char *StackSize;
 int DisplayNameLen;
 unsigned long DocumentCacheTime;
 ListNode *SSLKeys;

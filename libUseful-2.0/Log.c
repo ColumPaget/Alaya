@@ -64,6 +64,7 @@ TLogFile *LogFileGetEntry(char *FileName)
 			LogFile=(TLogFile *) calloc(1,sizeof(TLogFile));
 			LogFile->Path=CopyStr(LogFile->Path,FileName);
 			LogFile->LogFacility=LogFileDefaults->LogFacility;
+			LogFile->FlushInterval=LogFileDefaults->FlushInterval;
 			LogFile->Flags=LogFileDefaults->Flags;
 			LogFile->MaxSize=LogFileDefaults->MaxSize;
 			LogFile->S=S;

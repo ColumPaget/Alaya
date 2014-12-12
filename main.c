@@ -25,7 +25,7 @@
 #include "Authenticate.h"
 #include "Settings.h"
 #include "server.h"
-
+#include <sys/resource.h>
 
 ListNode *MimeTypes=NULL;
 ListNode *Connections=NULL;
@@ -147,6 +147,21 @@ LogToFile(Settings.LogPath, "%s",Msg);
 }
 
 
+
+void SetResourceLimits()
+{
+struct rlimit limit;
+
+getrlimit(RLIMIT_AS, &limit);
+limit.rlim_cur=(int) ParseHumanReadableDataQty(Settings.AddressSpace, 0);
+setrlimit(RLIMIT_AS, &limit);
+
+getrlimit(RLIMIT_STACK, &limit);
+limit.rlim_cur=(int) ParseHumanReadableDataQty(Settings.StackSize, 0);
+setrlimit(RLIMIT_STACK, &limit);
+}
+
+
 main(int argc, char *argv[])
 {
 STREAM *ServiceSock, *S;
@@ -183,6 +198,7 @@ if (Settings.Flags & FLAG_SSL_PFS)
 //Do this before any logging!
 if (! (Settings.Flags & FLAG_NODEMON)) demonize();
 
+SetResourceLimits();
 
 Tempstr=MCopyStr(Tempstr, "Alaya Starting up. Version: ",Version,NULL);
 ReopenLogFile(Tempstr);
