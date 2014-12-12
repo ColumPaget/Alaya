@@ -141,7 +141,7 @@ Tempstr[result]='\0';
 if (result > 0)
 {
 	result=MatchTokenFromList(TagName,ID3v2Fields,0);
-	LogToFile(Settings.LogPath,"v2 TAG: [%s] [%s] %d\n",TagName,Tempstr,result);
+	//LogToFile(Settings.LogPath,"v2 TAG: [%s] [%s] %d\n",TagName,Tempstr,result);
 	switch (result)
 	{
 		case TAG_ARTIST:
@@ -245,7 +245,7 @@ Tempstr[result]='\0';
 if (StrLen(Tempstr))
 {
 	result=MatchTokenFromList(TagName,ID3v3Fields,0);
-	LogToFile(Settings.LogPath,"v3 TAG: [%s] [%s] %d %d\n",TagName,Tempstr,result,len);
+	//LogToFile(Settings.LogPath,"v3 TAG: [%s] [%s] %d %d\n",TagName,Tempstr,result,len);
 	switch (result)
 	{
 		case TAG_ARTIST:
@@ -299,7 +299,7 @@ STREAMReadBytes(S,Tempstr,20);
 result=MatchTokenFromList(Tempstr,TagTypes,MATCH_TOKEN_PART|MATCH_TOKEN_CASE);
 STREAMSeek(S,(double) 0, SEEK_SET); 
 
-LogToFile(Settings.LogPath,"TAGTYPE: %d [%s]\n",result,Tempstr);
+//LogToFile(Settings.LogPath,"TAGTYPE: %d [%s]\n",result,Tempstr);
 
 DestroyString(Tempstr);
 	
@@ -443,7 +443,7 @@ int offset, NoOfTags;
 
 ptr=Data+4;
 
-LogToFile(Settings.LogPath,"DATA: [%s]",Data);
+//LogToFile(Settings.LogPath,"DATA: [%s]",Data);
 if (strncmp(Data,"II",2)==0)
 {
 	offset=(* (uint32_t *) ptr);
@@ -457,7 +457,7 @@ else
 	NoOfTags=(ntohs(* (uint16_t *) ptr));
 }
 
-LogToFile(Settings.LogPath,"Offset: %d NoOfTags: %d",offset,NoOfTags);
+//LogToFile(Settings.LogPath,"Offset: %d NoOfTags: %d",offset,NoOfTags);
 }
 
 
@@ -479,7 +479,7 @@ if (memcmp(Data+6,"JFIF",4)==0)
 }
 else ptr=Data+2;
 
-LogToFile(Settings.LogPath,"PTR: [%s] [%x] [%x] [%s]",Data,ptr[0],ptr[1],ptr+4);
+//LogToFile(Settings.LogPath,"PTR: [%s] [%x] [%x] [%s]",Data,ptr[0],ptr[1],ptr+4);
 
 if (
 		(memcmp(ptr,"\xFF\xE1",2)==0) &&

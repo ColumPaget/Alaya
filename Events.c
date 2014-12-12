@@ -104,7 +104,7 @@ void ProcessEventTrigger(HTTPSession *Session, char *URL, char *TriggerScript, c
 {
 	char *Tempstr=NULL;
 
-		LogToFile(Settings.LogPath, "EVENT TRIGGERED: ClientIP='%s' REQUEST='%s' TriggeredScript='%s' MatchInfo='%s'",Session->ClientIP, URL, TriggerScript, ExtraInfo);
+		LogToFile(Settings.LogPath, "EVENT TRIGGERED: Source='%s@%s (%s)' REQUEST='%s' TriggeredScript='%s' MatchInfo='%s'",Session->UserName, Session->ClientHost, Session->ClientIP, URL, TriggerScript, ExtraInfo);
 	
 		if (ParentProcessPipe)
 		{
@@ -144,17 +144,19 @@ while (Curr)
 
 	if (EventTriggerMatch(Curr, Session, &MatchStr))
 	{
-		ptr=GetToken((char *) Curr->Item,";",&Token,GETTOKEN_QUOTES);
+		ptr=GetToken((char *) Curr->Item,",",&Token,GETTOKEN_QUOTES);
 		while (ptr)
 		{
     	if (strcasecmp(Token,"ignore")==0) break;
+      else if (strcasecmp(Token,"log")==0) LogToFile(Settings.LogPath,"WARN: Event Rule encountered (%s on %s).",MatchStr,Tempstr);
+      else if (strcasecmp(Token,"syslog")==0) syslog(LOG_WARNING, "WARN: Event Rule encountered (%s on %s).",MatchStr,Tempstr);
 			else if (strcasecmp(Token,"deny") ==0)
 			{
 				LogToFile(Settings.LogPath,"WARN: 'Deny' Event Rule encountered (%s on %s). Denying Authentication",MatchStr,Tempstr);
 				Settings.AuthMethods=CopyStr(Settings.AuthMethods, "deny");
 			}
 			else ProcessEventTrigger(Session, Tempstr, Token, MatchStr);
-			ptr=GetToken(ptr,";",&Token,GETTOKEN_QUOTES);
+			ptr=GetToken(ptr,",",&Token,GETTOKEN_QUOTES);
 		}
 	}
 	Curr=ListGetNext(Curr);

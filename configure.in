@@ -17,10 +17,26 @@ AC_CHECK_LIB(z,deflate,,)
 cf_have_libz=$ac_cv_lib_z_deflate
 
 cf_have_capabilities=no
+cf_have_xattr=no
 cf_use_sendfile=yes
+cf_use_largefiles=yes
 
 AC_ARG_ENABLE(sendfile, [  --enable-sendfile       enable sendfile support (default=yes)], cf_use_sendfile=$enableval )
-AC_ARG_ENABLE(capabilities, [  --enable-capabilities       enable linux capabilities support], cf_use_capabilities=$enableval )
+AC_ARG_ENABLE(largefiles, [  --enable-largefiles		enable largefile support (default=yes)], cf_use_largefiles=$enableval )
+AC_ARG_ENABLE(xattr, [  --enable-xattr       enable extended file attributes support (default=no)], cf_use_xattr=$enableval )
+AC_ARG_ENABLE(capabilities, [  --enable-capabilities       enable linux capabilities support (default=no)], cf_use_capabilities=$enableval )
+
+AC_ARG_ENABLE(ssl, [  --enable-ssl		use Secure Sockets Layer (default=no)], cf_use_ssl=$enableval )
+AC_ARG_ENABLE(ip6, [  --enable-ip6		use IPv6 (default=no)], cf_use_ip6=$enableval )
+AC_ARG_ENABLE(pam, [  --enable-pam		enable Pluggable Authentication Modules (default=autodetect) ], cf_use_pam=$enableval )
+
+
+
+if test "$cf_use_xattr" != "no"
+then
+AC_CHECK_HEADER(sys/xattr.h,AC_DEFINE([USE_XATTR]),,)
+fi
+
 
 if test "$cf_use_capabilities" != "no"
 then
@@ -28,17 +44,12 @@ AC_CHECK_HEADER(sys/capability.h,cf_have_capabilities=yes,,)
 AC_CHECK_HEADER(linux/capability.h,cf_have_capabilities=yes,,)
 fi
 
+
 if test "$cf_have_capabilities" = "yes"
 then
 AC_CHECK_LIB(cap,cap_init,,)
 AC_DEFINE([USE_LINUX_CAPABILITIES])
 fi
-
-
-AC_ARG_ENABLE(ssl, [  --enable-ssl		use Secure Sockets Layer (default=no)], cf_use_ssl=$enableval )
-AC_ARG_ENABLE(ip6, [  --enable-ip6		use IPv6 (default=no)], cf_use_ip6=$enableval )
-AC_ARG_ENABLE(largefiles, [  --enable-largefiles		enable largefile support (default=no)], cf_use_largefiles=$enableval )
-AC_ARG_ENABLE(pam, [  --enable-pam		enable Pluggable Authentication Modules (default=autodetect) ], cf_use_pam=$enableval )
 
 if test "$cf_use_largefiles" = "yes"
 then
@@ -63,6 +74,7 @@ cf_have_libssl=$ac_cv_lib_ssl_SSL_library_init
 AC_CHECK_LIB(crypto,EVP_CIPHER_CTX_init,,)
 cf_have_libcrypto=$ac_cv_lib_crypto_EVP_CIPHER_CTX_init
 fi
+
 
 AC_CHECK_LIB(crypt, crypt,,)
 cf_have_libcrypt=$ac_cv_lib_crypt_crypt

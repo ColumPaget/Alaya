@@ -152,7 +152,7 @@ main(int argc, char *argv[])
 STREAM *ServiceSock, *S;
 int fd;
 char *Tempstr=NULL;
-int result;
+int result, i;
 
 
 SetTimezoneEnv();
@@ -191,7 +191,14 @@ signal(SIGHUP, SigHandler);
 
 LoadFileMagics("/etc/mime.types","/etc/magic");
 
-fd=InitServerSock(Settings.BindAddress,Settings.Port);
+//Allow 5 secs for any previous instance of alaya to shutdown
+for (i=0; i < 5; i++)
+{
+	fd=InitServerSock(Settings.BindAddress,Settings.Port);
+	if (fd != -1) break;
+	sleep(1);
+}
+
 if (fd==-1)
 {
 	LogToFile(Settings.LogPath, "Cannot bind to port %s:%d",Settings.BindAddress,Settings.Port);

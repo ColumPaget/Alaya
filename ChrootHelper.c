@@ -602,7 +602,7 @@ Tempstr=STREAMReadLine(Tempstr,S);
 if (! Tempstr) return(FALSE);
 
 StripTrailingWhitespace(Tempstr);
-LogToFile(Settings.LogPath, "HCPR: %s",Tempstr);
+//LogToFile(Settings.LogPath, "HCPR: %s",Tempstr);
 
 ptr=GetToken(Tempstr,"\\S",&Token,0);
 if (strcmp(Token,"EXEC")==0) result=HandleExecRequest(S,ptr);
@@ -707,7 +707,7 @@ while (Tempstr)
 Tempstr=MCopyStr(Tempstr, ResponseLine,"\r\n",Headers,"\r\n",NULL);
 STREAMWriteLine(Tempstr,S);
 
-if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"CGI HEADERS: [%s]",Tempstr);
+if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"CGI HEADERS: [%s]",Tempstr);
 
 
 //Read remaining data from CGI

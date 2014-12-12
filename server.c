@@ -150,7 +150,7 @@ DestroyString(Value);
 
 
 //Will only return false if FLAG_SSL_CERT_REQUIRED is set
-int HTTPServerCheckCertificate(STREAM *S)
+int HTTPServerCheckCertificate(HTTPSession *Session, STREAM *S)
 {
 char *ptr;
 int result=TRUE;
@@ -159,30 +159,21 @@ int result=TRUE;
 
 	if (StrLen(ptr) && (strcmp(ptr,"no certificate") !=0)  )
 	{
-		if (strcmp(ptr,"OK")==0)
-		{
-			LogToFile(Settings.LogPath,"CLIENT CERTIFIED BY: %s", STREAMGetValue(S,"SSL-Certificate-Issuer"));
-			LogToFile(Settings.LogPath,"CLIENT CERTIFICATE SUBJECT: %s", STREAMGetValue(S,"SSL-Certificate-Subject"));
-		}
-		else 
+		LogToFile(Settings.LogPath,"AUTH SSL Certificate Provided by '%s@%s'. Subject=%s Issuer=%s",Session->UserName,Session->ClientIP,STREAMGetValue(S,"SSL-Certificate-Subject"), STREAMGetValue(S,"SSL-Certificate-Issuer"));
+
+		if (strcmp(ptr,"OK")!=0)
 		{
 			if (Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED)
 			{
-				LogToFile(Settings.LogPath,"AUTH: ERROR: SSL Certificate required, but client failed to provide a valid certificate. Error was: %s",ptr);
+				LogToFile(Settings.LogPath,"AUTH: ERROR: SSL Certificate REQUIRED from client '%s@%s'. Invalid Certificate. Error was: %s",Session->UserName,Session->ClientIP, ptr);
 				result=FALSE;
 			}
-			LogToFile(Settings.LogPath,"AUTH: SSL Certificate provided, but invalid. Error was: %s",ptr);
+			else LogToFile(Settings.LogPath,"AUTH: SSL Certificate Optional for client '%s@%s'. Invalid Certificate. Error was: %s",Session->UserName,Session->ClientIP, ptr);
 
-			ptr=STREAMGetValue(S,"SSL-Certificate-Subject");
-			if (StrLen(ptr))
-			{
-				LogToFile(Settings.LogPath,"CLIENT CERTIFICATE ISSUER: %s", STREAMGetValue(S,"SSL-Certificate-Issuer"));
-				LogToFile(Settings.LogPath,"CLIENT CERTIFICATE SUBJECT: %s", STREAMGetValue(S,"SSL-Certificate-Subject"));
-			}
 			LogFileFlushAll(TRUE);
 		}
 	}
-	else if (Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED) LogToFile(Settings.LogPath,"AUTH: ERROR: SSL Certificate required, but client failed to provide a valid certificate.");
+	else if (Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED) LogToFile(Settings.LogPath,"AUTH: ERROR: SSL Certificate REQUIRED from client '%s@%s'. Missing Certificate.",Session->UserName,Session->ClientIP);
 
 
 return(result);
@@ -206,12 +197,13 @@ if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrLen(Heads->ClientIP)) Heads->Cli
 
 LogToFile(Settings.LogPath,"");
 //Log first line of the response
-LogToFile(Settings.LogPath,"NEW REQUEST: %s (%s) %s",Heads->ClientHost,Heads->ClientIP,Tempstr);
+
+Token=MCopyStr(Token, "NEW REQUEST: ",Heads->ClientHost," (",Heads->ClientIP,") ", Tempstr, NULL);
 if (Settings.Flags & FLAG_SSL)
 {
 	Heads->Cipher=CopyStr(Heads->Cipher,STREAMGetValue(S,"SSL-Cipher"));
-	LogToFile(Settings.LogPath,"SSL CIPHER: %s", Heads->Cipher);
-	if (! HTTPServerCheckCertificate(S)) exit(1);
+	Token=MCatStr(Token,"  SSL-CIPHER=", Heads->Cipher, NULL);
+	if (! HTTPServerCheckCertificate(Heads,S)) exit(1);
 
 	//Set the Username to be the common name signed in the certificate. If it doesn't
 	//authenticate against a user then we can query for a username later
@@ -221,6 +213,8 @@ if (Settings.Flags & FLAG_SSL)
 		if (StrLen(Heads->UserName)) Heads->AuthFlags |= FLAG_AUTH_PRESENT;
 	}
 }
+
+LogToFile(Settings.LogPath, "%s", Token);
 
 //Read Method (GET, POST, etc)
 ptr=GetToken(Tempstr,"\\S",&Heads->Method,0);
@@ -536,9 +530,9 @@ HTTPSession *Response;
 char *Tempstr=NULL;
 long ResponseCode=0;
 
+LogToFile(Settings.LogPath,"RESPONSE: '%s' to %s@%s for '%s %s'",ResponseLine,Session->UserName,Session->ClientIP,Session->Method,Session->Path);
+
 ResponseCode=strtol(ResponseLine,NULL,10);
-
-
 
 //Create 'Response' rather than using session, because things set by the client in 'Session' might
 //get copied into the response and interfere with the response otherwise
@@ -762,7 +756,6 @@ char *Tempstr=NULL;
 Curr=ListGetNext(Vars);
 while (Curr)
 {
-	LogToFile(Settings.LogPath,"HEAD: %s -? %s", Curr->Tag, Curr->Item);
 	if (strncmp(Curr->Tag,"Media-",6)==0)
 	{
 		Tempstr=MCopyStr(Tempstr,"X-",Curr->Tag,NULL);
@@ -784,11 +777,7 @@ int BuffSize=4096, result;
 int ICYInterval=4096000;
 
 	Doc=STREAMOpenFile(Path, O_RDONLY);
-	if (! Doc) 
-	{
-			HTTPServerSendHTML(S, Session, "403 Forbidden","You don't have permission for that.");
-			LogToFile(Settings.LogPath,"%s@%s (%s) 403 Forbidden: %s", Session->UserName,Session->ClientHost,Session->ClientIP,Session->Path);
-	}
+	if (! Doc) HTTPServerSendHTML(S, Session, "403 Forbidden","You don't have permission for that.");
 	else
 	{
 		if (Session)
@@ -840,12 +829,7 @@ ListNode *Vars;
 	else result=LoadFileRealProperties(Path, TRUE, Vars);
 
 		
-	LogToFile(Settings.LogPath,"LOAD PROPS: %d %d", result, ListSize(Vars));
-	if (result==FILE_NOSUCH) 
-	{
-		HTTPServerSendHTML(S, Session, "404 Not Found","Couldn't find that document.");
-		LogToFile(Settings.LogPath,"%s@%s (%s) 404 Not Found: %s", Session->UserName,Session->ClientHost,Session->ClientIP,Path);
-	}
+	if (result==FILE_NOSUCH) HTTPServerSendHTML(S, Session, "404 Not Found","Couldn't find that document.");
 	else
 	{
 		//Set 'LastModified' so we can use it if the server sends 'If-Modified-Since'
@@ -915,19 +899,18 @@ int len;
 			break;
 
 			case PATHTYPE_URL:
-      ChrootProcessRequest(S, Session, "PROXY", PI->Path, "");
+			ChrootProcessRequest(S, Session, "PROXY", PI->Path, "");
 			break;
 
 			case PATHTYPE_PROXY:
 			if (StrLen(Session->UserName)) 
 			{
 				Path=MCopyStr(Path,Session->UserName,":",Session->Password,NULL);
-				char *EncodeBytes(char *Buffer, unsigned const char *Bytes, int len, int Encoding);
 				Tempstr=EncodeBytes(Tempstr, Path, StrLen(Path), ENCODE_BASE64);
 				Session->RemoteAuthenticate=MCopyStr(Session->RemoteAuthenticate,"Basic ",Tempstr,NULL);	
 			}
-      Path=MCopyStr(Path,PI->Path,Session->Path+StrLen(PI->URL),NULL);
-      ChrootProcessRequest(S, Session, "PROXY", Path, "");
+			Path=MCopyStr(Path,PI->Path,Session->Path+StrLen(PI->URL),NULL);
+			ChrootProcessRequest(S, Session, "PROXY", Path, "");
 			break;
 
 			case PATHTYPE_MIMEICONS:
@@ -961,11 +944,7 @@ int BuffSize=4096, result, total=0;
 
 Doc=STREAMOpenFile(Heads->Path, O_CREAT | O_TRUNC | O_WRONLY);
 
-if (! Doc) 
-{
-	HTTPServerSendHTML(S, Heads, "403 Forbidden","Can't open document for write.");
-	LogToFile(Settings.LogPath,"%s@%s (%s) 403 Forbidden: '..' cannot open %s", Heads->UserName,Heads->ClientHost,Heads->ClientIP,Heads->Path);
-}
+if (! Doc) HTTPServerSendHTML(S, Heads, "403 Forbidden","Can't open document for write.");
 else
 {
 	fchmod(Doc->in_fd,0660); 
@@ -1216,7 +1195,7 @@ else
 
 	if (chdir(ChrootDir) !=0) 
 	{
-		LogToFile(Settings.LogPath,"ERROR: CHDIR FAILED: %d %s %s\n",getuid(),ChrootDir,strerror(errno));
+		LogToFile(Settings.LogPath,"ERROR: CHDIR FAILED: %d %s %s",getuid(),ChrootDir,strerror(errno));
 		HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to home-directory");
  		_exit(1);
 	}
@@ -1335,7 +1314,7 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 	//This handles someone clicking a 'logout' button
 	if (! HTTPServerHandleRegister(Session, LOGIN_CHECK_ALLOWED))
 	{
-		LogToFile(Settings.LogPath,"AUTH: LOGIN NOT ALLOWED: [%s]",Session->ClientIP);
+		LogToFile(Settings.LogPath,"AUTH: Forcing Relogin for  %s@%s (%s) %s %s",Session->ClientIP,Session->ClientHost,Session->ClientIP,Session->Method,Session->Path);
 		return(FALSE);
 	}
 
@@ -1343,10 +1322,10 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 	{
 		if (strcmp(Session->UserName,Session->AuthenticatedUser)==0) 
 		{
-			LogToFile(Settings.LogPath,"AUTH: Session Keep-Alive active, reusing authentication for  '%s' ",Session->UserName);
+			LogToFile(Settings.LogPath,"AUTH: Session Keep-Alive active, reusing authentication for %s@%s (%s) %s %s",Session->ClientIP,Session->ClientHost,Session->ClientIP,Session->Method,Session->Path);
 			return(TRUE);
 		}
-		else LogToFile(Settings.LogPath,"ERROR: Session Keep-Alive active, but user has changed.  '%s' != '%s'. Not resuing authentication",Session->UserName,Session->AuthenticatedUser);
+		else LogToFile(Settings.LogPath,"AUTH: ERROR: Session Keep-Alive active, but user has changed to %s@%s (%s) %s %s. Refusing authentication",Session->ClientIP,Session->ClientHost,Session->ClientIP,Session->Method,Session->Path);
 	}
 
 
@@ -1357,19 +1336,17 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 	if (Session->AuthFlags & FLAG_AUTH_PRESENT)
 	{
 		if (StrLen(Session->UserName) && Authenticate(Session)) result=TRUE;
-		else LogToFile(Settings.LogPath,"AUTH: FAILED TO AUTHENTICATE: [%s]",Session->UserName);
 
 		//If authentication provided any users settings, then apply those
 		if (StrLen(Session->UserSettings)) ParseConfigItemList(Session->UserSettings);
 
 		//The FLAG_SSL_CERT_REQUIRED flag might have been set by user settings
 		//during authentication, so check it again here
-		if (! HTTPServerCheckCertificate(Session->S)) result=FALSE;
+		if (! HTTPServerCheckCertificate(Session, Session->S)) result=FALSE;
 
 		if (result) HTTPServerHandleRegister(Session, LOGGED_IN);
 		else HTTPServerHandleRegister(Session, LOGIN_FAIL);
 	}
-	else LogToFile(Settings.LogPath,"AUTH: Authentication Required, but no auth-details in request.");
 
 	if (result==TRUE) 
 	{
@@ -1507,7 +1484,6 @@ void HTTPServerHandlePost(STREAM *S, HTTPSession *Session)
 {
 char *Tempstr=NULL;
 
-if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"HANDLE POST: [%s]",Session->ContentType);
 
 //disallow any 'Get' style arguments previously read. Post sends arguments on stdin
 Session->Arguments=CopyStr(Session->Arguments,"");
@@ -1531,7 +1507,6 @@ if (strcmp(Session->ContentType,"application/x-www-form-urlencoded")==0)
 }
 else HTTPServerHandleMultipartPost(S, Session);
 
-LogToFile(Settings.LogPath,"POST: %s",Session->Arguments);
 DestroyString(Tempstr);
 }
 
@@ -1542,14 +1517,13 @@ int HTTPServerValidateURL(HTTPSession *Session, char **Token)
 {
 char *ptr;
 
-
 ptr=GetToken(Settings.ForbiddenURLStrings,",",Token,0);
 while (ptr)
 {
 	if (strstr(Session->OriginalURL,*Token)) 
 	{
 		Session->Flags |= HTTP_ERR_BADURL;
-		LogToFile(Settings.LogPath,"INVALID URL: %s",Session->URL);
+		LogToFile(Settings.LogPath,"ERROR: INVALID URL: %s",Session->URL);
 		return(FALSE);
 	}
 	ptr=GetToken(ptr,",",Token,0);
@@ -1589,7 +1563,7 @@ if (Settings.Flags & FLAG_SSL)
 {
 	if (! ActivateSSL(Session->S,Settings.SSLKeys))
 	{
-		LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed. %s",STREAMGetValue(Session->S,"SSL-Error"));
+		LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed with %s %s. Error was %s",Session->ClientHost,Session->ClientIP,STREAMGetValue(Session->S,"SSL-Error"));
 		return;
 	}
 }
@@ -1600,14 +1574,14 @@ if (! HTTPServerReadHeaders(Session,Session->S)) break;
 
 ProcessSessionEventTriggers(Session);
 
-LogToFile(Settings.LogPath,"PREAUTH: %s against %s %s\n",Session->UserName,Settings.AuthPath,Settings.AuthMethods);
+if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"PREAUTH: %s against %s %s\n",Session->UserName,Settings.AuthPath,Settings.AuthMethods);
 if (Settings.AuthFlags & FLAG_AUTH_REQUIRED)
 {
 	AuthOkay=FALSE;
 
 	if (HTTPServerAuthenticate(Session))
 	{
-		LogToFile(Settings.LogPath,"AUTHENTICATE: %s against %s %s\n",Session->UserName,Settings.AuthPath,Settings.AuthMethods);
+		LogToFile(Settings.LogPath,"AUTHENTICATED: %s@%s for '%s %s' against %s %s\n",Session->UserName,Session->ClientIP,Session->Method,Session->Path,Settings.AuthPath,Settings.AuthMethods);
 		AuthOkay=TRUE;
 	}
 	else
@@ -1615,23 +1589,17 @@ if (Settings.AuthFlags & FLAG_AUTH_REQUIRED)
 		if (IsProxyMethod(Session->MethodID)) HTTPServerSendHTML(Session->S, Session, "407 UNAUTHORIZED","Proxy server requires authentication.");
 		else HTTPServerSendHTML(Session->S, Session, "401 UNAUTHORIZED","Server requires authentication.");
 
-		LogToFile(Settings.LogPath,"AUTHENTICATE FAIL: %s against %s\n",Session->UserName,Settings.AuthPath);
+		if (Session->AuthFlags & FLAG_AUTH_PRESENT) LogToFile(Settings.LogPath,"AUTHENTICATE FAIL: %s@%s for '%s %s' against %s %s\n",Session->UserName,Session->ClientIP,Session->Method,Session->Path,Settings.AuthPath,Settings.AuthMethods);
 	}
 }
 
 
 
-
-if (! HTTPMethodAllowed(Session))
-{
-	HTTPServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
-	LogToFile(Settings.LogPath,"%s@%s (%s) 503 Not Implemented. %s %s", Session->UserName,Session->ClientHost,Session->ClientIP,Session->Method,Session->Path);
-}
+if (! HTTPMethodAllowed(Session)) HTTPServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
 else if (! HTTPServerValidateURL(Session, &Tempstr))
 {
-	LogToFile(Settings.LogPath,"ERR: '%s' found in %s",Tempstr,Session->URL);
 	HTTPServerSendHTML(Session->S, Session, "403 Forbidden","Bad pattern found in URL");
-	LogToFile(Settings.LogPath,"%s@%s (%s) 403 Forbidden: '%s' found in URL %s", Session->UserName, Session->ClientHost, Session->ClientIP, Tempstr, Session->URL);
+	LogToFile(Settings.LogPath,"ERROR: Bad pattern '%s' found in URL '%s' from %s@%s (%s)", Tempstr, Session->URL, Session->UserName, Session->ClientHost, Session->ClientIP);
 }
 else if (AuthOkay)
 {
@@ -1699,7 +1667,6 @@ switch (Session->MethodID)
 
 	default:
 	HTTPServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
-	LogToFile(Settings.LogPath,"%s@%s (%s) 503 Not Implemented. %s %s", Session->UserName,Session->ClientHost,Session->ClientIP,Session->Method,Session->Path);
 	break;
 }
 }

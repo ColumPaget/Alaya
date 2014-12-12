@@ -1221,7 +1221,7 @@ while (1)
 	if (! UseSendFile)
 	{
 		result=STREAMReadBytes(In,Buffer,len);
-		if (result > 0) bytes_read+=STREAMWriteBytes(Out,Buffer,result);
+		if (result > 0) result=STREAMWriteBytes(Out,Buffer,result);
 	}
 
 	if (result < 1) break;
