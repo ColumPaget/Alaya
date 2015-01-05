@@ -296,7 +296,7 @@ switch(result)
 	break;
 
 	case CT_MAXLOGSIZE:
-		Settings.MaxLogSize = atoi(ptr);
+		Settings.MaxLogSize = (int) ParseHumanReadableDataQty(ptr, 0);
 	break;
 
   case CT_SCRIPTHANDLER:

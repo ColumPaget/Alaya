@@ -153,11 +153,11 @@ void SetResourceLimits()
 struct rlimit limit;
 
 getrlimit(RLIMIT_AS, &limit);
-limit.rlim_cur=(int) ParseHumanReadableDataQty(Settings.AddressSpace, 0);
+limit.rlim_cur=(rlim_t) ParseHumanReadableDataQty(Settings.AddressSpace, 0);
 setrlimit(RLIMIT_AS, &limit);
 
 getrlimit(RLIMIT_STACK, &limit);
-limit.rlim_cur=(int) ParseHumanReadableDataQty(Settings.StackSize, 0);
+limit.rlim_cur=(rlim_t) ParseHumanReadableDataQty(Settings.StackSize, 0);
 setrlimit(RLIMIT_STACK, &limit);
 }
 

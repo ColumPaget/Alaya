@@ -95,6 +95,7 @@ There should be an example config file in the source distribution. It's worth lo
 
 Config file entries are:
 
+
 Chroot=<dir>			Specifies directory to serve requests out of
 ChHome						Serve requests out of users home directory
 AllowUsers=<list>			Only allow these users access.
@@ -115,6 +116,7 @@ SSLDHParams=<path>		Path to an openssl generated Diffie Helman parameters file.
 Path=<type>,<alias>,<path>	Path to a trusted directory outside of a chroot jail, which is made accessible as a 'virtual' directory under the top-level of the chroot. Currently there are two types of path 'cgi', for cgi programs, and 'files' for a standard directory made available in this way. (See 'VPaths' below)
 Event=<type>:<match string>,<match str>,<match str>...:Script
 LogVerbose			More information in log file
+MaxLogSize=<max bytes>		Max log file size. A suffix can be used to express size, e.g.  1G, 2M, 900k. When max size is reached the logfile is renamed to have a '-' suffix, and a new file opened.
 DefaultUser=<username>	Default user that is used both for running cgi scripts, and for 'native' users that have no specified 'real' user
 DefaultGroup=<groupname>	Default group for webserver
 DirListType=<type>  Type of directory listings served. Can be 'none', 'basic', 'fancy' or 'interactive', with other flags to see optional properties. See 'DIRECTORY LISTINGS' below.
@@ -126,7 +128,11 @@ LookupClientName 	 If present then lookup client hostnames with DNS and use in l
 SanitizeAllowTags=<tag list>		List of HTML tags allowed to be used in 'POST' to cgi-scripts. If left blank, then all are allowed, if set, then all but the listed html elements will be stripped 
 UserAgentSettings=UserAgentString,Settings		Settings to be applied when a particular user agent string is seen.
 FileCacheTime=<seconds>		Amount of time to recommend the browser	caches documents for.
-HttpKeepAlives=<yes|no>		Use http keep-alive
+HttpKeepAlive=<yes|no>		Use http keep-alive
+MaxMemory=<max bytes>			Maximum amount of memory per alaya process. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
+MaxStack=<max bytes>			Maximum Stack Size. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
+
+
 
 AUTHENTICATION
 
