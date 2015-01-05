@@ -597,6 +597,7 @@ char *Tempstr=NULL, *Token=NULL, *ptr;
 int result=TRUE;
 
 Tempstr=STREAMReadLine(Tempstr,S);
+StripCRLF(Tempstr);
 
 
 if (! Tempstr) return(FALSE);

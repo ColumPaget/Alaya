@@ -180,52 +180,47 @@ return(result);
 }
 
 
-int HTTPServerReadHeaders(HTTPSession *Heads, STREAM *S)
+
+//This function reads the first line of an HTTP Request, including the Method, URL, and cgi arguments
+void HTTPServerParseCommand(HTTPSession *Session, STREAM *S, char *Command)
 {
-char *Tempstr=NULL, *Token=NULL, *ptr, *tmp_ptr;
-ListNode *Curr;
+char *Token=NULL, *ptr, *tmp_ptr;
 int val;
 
-Tempstr=STREAMReadLine(Tempstr,S);
-if (! Tempstr) return(FALSE);
-
-HTTPSessionClear(Heads);
-StripTrailingWhitespace(Tempstr);
-
-GetSockDetails(S->in_fd,&Heads->ServerName,&Heads->ServerPort,&Heads->ClientIP,&val);
-if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrLen(Heads->ClientIP)) Heads->ClientHost=CopyStr(Heads->ClientHost,IPStrToHostName(Heads->ClientIP));
+GetSockDetails(S->in_fd,&Session->ServerName,&Session->ServerPort,&Session->ClientIP,&val);
+if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrLen(Session->ClientIP)) Session->ClientHost=CopyStr(Session->ClientHost,IPStrToHostName(Session->ClientIP));
 
 LogToFile(Settings.LogPath,"");
 //Log first line of the response
 
-Token=MCopyStr(Token, "NEW REQUEST: ",Heads->ClientHost," (",Heads->ClientIP,") ", Tempstr, NULL);
+Token=MCopyStr(Token, "NEW REQUEST: ",Session->ClientHost," (",Session->ClientIP,") ", Command, NULL);
 if (Settings.Flags & FLAG_SSL)
 {
-	Heads->Cipher=CopyStr(Heads->Cipher,STREAMGetValue(S,"SSL-Cipher"));
-	Token=MCatStr(Token,"  SSL-CIPHER=", Heads->Cipher, NULL);
-	if (! HTTPServerCheckCertificate(Heads,S)) exit(1);
+	Session->Cipher=CopyStr(Session->Cipher,STREAMGetValue(S,"SSL-Cipher"));
+	Token=MCatStr(Token,"  SSL-CIPHER=", Session->Cipher, NULL);
+	if (! HTTPServerCheckCertificate(Session,S)) exit(1);
 
 	//Set the Username to be the common name signed in the certificate. If it doesn't
 	//authenticate against a user then we can query for a username later
-	Heads->UserName=CopyStr(Heads->UserName,STREAMGetValue(Heads->S,"SSL-Certificate-CommonName"));
+	Session->UserName=CopyStr(Session->UserName,STREAMGetValue(Session->S,"SSL-Certificate-CommonName"));
 	if (Settings.AuthFlags & FLAG_AUTH_CERT_SUFFICIENT)
 	{
-		if (StrLen(Heads->UserName)) Heads->AuthFlags |= FLAG_AUTH_PRESENT;
+		if (StrLen(Session->UserName)) Session->AuthFlags |= FLAG_AUTH_PRESENT;
 	}
 }
 
 LogToFile(Settings.LogPath, "%s", Token);
 
 //Read Method (GET, POST, etc)
-ptr=GetToken(Tempstr,"\\S",&Heads->Method,0);
-Heads->MethodID=MatchTokenFromList(Heads->Method,HTTPMethods,0);
+ptr=GetToken(Command,"\\S",&Session->Method,0);
+Session->MethodID=MatchTokenFromList(Session->Method,HTTPMethods,0);
 
 //Read URL
 ptr=GetToken(ptr,"\\S",&Token,0);
 
 //Read Protocol (HTTP1.0, HTTP1.1, etc)
-ptr=GetToken(ptr,"\\S",&Heads->Protocol,0);
-if (! StrLen(Heads->Protocol)) Heads->Protocol=CopyStr(Heads->Protocol,"HTTP/1.0");
+ptr=GetToken(ptr,"\\S",&Session->Protocol,0);
+if (! StrLen(Session->Protocol)) Session->Protocol=CopyStr(Session->Protocol,"HTTP/1.0");
 
 tmp_ptr=Token;
 
@@ -235,36 +230,55 @@ if (tmp_ptr)
 {
 	*tmp_ptr='\0';
 	tmp_ptr++;
-//	Heads->Arguments=HTTPUnQuote(Heads->Arguments,tmp_ptr);
+//	Session->Arguments=HTTPUnQuote(Session->Arguments,tmp_ptr);
 
 	//Don't unquote arguments here, one of them might contain '&'
-	Heads->Arguments=CopyStr(Heads->Arguments,tmp_ptr);
+	Session->Arguments=CopyStr(Session->Arguments,tmp_ptr);
 }
 
 
 //URL with arguments removed is the 'true' URL
-Heads->OriginalURL=CopyStr(Heads->OriginalURL,Token);
-if (StrLen(Heads->OriginalURL)==0) Heads->OriginalURL=CopyStr(Heads->OriginalURL,"/");
-StripTrailingWhitespace(Heads->OriginalURL);
+Session->OriginalURL=CopyStr(Session->OriginalURL,Token);
+if (StrLen(Session->OriginalURL)==0) Session->OriginalURL=CopyStr(Session->OriginalURL,"/");
+StripTrailingWhitespace(Session->OriginalURL);
 
 if 
 (
-	(strncasecmp(Heads->OriginalURL,"http:",5)==0) ||
-	(strncasecmp(Heads->OriginalURL,"https:",6)==0)
+	(strncasecmp(Session->OriginalURL,"http:",5)==0) ||
+	(strncasecmp(Session->OriginalURL,"https:",6)==0)
 )
 {
-	if (Heads->MethodID==METHOD_GET) 
+	if (Session->MethodID==METHOD_GET) 
 	{
-		Heads->Method=CopyStr(Heads->Method,"RGET");
-		Heads->MethodID=METHOD_RGET;
+		Session->Method=CopyStr(Session->Method,"RGET");
+		Session->MethodID=METHOD_RGET;
 	}
 
-	if (Heads->MethodID==METHOD_POST)
+	if (Session->MethodID==METHOD_POST)
 	{
-		Heads->Method=CopyStr(Heads->Method,"RPOST");
-		Heads->MethodID=METHOD_RPOST;
+		Session->Method=CopyStr(Session->Method,"RPOST");
+		Session->MethodID=METHOD_RPOST;
 	}
 }
+
+DestroyString(Token);
+}
+
+
+int HTTPServerReadHeaders(HTTPSession *Heads, STREAM *S)
+{
+char *Tempstr=NULL, *Token=NULL, *ptr;
+ListNode *Curr;
+int val;
+
+HTTPSessionClear(Heads);
+Tempstr=STREAMReadLine(Tempstr,S);
+if (! Tempstr) return(FALSE);
+
+StripTrailingWhitespace(Tempstr);
+
+//First line of the HTTP request is the 'Command' in the form "<method> <url>?<arguments> <HTTP version>"
+HTTPServerParseCommand(Heads, S, Tempstr);
 
 
 Tempstr=STREAMReadLine(Tempstr,S);
