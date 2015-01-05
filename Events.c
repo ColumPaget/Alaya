@@ -147,7 +147,11 @@ while (Curr)
 		ptr=GetToken((char *) Curr->Item,",",&Token,GETTOKEN_QUOTES);
 		while (ptr)
 		{
-    	if (strcasecmp(Token,"ignore")==0) break;
+    	if (strcasecmp(Token,"ignore")==0)
+			{
+				Curr=NULL;
+				break;
+			}
       else if (strcasecmp(Token,"log")==0) LogToFile(Settings.LogPath,"WARN: Event Rule encountered (%s on %s).",MatchStr,Tempstr);
       else if (strcasecmp(Token,"syslog")==0) syslog(LOG_WARNING, "WARN: Event Rule encountered (%s on %s).",MatchStr,Tempstr);
 			else if (strcasecmp(Token,"deny") ==0)
