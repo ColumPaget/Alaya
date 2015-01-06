@@ -103,6 +103,7 @@ return(result);
 void ProcessEventTrigger(HTTPSession *Session, char *URL, char *TriggerScript, char *ExtraInfo)
 {
 	char *Tempstr=NULL;
+	int result;
 
 		LogToFile(Settings.LogPath, "EVENT TRIGGERED: Source='%s@%s (%s)' REQUEST='%s' TriggeredScript='%s' MatchInfo='%s'",Session->UserName, Session->ClientHost, Session->ClientIP, URL, TriggerScript, ExtraInfo);
 	
@@ -116,9 +117,13 @@ void ProcessEventTrigger(HTTPSession *Session, char *URL, char *TriggerScript, c
   	else 
 		{
 			Tempstr=MCopyStr(Tempstr, TriggerScript, " '", Session->ClientIP,"' '", URL, "'",NULL);
-			if (Spawn(Tempstr,Settings.DefaultUser,Settings.DefaultGroup,NULL) ==-1)
+
+			LogToFile(Settings.LogPath, "SPAWN: %d %s\n",getuid(),Tempstr);
+			if (getuid()==0) result=Spawn(Tempstr,Settings.DefaultUser,Settings.DefaultGroup,NULL);
+			else result=Spawn(Tempstr,NULL,NULL,NULL);
+			if (result==-1)
 			{
-			LogToFile(Settings.LogPath, "ERROR: Failed to run event script '%s'. Error was: %s", TriggerScript, strerror(errno));
+				LogToFile(Settings.LogPath, "ERROR: Failed to run event script '%s'. Error was: %s", TriggerScript, strerror(errno));
 			}
 		}
 

@@ -41,8 +41,8 @@ for (i=0; i < 100; i++)
 }
 
 if (StrLen(Dir)) chdir(Dir);
-if (StrLen(User)) SwitchUser(User);
 if (StrLen(Group)) SwitchGroup(Group);
+if (StrLen(User)) SwitchUser(User);
 
 DestroyString(Token);
 DestroyString(SafeStr);
@@ -57,15 +57,15 @@ execv(argv[0],argv);
 pid_t ForkWithContext(char *User, char *Dir, char *Group)
 {
 char *ptr;
-pid_t pid;
+pid_t pid=-1;
 
 LogFileFlushAll(TRUE);
 pid=fork();
 if (pid==0)
 {
 	if (StrLen(Dir)) chdir(Dir);
-	if (StrLen(User)) SwitchUser(User);
 	if (StrLen(Group)) SwitchGroup(Group);
+	if (StrLen(User)) SwitchUser(User);
 }
 return(pid);
 }

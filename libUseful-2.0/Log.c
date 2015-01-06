@@ -271,7 +271,7 @@ int LogToFile(char *FileName,char *fmt, ...)
 	Tempstr=VFormatStr(Tempstr,fmt,args);
 	va_end(args);
 	StripTrailingWhitespace(Tempstr);
-	result=LogFileInternalWrite(LogFile->S,LOG_INFO, LogFile->Flags, Tempstr);
+	if (LogFile->S) result=LogFileInternalWrite(LogFile->S,LOG_INFO, LogFile->Flags, Tempstr);
 	}
 
 DestroyString(Tempstr);
