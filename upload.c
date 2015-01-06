@@ -140,6 +140,9 @@ while (Tempstr)
 Tempstr=STREAMReadLine(Tempstr,S);
 }
 
+//Protect final argument for broken CGI implementations that read all
+//data without regard to 'ContentSize'
+Session->Arguments=CatStr(Session->Arguments,"&");
 Session->ContentSize=StrLen(Session->Arguments);
 if (Session->ContentSize > 0) Session->ContentType=CopyStr(Session->ContentType,"application/x-www-form-urlencoded");
 

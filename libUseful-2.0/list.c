@@ -278,9 +278,12 @@ if ((Head->Flags & LIST_FLAG_ORDERED) && (result < 1)) return(Prev);
 if ((Head->Flags & LIST_FLAG_CACHE) && (Head->Jump))
 {
 	Prev=Head->Jump;
+	if (Prev->Tag)
+	{
 	if (Head->Flags & LIST_FLAG_CASE) result=strcmp(Prev->Tag,Name);
 	else result=strcasecmp(Prev->Tag,Name);
 	if (result < 1) Curr=Prev;
+	}
 }
 
 ls=ListSize(Head);
@@ -289,7 +292,7 @@ addjump=100;
 Prev=Head;
 while (Curr)
 {
-	if (Curr->Jump)
+	if (Curr->Jump && Curr->Jump->Tag)
 	{
 		if (Head->Flags & LIST_FLAG_CASE) result=strcmp(Curr->Jump->Tag,Name);
 		else result=strcasecmp(Curr->Jump->Tag,Name);
@@ -354,9 +357,8 @@ ListNode *ListFindNamedItem(ListNode *Head, const char *Name)
 	ListNode *Node;
 	int result;
 
-	if (! StrLen(Name)) return(NULL);
 	Node=ListFindNamedItemInsert(Head, Name);
-	if ((! Node) || (StrLen(Node->Tag)==0)) return(NULL);
+	if ((! Node) || (Node==Head) || (! Node->Tag)) return(NULL);
  	if (Head->Flags & LIST_FLAG_CASE) result=strcmp(Node->Tag,Name);
 	else result=strcasecmp(Node->Tag,Name);
 

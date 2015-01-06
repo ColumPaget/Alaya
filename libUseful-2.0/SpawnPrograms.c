@@ -57,7 +57,7 @@ execv(argv[0],argv);
 pid_t ForkWithContext(char *User, char *Dir, char *Group)
 {
 char *ptr;
-pid_t pid=-1;
+pid_t pid;
 
 LogFileFlushAll(TRUE);
 pid=fork();

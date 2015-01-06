@@ -56,7 +56,6 @@ TLogFile *LogFileGetEntry(char *FileName)
 		else
 		{
 			S=STREAMOpenFile(FileName,O_CREAT | O_APPEND | O_WRONLY);
-			if (S) S->Flags &= ~FLUSH_ALWAYS;
 		}
 
 		if (S)
@@ -64,7 +63,6 @@ TLogFile *LogFileGetEntry(char *FileName)
 			LogFile=(TLogFile *) calloc(1,sizeof(TLogFile));
 			LogFile->Path=CopyStr(LogFile->Path,FileName);
 			LogFile->LogFacility=LogFileDefaults->LogFacility;
-			LogFile->FlushInterval=LogFileDefaults->FlushInterval;
 			LogFile->Flags=LogFileDefaults->Flags;
 			LogFile->MaxSize=LogFileDefaults->MaxSize;
 			LogFile->S=S;
@@ -271,7 +269,7 @@ int LogToFile(char *FileName,char *fmt, ...)
 	Tempstr=VFormatStr(Tempstr,fmt,args);
 	va_end(args);
 	StripTrailingWhitespace(Tempstr);
-	if (LogFile->S) result=LogFileInternalWrite(LogFile->S,LOG_INFO, LogFile->Flags, Tempstr);
+	result=LogFileInternalWrite(LogFile->S,LOG_INFO, LogFile->Flags, Tempstr);
 	}
 
 DestroyString(Tempstr);
