@@ -118,9 +118,9 @@ void ProcessEventTrigger(HTTPSession *Session, char *URL, char *TriggerScript, c
 		{
 			Tempstr=MCopyStr(Tempstr, TriggerScript, " '", Session->ClientIP,"' '", URL, "'",NULL);
 
-			LogToFile(Settings.LogPath, "SPAWN: %d %s\n",getuid(),Tempstr);
 			if (getuid()==0) result=Spawn(Tempstr,Settings.DefaultUser,Settings.DefaultGroup,NULL);
 			else result=Spawn(Tempstr,NULL,NULL,NULL);
+
 			if (result==-1)
 			{
 				LogToFile(Settings.LogPath, "ERROR: Failed to run event script '%s'. Error was: %s", TriggerScript, strerror(errno));
