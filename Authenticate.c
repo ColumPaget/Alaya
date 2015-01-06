@@ -53,6 +53,8 @@ return(FALSE);
 }
 
 
+
+
 void AuthenticateExamineMethods(char *Methods)
 {
 char *ptr, *Token=NULL;
@@ -116,29 +118,6 @@ DestroyString(Token);
 }
 
 
-int CheckUserExists(char *UserName)
-{
-HTTPSession *Session;
-int result=FALSE;
-
-if (! UserName) return(FALSE);
-
-Session=(HTTPSession *) calloc(1,sizeof(HTTPSession));
-Session->UserName=CopyStr(Session->UserName,UserName);
-Session->Password=CopyStr(Session->Password,"");
-
-if (AuthPasswdFile(Session) != USER_UNKNOWN) result=TRUE;
-if (AuthShadowFile(Session) != USER_UNKNOWN) result=TRUE;
-if (AuthNativeFile(Session,FALSE) != USER_UNKNOWN) result=TRUE;
-
-DestroyString(Session->UserName);
-DestroyString(Session->Password);
-
-free(Session);
-
-return(result);
-}
-
 
 
 
@@ -194,6 +173,7 @@ int result=FALSE;
 if (strcmp(Session->Method, "PUT")==0) return(FALSE);
 if (strcmp(Session->Method, "POST")==0) return(FALSE);
 Token=MakeAccessToken(Token, Salt, Session->UserName, ClientIP, URL);
+
 if (StrLen(Token) && (strcmp(Token, CorrectToken)==0)) result=TRUE; 
 
 DestroyString(Token);
@@ -238,50 +218,10 @@ return(result);
 }
 
 
-char *GetUserHomeDir(char *RetBuff, char *UserName)
-{
-STREAM *S;
-char *Tempstr=NULL, *Token=NULL, *Dir=NULL, *ptr;
-struct passwd *pass_struct;
-
-Dir=CopyStr(RetBuff,"");
-
-//First Try Native File
-S=STREAMOpenFile(Settings.AuthPath,O_RDONLY);
-if (S)
-{
-	Tempstr=STREAMReadLine(Tempstr,S);
-	while (Tempstr)
-	{
- 	 StripTrailingWhitespace(Tempstr);
-		ptr=GetToken(Tempstr,":",&Token,0);
-		if (strcmp(Token, UserName)==0)
-		{
-		ptr=GetToken(ptr,":",&Token,0);
-		ptr=GetToken(ptr,":",&Token,0);
-		ptr=GetToken(ptr,":",&Token,0);
-		ptr=GetToken(ptr,":",&Dir,0);
-		break;
-		}
-	Tempstr=STREAMReadLine(Tempstr,S);
-	}
-STREAMClose(S);
-}
-
-if (! StrLen(Dir))
-{
-pass_struct=getpwnam(UserName);
-if (pass_struct) Dir=CopyStr(Dir,pass_struct->pw_dir);
-}
-
-DestroyString(Tempstr);
-DestroyString(Token);
-
-return(Dir);
-}
 
 
-int AuthPasswdFile(HTTPSession *Session)
+
+int AuthPasswdFile(HTTPSession *Session, char **RealUser, char **HomeDir)
 {
 struct passwd *pass_struct;
 char *ptr;
@@ -300,7 +240,8 @@ if (
 		if (ptr && (strcmp(pass_struct->pw_passwd, ptr)==0) )
 		{
 			if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"AUTH: UserName '%s' Authenticated via /etc/passwd.",Session->UserName);
-			Session->RealUser=CopyStr(Session->RealUser,Session->UserName);
+			if (RealUser) *RealUser=CopyStr(*RealUser,Session->UserName);
+			if (HomeDir) *HomeDir=CopyStr(*HomeDir, pass_struct->pw_dir);
 			return(TRUE);
 		}
 }
@@ -312,6 +253,8 @@ AuthenticationsTried=CatStr(AuthenticationsTried,"passwd ");
 
 return(FALSE);
 }
+
+
 
 
 int AuthShadowFile(HTTPSession *Session)
@@ -365,7 +308,6 @@ AuthenticationsTried=CatStr(AuthenticationsTried,"shadow ");
 if (result && (Settings.Flags & FLAG_LOG_VERBOSE)) 
 {
 	LogToFile(Settings.LogPath,"AUTH: UserName '%s' Authenticated via /etc/shadow.",Session->UserName);
-	Session->RealUser=CopyStr(Session->RealUser,Session->UserName);
 }
 
 #endif
@@ -620,11 +562,11 @@ return(result);
 
 
 
-int AuthNativeFile(HTTPSession *Session, int HTTPDigest)
+int AuthNativeFile(HTTPSession *Session, int HTTPDigest, char **RealUser, char **HomeDir, char **UserSettings)
 {
 STREAM *S;
 char *Tempstr=NULL, *ptr;
-char *Name=NULL, *Pass=NULL, *RealUser=NULL, *HomeDir=NULL, *PasswordType=NULL, *UserSettings=NULL;
+char *Name=NULL, *Pass=NULL, *PasswordType=NULL, *Trash=NULL;
 int RetVal=USER_UNKNOWN, result;
 struct passwd *pass_struct;
 
@@ -638,61 +580,30 @@ while (Tempstr)
 
   StripTrailingWhitespace(Tempstr);
 	ptr=GetToken(Tempstr,":",&Name,0);
-	ptr=GetToken(ptr,":",&PasswordType,0);
-	ptr=GetToken(ptr,":",&Pass,0);
-	ptr=GetToken(ptr,":",&RealUser,0);
-	ptr=GetToken(ptr,":",&HomeDir,0);
-	ptr=GetToken(ptr,":",&UserSettings,0);
-	
+
   if (strcasecmp(Name,Session->UserName)==0)
   {
+		ptr=GetToken(ptr,":",&PasswordType,0);
+		ptr=GetToken(ptr,":",&Pass,0);
+		if (RealUser) ptr=GetToken(ptr,":",RealUser,0);
+		else ptr=GetToken(ptr,":",&Trash,0);
+		if (HomeDir) ptr=GetToken(ptr,":",HomeDir,0);
+		else ptr=GetToken(ptr,":",&Trash,0);
+		if (UserSettings) ptr=GetToken(ptr,":",UserSettings,0);
+		else ptr=GetToken(ptr,":",&Trash,0);
+	
 		RetVal=FALSE;
 
 		if (CheckSSLAuthentication(Session, Name)) RetVal=TRUE;
 		else if (HTTPDigest) RetVal=NativeFileCheckHTTPDigestAuth(Session, PasswordType, Pass, Session->Password);
 		else RetVal=NativeFileCheckPassword(Name,PasswordType,Pass,Session->Password);
 
-		if (RetVal)
-    {
-			Session->RealUser=CopyStr(Session->RealUser,RealUser);	
-			Session->UserSettings=CopyStr(Session->UserSettings,UserSettings);	
-			if (StrLen(HomeDir)) Session->HomeDir=CopyStr(Session->HomeDir,HomeDir);	
-			else Session->HomeDir=GetUserHomeDir(Session->HomeDir,Session->RealUser);
-    }
 		break;
   }
 
   Tempstr=STREAMReadLine(Tempstr,S);
 }
 STREAMClose(S);
-
-//Don't let them authenticate if HomeDir and user mapping not set
-
-if (RetVal==TRUE)
-{
-	if (! StrLen(Session->RealUser)) 
-	{
-		Session->RealUser=CopyStr(Session->RealUser,Settings.DefaultUser);
-	}
- 
-	if (! StrLen(Session->RealUser)) 
-	{
-		LogToFile(Settings.LogPath,"AUTH: No 'RealUser' set for '%s'. Login Denied",Session->UserName);
-		RetVal=FALSE;
-	}
-
-	if (RetVal=TRUE)
-	{
-		pass_struct=getpwnam(Session->RealUser);
-		if (pass_struct) Session->RealUserUID=pass_struct->pw_uid;
-	
-		if (! StrLen(Session->HomeDir)) 
-		{
-			LogToFile(Settings.LogPath,"AUTH: No 'HomeDir' set for '%s'. Login Denied",Session->UserName);
-			RetVal=FALSE;
-		}
-	}
-}
 
 
 if ((RetVal==TRUE) && (Settings.Flags & FLAG_LOG_VERBOSE)) LogToFile(Settings.LogPath,"AUTH: UserName '%s' Authenticated via %s.",Session->UserName,Settings.AuthPath);
@@ -702,9 +613,6 @@ AuthenticationsTried=CatStr(AuthenticationsTried,"native ");
 DestroyString(Name);
 DestroyString(Pass);
 DestroyString(Tempstr);
-DestroyString(HomeDir);
-DestroyString(RealUser);
-DestroyString(UserSettings);
 DestroyString(PasswordType);
 
 return(RetVal);
@@ -792,32 +700,16 @@ else return(FALSE);
 #endif
 
 
+
+
 int Authenticate(HTTPSession *Session)
 {
 int result=0, Authenticated=FALSE;
-char *Token=NULL, *ptr;
+char *Token=NULL, *RealUser=NULL, *HomeDir=NULL, *UserSettings=NULL, *ptr;
 struct passwd *pwent;
 struct group *grent;
 
 AuthenticationsTried=CopyStr(AuthenticationsTried,"");
-if (! CheckUserExists(Session->UserName))
-{
-	LogToFile(Settings.LogPath,"AUTH: Authentication failed for UserName '%s'. User Unknown. Tried methods: %s ",Session->UserName,AuthenticationsTried);
- return(FALSE);
-}
-
-AuthenticationsTried=CopyStr(AuthenticationsTried,"");
-Session->RealUser=CopyStr(Session->RealUser,Session->UserName);
-pwent=getpwnam(Session->UserName);
-
-if (pwent)
-{
-Session->RealUserUID=pwent->pw_uid;
-}
-
-//grent=getgrnam(Session->Group);
-
-if (! StrLen(Session->HomeDir)) Session->HomeDir=GetUserHomeDir(Session->HomeDir,Session->UserName);
 
 if (! CheckServerAllowDenyLists(Session->UserName)) 
 {
@@ -830,10 +722,10 @@ ptr=GetToken(Settings.AuthMethods,",",&Token,0);
 while (ptr)
 {
 	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"AUTH: Try to authenticate '%s' via '%s'. Remaining authentication types: %s",Session->UserName, Token, ptr);
-	if (strcasecmp(Token,"native")==0) result=AuthNativeFile(Session,FALSE);
-	else if (strcasecmp(Token,"digest")==0) result=AuthNativeFile(Session,TRUE);
+	if (strcasecmp(Token,"native")==0) result=AuthNativeFile(Session,FALSE, &RealUser, &HomeDir, &UserSettings);
+	else if (strcasecmp(Token,"digest")==0) result=AuthNativeFile(Session,TRUE, &RealUser, &HomeDir, &UserSettings);
+	else if (strcasecmp(Token,"passwd")==0) result=AuthPasswdFile(Session, &RealUser, &HomeDir);
 	else if (strcasecmp(Token,"shadow")==0) result=AuthShadowFile(Session);
-	else if (strcasecmp(Token,"passwd")==0) result=AuthPasswdFile(Session);
 	else if (strcasecmp(Token,"accesstoken")==0) result=AuthAccessToken(Session);
 	#ifdef HAVE_LIBPAM
 	else if (strcasecmp(Token,"pam")==0) result=AuthPAM(Session);
@@ -853,16 +745,64 @@ while (ptr)
 	ptr=GetToken(ptr,",",&Token,0);
 }
 
-if (result==USER_UNKNOWN) LogToFile(Settings.LogPath,"AUTH: Authentication failed for UserName '%s'. User Unknown. Tried methods: %s ",Session->UserName,AuthenticationsTried);
-else if (result==FALSE) LogToFile(Settings.LogPath,"AUTH: Authentication failed for UserName '%s'. Bad Password/Credentials. Tried methods: %s ",Session->UserName,AuthenticationsTried);
 
-//We no longer care if it was 'user unknown' or 'password wrong'
-if (result !=TRUE) result=FALSE;
+switch (result)
+{
+case TRUE:
+//Don't let them authenticate if HomeDir and user mapping not set
+
+if (! StrLen(RealUser)) 
+{
+	RealUser=CopyStr(RealUser,Session->UserName);
+	pwent=getpwnam(RealUser);
+
+	if (! pwent) RealUser=CopyStr(RealUser,Settings.DefaultUser);
+}
+
+pwent=getpwnam(RealUser);
+
+if (pwent)
+{
+	Session->RealUser=CopyStr(Session->RealUser, RealUser);
+	Session->RealUserUID=pwent->pw_uid;
+
+if (StrLen(HomeDir)) Session->HomeDir=CopyStr(Session->HomeDir,HomeDir);
+else Session->HomeDir=CopyStr(Session->HomeDir,pwent->pw_dir);
+Session->UserSettings=CopyStr(Session->UserSettings,UserSettings);	
+//grent=getgrnam(Session->Group);
+}
+else
+{
+	LogToFile(Settings.LogPath,"AUTH: No 'RealUser' for '%s'. Login Denied",Session->UserName);
+	result=FALSE;
+}
 
 
+if (! StrLen(Session->HomeDir)) 
+{
+	LogToFile(Settings.LogPath,"AUTH: No 'HomeDir' set for '%s'. Login Denied",Session->UserName);
+	result=FALSE;
+}
+break;
+
+
+case USER_UNKNOWN: 
+	LogToFile(Settings.LogPath,"AUTH: Authentication failed for UserName '%s'. User Unknown. Tried methods: %s ",Session->UserName,AuthenticationsTried); 
+break;
+
+case FALSE: 
+	LogToFile(Settings.LogPath,"AUTH: Authentication failed for UserName '%s'. Bad Password/Credentials. Tried methods: %s ",Session->UserName,AuthenticationsTried);
+break;
+}
+
+
+DestroyString(UserSettings);
+DestroyString(RealUser);
+DestroyString(HomeDir);
 DestroyString(Token);
 return(result);
 }
+
 
 
 char *GetDefaultUser()
@@ -877,8 +817,35 @@ for (i=0; Possibilities[i] !=NULL; i++)
 {
 	Session->UserName=CopyStr(Session->UserName,Possibilities[i]);
 	Session->Password=CopyStr(Session->Password,"");
-	if (AuthPasswdFile(Session) != USER_UNKNOWN) break;
+	if (AuthPasswdFile(Session, NULL, NULL) != USER_UNKNOWN) break;
 } 
     
 return(Possibilities[i]);  
 }
+
+
+
+int CheckUserExists(char *UserName)
+{
+HTTPSession *Session;
+int result=FALSE;
+
+if (! UserName) return(FALSE);
+
+Session=(HTTPSession *) calloc(1,sizeof(HTTPSession));
+Session->UserName=CopyStr(Session->UserName,UserName);
+Session->Password=CopyStr(Session->Password,"");
+
+if (AuthPasswdFile(Session, NULL, NULL) != USER_UNKNOWN) result=TRUE;
+if (AuthShadowFile(Session) != USER_UNKNOWN) result=TRUE;
+if (AuthNativeFile(Session,FALSE, NULL, NULL, NULL) != USER_UNKNOWN) result=TRUE;
+
+DestroyString(Session->UserName);
+DestroyString(Session->Password);
+
+free(Session);
+
+return(result);
+}
+
+
