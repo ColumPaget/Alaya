@@ -125,43 +125,41 @@ DestroyString(Token);
 int CheckServerAllowDenyLists(char *UserName)
 {
 char *ptr, *Token=NULL;
+int result=FALSE;
 
 if (StrLen(Settings.DenyUsers))
 {
-ptr=GetToken(Settings.DenyUsers,",",&Token,GETTOKEN_QUOTES);
-
-while (ptr)
-{
-	if (strcmp(Token,UserName)==0)
+	ptr=GetToken(Settings.DenyUsers,",",&Token,GETTOKEN_QUOTES);
+	
+	while (ptr)
 	{
-		LogToFile(Settings.LogPath,"AUTH: UserName '%s' in 'DenyUsers' list. Login Denied",UserName);
-		DestroyString(Token);
-		return(FALSE);
+		if (strcmp(Token,UserName)==0)
+		{
+			LogToFile(Settings.LogPath,"AUTH: UserName '%s' in 'DenyUsers' list. Login Denied",UserName);
+			DestroyString(Token);
+			return(FALSE);
+		}
+		ptr=GetToken(ptr,",",&Token,GETTOKEN_QUOTES);
 	}
-	ptr=GetToken(ptr,",",&Token,GETTOKEN_QUOTES);
 }
 
-}
-
-if (! StrLen(Settings.AllowUsers))
+if (! StrLen(Settings.AllowUsers)) result=TRUE;
+else
 {
+	ptr=GetToken(Settings.AllowUsers,",",&Token,GETTOKEN_QUOTES);
+	while (ptr)
+	{
+		if (strcmp(Token,UserName)==0)
+		{
+			if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"AUTH: UserName '%s' Found in 'AllowUsers' list.",UserName);
+			result=TRUE;
+			break;
+		}
+		ptr=GetToken(ptr,",",&Token,GETTOKEN_QUOTES);
+	}
+}
 DestroyString(Token);
-return(TRUE);
-}
-
-ptr=GetToken(Settings.AllowUsers,",",&Token,GETTOKEN_QUOTES);
-while (ptr)
-{
-	if (strcmp(Token,UserName)==0)
-	{
-		if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"AUTH: UserName '%s' Found in 'AllowUsers' list.",UserName);
-		DestroyString(Token);
-		return(TRUE);
-	}
-	ptr=GetToken(ptr,",",&Token,GETTOKEN_QUOTES);
-}
-
-return(FALSE);
+return(result);
 }
 
 

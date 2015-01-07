@@ -414,7 +414,7 @@ void HandleUserSetup(char *Operation, int argc, char *argv[])
  char *UserName=NULL, *Password=NULL, *PassType=NULL, *HomeDir=NULL, *RealUser=NULL, *Args=NULL;
 
 	if (strcmp(Operation,"del")==0) PassType=CopyStr(PassType,"delete");
-	else PassType=CopyStr(PassType,"md5");
+	else PassType=CopyStr(PassType,"sha256");
 	HomeDir=CopyStr(HomeDir,"/tmp");
 	RealUser=CopyStr(RealUser,GetDefaultUser());
 	Password=CopyStr(Password,"");
