@@ -842,8 +842,6 @@ ListNode *Vars;
 	if (StrLen(Path)==0) result=FILE_NOSUCH;
 	else result=LoadFileRealProperties(Path, TRUE, Vars);
 
-	LogToFile(Settings.LogPath,"FIND: %d [%s]",result,Path);
-		
 	if (result==FILE_NOSUCH) HTTPServerSendHTML(S, Session, "404 Not Found","Couldn't find that document.");
 	else
 	{
