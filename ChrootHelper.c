@@ -31,15 +31,14 @@ char *CleanStr(char *Buffer, char *Data)
 {
 char *RetStr=NULL;
 char *BadChars=";|`&";
-int len,i;
+char *ptr;
 
-len=StrLen(Data);
-RetStr=CopyStrLen(Buffer,Data,len);
+RetStr=DeQuoteStr(Buffer,Data);
 
-for (i=0; i < len; i++)
+for (ptr=RetStr; *ptr !='\0'; ptr++)
 {
-	if (strchr(BadChars,RetStr[i])) RetStr[i]='?';
-	else if (! isprint(RetStr[i])) RetStr[i]='?';
+	if (strchr(BadChars,*ptr)) *ptr='?';
+	else if (! isprint(*ptr)) *ptr='?';
 }
 return(RetStr);
 }
@@ -50,7 +49,6 @@ char *SanitizeStr(char *Buffer, char *Data)
 {
 char *TagNamespace=NULL, *TagType=NULL, *TagData=NULL, *ptr;
 char *RetStr=NULL, *Tempstr=NULL;
-int len,i;
 
 ptr=XMLGetTag(Data, &TagNamespace, &TagType, &TagData);
 while (ptr)
@@ -164,14 +162,14 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		else if (strcmp(Name,"ContentType")==0) Response->ContentType=CopyStr(Response->ContentType,Value);
 		else if (strcmp(Name,"SearchPath")==0) Response->SearchPath=CleanStr(Response->SearchPath,Value);
 		else if (strcmp(Name,"Path")==0) Response->Path=CleanStr(Response->Path,Value);
-		else if (strcmp(Name,"URL")==0) Response->URL=CopyStr(Response->URL,Value);
+		else if (strcmp(Name,"URL")==0) Response->URL=DeQuoteStr(Response->URL,Value);
 		else if (strcmp(Name,"Arguments")==0) Response->Arguments=SanitizeQueryString(Response->Arguments,Value);
 		else if (strcmp(Name,"ServerName")==0) Response->ServerName=CopyStr(Response->ServerName,Value);
 		else if (strcmp(Name,"ServerPort")==0) Response->ServerPort=atoi(Value);
 		else if (strcmp(Name,"ClientIP")==0) Response->ClientIP=CopyStr(Response->ClientIP,Value);
 		else if (strcmp(Name,"ContentLength")==0) Response->ContentSize=atoi(Value);
-		else if (strcmp(Name,"StartDir")==0) Response->StartDir=CopyStr(Response->StartDir,Value);
-		else if (strcmp(Name,"ClientReferrer")==0) Response->ClientReferrer=CopyStr(Response->ClientReferrer,Value);
+		else if (strcmp(Name,"StartDir")==0) Response->StartDir=DeQuoteStr(Response->StartDir,Value);
+		else if (strcmp(Name,"ClientReferrer")==0) Response->ClientReferrer=DeQuoteStr(Response->ClientReferrer,Value);
 		else if (strcmp(Name,"RemoteAuthenticate")==0) Response->RemoteAuthenticate=CopyStr(Response->RemoteAuthenticate,Value);
 		else if (strcmp(Name,"Cipher")==0) Response->Cipher=CopyStr(Response->Cipher,Value);
 		else if (strcmp(Name,"Cookies")==0) Response->Cookies=CopyStr(Response->Cookies,Value);
@@ -322,9 +320,9 @@ return(result);
 
 int HandleExecRequest(STREAM *ClientCon, char *Data)
 {
-char *Tempstr=NULL, *Name=NULL, *Value=NULL, *ptr, *ptr2;
+char *Tempstr=NULL, *Name=NULL, *Value=NULL;
 char *ScriptPath=NULL;
-int result, i, ScriptGo=FALSE;
+int result, i;
 HTTPSession *Response;
 
 	//We will never read from this stream again. Any further data will be read
@@ -535,7 +533,7 @@ DestroyString(Tempstr);
 void HandleChildRegisterRequest(STREAM *S, char *Data)
 {
 char *Tempstr=NULL, *Host=NULL, *ptr;
-int NoOfConnections=0, Flags=0;
+int Flags=0;
 time_t LastTime;
 
 ptr=GetToken(Data,":",&Host,0);
@@ -624,29 +622,50 @@ return(result);
 
 int ChrootProcessRequest(STREAM *S, HTTPSession *Session, char *Type, char *Path, char *SearchPath)
 {
-char *Tempstr=NULL, *PortStr=NULL, *ContentLengthStr=NULL, *ArgumentsStr=NULL, *Referrer=NULL;
+char *Tempstr=NULL, *PortStr=NULL, *ContentLengthStr=NULL;
 char *ResponseLine=NULL, *Headers=NULL, *ptr;
-int result, KeepAlive=FALSE;
+char *Quoted=NULL;
+int KeepAlive=FALSE, RetVal=FALSE;
 off_t ContentLength=0;
+
+if (! ParentProcessPipe) return(FALSE);
 
 PortStr=FormatStr(PortStr,"%d",Session->ServerPort);
 ContentLengthStr=FormatStr(ContentLengthStr,"%d",Session->ContentSize);
-ArgumentsStr=QuoteCharsInStr(ArgumentsStr,Session->Arguments,"'");
-Referrer=QuoteCharsInStr(Referrer,Session->ClientReferrer,"'");
 
 //Trying to do this all as one string causes a problem!
-Tempstr=MCopyStr(Tempstr,Type," Host='",Session->Host,"' URL='",Session->URL,"' Arguments='",ArgumentsStr, "' ClientIP='",Session->ClientIP,"' StartDir='",Session->StartDir,"'",NULL);
+Tempstr=MCopyStr(Tempstr,Type," Host='",Session->Host, "' ClientIP='",Session->ClientIP, "'",NULL);
+
+Quoted=QuoteCharsInStr(Quoted,Session->URL,"'");
+Tempstr=MCatStr(Tempstr, " URL='",Quoted,"'",NULL);
+
+Quoted=QuoteCharsInStr(Quoted,Path,"'");
+Tempstr=MCatStr(Tempstr, " Path='",Quoted,"'",NULL);
+
+Quoted=QuoteCharsInStr(Quoted,SearchPath,"'");
+Tempstr=MCatStr(Tempstr, " SearchPath='",Quoted,"'",NULL);
+
+Quoted=QuoteCharsInStr(Quoted,Session->Arguments,"'");
+Tempstr=MCatStr(Tempstr, " Arguments='",Quoted,"'", NULL);
+
+Quoted=QuoteCharsInStr(Quoted,Session->StartDir,"'");
+Tempstr=MCatStr(Tempstr," StartDir='",Quoted,"'",NULL);
+
+Quoted=QuoteCharsInStr(Quoted,Session->ClientReferrer,"'");
+Tempstr=MCatStr(Tempstr, " ClientReferrer='",Quoted,"'",NULL);
+
 if (Session->Flags & HTTP_KEEP_ALIVE) Tempstr=CatStr(Tempstr," KeepAlive=Y");
 if (StrLen(Session->UserName)) Tempstr=MCatStr(Tempstr," User='",Session->UserName,"'",NULL);
 if (StrLen(Session->RemoteAuthenticate)) Tempstr=MCatStr(Tempstr," RemoteAuthenticate='",Session->RemoteAuthenticate,"'",NULL);
-Tempstr=MCatStr(Tempstr," ClientReferrer='",Referrer,"' ServerName=",Session->ServerName," ServerPort=",PortStr,NULL);
-if (StrLen(Session->Cipher)) Tempstr=MCatStr(Tempstr," Cipher='",Session->Cipher,"' ",NULL);
-Tempstr=MCatStr(Tempstr," Method=",Session->Method," UserAgent='",Session->UserAgent,"' SearchPath='",SearchPath,"' Path='",Path,"' ContentType='",Session->ContentType,"' ContentLength='",ContentLengthStr,"'",NULL);
+Tempstr=MCatStr(Tempstr," ServerName=",Session->ServerName," ServerPort=",PortStr,NULL);
+if (StrLen(Session->Cipher)) Tempstr=MCatStr(Tempstr," Cipher='",Session->Cipher,"'",NULL);
+Tempstr=MCatStr(Tempstr," Method=",Session->Method," UserAgent='",Session->UserAgent,"' ContentType='",Session->ContentType,"' ContentLength='",ContentLengthStr,"'",NULL);
 if (StrLen(Session->Cookies)) Tempstr=MCatStr(Tempstr," Cookies='",Session->Cookies,"'",NULL);
 Tempstr=CatStr(Tempstr,"\n");
 
 
-if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"REQUESTING DATA FROM OUTSIDE CHROOT: [%s]",Tempstr);
+//if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) 
+LogToFile(Settings.LogPath,"REQUESTING DATA FROM OUTSIDE CHROOT: [%s]",Tempstr);
 STREAMWriteLine(Tempstr,ParentProcessPipe);
 STREAMFlush(ParentProcessPipe);
 
@@ -668,6 +687,7 @@ if ((strcmp(Session->Method,"POST")==0) && StrLen(Session->Arguments))
 Headers=CopyStr(Headers,"");
 ResponseLine=STREAMReadLine(ResponseLine,ParentProcessPipe);
 StripTrailingWhitespace(ResponseLine);
+if (StrLen(ResponseLine)) RetVal=TRUE;
 
 Tempstr=STREAMReadLine(Tempstr,ParentProcessPipe);
 while (Tempstr)
@@ -720,13 +740,14 @@ if (KeepAlive) Session->Flags |= HTTP_REUSE_SESSION;
 else Session->Flags &= ~(HTTP_KEEP_ALIVE | HTTP_REUSE_SESSION);
 
 
+DestroyString(Quoted);
 DestroyString(Tempstr);
 DestroyString(PortStr);
-DestroyString(Referrer);
-DestroyString(ArgumentsStr);
+DestroyString(Headers);
 DestroyString(ContentLengthStr);
 DestroyString(ResponseLine);
-DestroyString(Headers);
+
+return(RetVal);
 }
 
 
@@ -825,5 +846,3 @@ DestroyString(Value);
 
 return(result);
 }
-
-

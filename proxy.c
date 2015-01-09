@@ -55,7 +55,6 @@ void HTTPProxyRGETURL(STREAM *S,HTTPSession *Session)
 {
 STREAM *TargetS;
 char *Tempstr=NULL;
-HTTPSession *Heads;
 HTTPInfoStruct *Info;
 ListNode *Curr;
 
@@ -135,10 +134,9 @@ DestroyString(Tempstr);
 
 void HTTPProxyConnect(STREAM *S,HTTPSession *ClientHeads)
 {
-STREAM *TargetS;
+STREAM *TargetS=NULL;
 int Port=0;
 char *Host=NULL, *Date=NULL, *Tempstr=NULL, *ptr;
-HTTPSession *Heads;
 
 //Path will normally start with a '/', remove it
 ptr=ClientHeads->Path;
@@ -181,15 +179,15 @@ if (Port > 0)
 		STREAMWriteLine("Content-Length: 0\r\n\r\n",S);
 	}
 }
-	else
-	{
-		STREAMWriteLine("HTTP/1.1 400 No port given\r\n",S);
-		Tempstr=MCopyStr(Tempstr, "Server: Alaya/",Version,"\r\n",NULL);
-		STREAMWriteLine(Tempstr,S);
-		STREAMWriteLine(Date,S);
-		STREAMWriteLine("Connection: close\r\n",S);
-		STREAMWriteLine("Content-Length: 0\r\n\r\n",S);
-	}
+else
+{
+	STREAMWriteLine("HTTP/1.1 400 No port given\r\n",S);
+	Tempstr=MCopyStr(Tempstr, "Server: Alaya/",Version,"\r\n",NULL);
+	STREAMWriteLine(Tempstr,S);
+	STREAMWriteLine(Date,S);
+	STREAMWriteLine("Connection: close\r\n",S);
+	STREAMWriteLine("Content-Length: 0\r\n\r\n",S);
+}
 STREAMClose(TargetS);
 
 DestroyString(Tempstr);

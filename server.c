@@ -4,10 +4,14 @@
 #include "DavProps.h"
 #include "directory_listing.h"
 #include "FileDetailsPage.h"
+#include "FileProperties.h"
+#include "ChrootHelper.h"
+#include "Settings.h"
 #include "Events.h"
 #include "ID3.h"
 #include "upload.h"
 #include "proxy.h"
+#include "fnmatch.h"
 
 char *HTTPMethods[]={"HEAD","GET","POST","PUT","DELETE","MKCOL","PROPFIND","PROPPATCH","MOVE","COPY","OPTIONS","CONNECT",NULL};
 
@@ -29,12 +33,12 @@ return(RetStr);
 char *HTMLQuote(char *RetBuff, char *Str)
 {
 char *RetStr=NULL, *Token=NULL, *ptr;
-int olen=0, ilen;
+int len;
 
 RetStr=CopyStr(RetStr,"");
-ilen=StrLen(Str);
+len=StrLen(Str);
 
-for (ptr=Str; ptr < (Str+ilen); ptr++)
+for (ptr=Str; ptr < (Str+len); ptr++)
 {
 
 switch (*ptr)
@@ -539,7 +543,6 @@ DestroyString(Tempstr);
 
 void HTTPServerSendResponse(STREAM *S, HTTPSession *Session, char *ResponseLine, char *ContentType, char *Body)
 {
-STREAM *Doc;
 HTTPSession *Response;
 char *Tempstr=NULL;
 long ResponseCode=0;
@@ -619,7 +622,7 @@ char *Tempstr=NULL;
 	Tempstr=SetStrLen(Tempstr,len * 16);
 	memset(Tempstr,0,len * 16);
 	strcpy(Tempstr,ICYMessage);
-	STREAMWriteBytes(Output,&len,1);
+	STREAMWriteBytes(Output,(char *) &len,1);
 	STREAMWriteBytes(Output,Tempstr,len * 16);
 
 DestroyString(Tempstr);
@@ -787,7 +790,6 @@ void HTTPServerSendFile(STREAM *S, HTTPSession *Session, char *Path, ListNode *V
 STREAM *Doc;
 HTTPSession *Response;
 char *Buffer=NULL, *Tempstr=NULL;
-int BuffSize=4096, result;
 int ICYInterval=4096000;
 
 	Doc=STREAMOpenFile(Path, O_RDONLY);
@@ -863,10 +865,9 @@ ListDestroy(Vars,DestroyString);
 //are allowed access from outside chroot
 void HTTPServerFindAndSendDocument(STREAM *S, HTTPSession *Session, int Flags)
 {
-ListNode *Curr=NULL, *Matching=NULL, *Default=NULL;
+ListNode *Curr=NULL, *Default=NULL;
 TPathItem *PI=NULL;
 char *Path=NULL, *Tempstr=NULL, *ptr;
-int len;
 
 
 	
@@ -952,7 +953,7 @@ void HTTPServerRecieveURL(STREAM *S,HTTPSession *Heads)
 STREAM *Doc;
 struct stat FileStat;
 char *Buffer=NULL, *Tempstr=NULL;
-int BuffSize=4096, result, total=0;
+int BuffSize=4096;
 
 
 Doc=STREAMOpenFile(Heads->Path, O_CREAT | O_TRUNC | O_WRONLY);
@@ -963,7 +964,7 @@ else
 	fchmod(Doc->in_fd,0660); 
 
 	Buffer=SetStrLen(Buffer,BuffSize);
-	total=STREAMSendFile(S,Doc,Heads->ContentSize);
+	STREAMSendFile(S,Doc,Heads->ContentSize);
 	STREAMClose(Doc);
 
 	stat(Heads->Path,&FileStat);
@@ -1081,8 +1082,7 @@ else switch (errno)
 void HTTPServerCopy(STREAM *S,HTTPSession *Heads)
 {
 int result=-1;
-char *Tempstr=NULL, *Host=NULL, *Destination=NULL, *ptr;
-char *User=NULL, *Password=NULL, *FromPath=NULL, *ToPath=NULL;
+char *Tempstr=NULL, *Host=NULL, *Destination=NULL;
 
 LogToFile(Settings.LogPath,"HTTP COPY: [%s] [%s]",Heads->URL,Heads->Destination);
 
@@ -1168,9 +1168,7 @@ DestroyString(Destination);
 
 void HTTPServerOptions(STREAM *S,HTTPSession *ClientHeads)
 {
-int result;
-char *Tempstr=NULL, *ptr;
-HTTPSession *Heads;
+char *Tempstr=NULL;
 
 STREAMWriteLine("HTTP/1.1 200 OK\r\n",S);
 Tempstr=CopyStr(Tempstr,GetDateStr("Date: %a, %d %b %Y %H:%M:%S %Z\r\n",NULL));
@@ -1568,9 +1566,8 @@ return(DoSSLServerNegotiation(S,Flags));
 
 void HTTPServerHandleConnection(HTTPSession *Session)
 {
-char *Tempstr=NULL, *Method=NULL, *URL=NULL, *ptr;
-int val, AuthOkay=TRUE, result;
-int NoOfConnections;
+char *Tempstr=NULL, *Method=NULL, *URL=NULL;
+int AuthOkay=TRUE, result;
 
 if (Settings.Flags & FLAG_SSL)
 {
@@ -1696,6 +1693,4 @@ DestroyString(Tempstr);
 DestroyString(Method);
 DestroyString(URL);
 }
-
-
 

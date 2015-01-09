@@ -3,6 +3,6 @@
 
 #include "common.h"
 
-int HTTPServerHandleMultipartPost(STREAM *S, HTTPSession *Session);
+void HTTPServerHandleMultipartPost(STREAM *S, HTTPSession *Session);
 
 #endif 

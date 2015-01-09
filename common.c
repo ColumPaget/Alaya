@@ -8,6 +8,23 @@
 TSettings Settings;
 char *Version="1.5";
 
+void SetTimezoneEnv()
+{
+time_t Now;
+
+time(&Now);
+localtime(&Now);
+
+if (StrLen(tzname[1]))
+{
+   setenv("TZ",tzname[1],TRUE);
+}
+else if (StrLen(tzname[0]))
+{
+   setenv("TZ",tzname[0],TRUE);
+}
+}
+
 
 
 HTTPSession *HTTPSessionCreate()
@@ -291,7 +308,7 @@ int CopyLocalItem(char *From, char *To)
 glob_t Glob;
 struct stat FStat;
 char *Tempstr=NULL, *ptr;
-int i, RetVal=EFAULT;
+int i,  RetVal=EFAULT;
 STREAM *In=NULL, *Out=NULL;
 
 stat(From,&FStat);
@@ -332,8 +349,8 @@ return(RetVal);
 
 int CopyURL(HTTPSession *Session, char *From, char *To)
 {
-char *Tempstr=NULL, *Host=NULL, *PortStr=NULL, *FromPath=NULL, *ToPath=NULL, *User=NULL, *Password=NULL, *ptr;
-int RetVal=EFAULT, result, i;
+char *Tempstr=NULL, *Host=NULL, *PortStr=NULL, *FromPath=NULL, *ToPath=NULL, *User=NULL, *Password=NULL;
+int RetVal=EFAULT;
 STREAM *In=NULL, *Out=NULL;
 
 ParseURL(To, &Tempstr, &Host, &Tempstr, NULL, NULL, &ToPath, NULL);
@@ -383,7 +400,7 @@ void DropCapabilities(int Level)
 
 #define CAPSET_SIZE 10
 int CapSet[CAPSET_SIZE];
-int NumCapsSet=0, i;
+int NumCapsSet=0;
 cap_t cap;
 
 

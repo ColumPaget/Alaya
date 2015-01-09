@@ -113,8 +113,6 @@ ListSetNoOfItems(ListStart,0);
 
 void ListDestroy(ListNode *ListStart, LIST_ITEM_DESTROY_FUNC ItemDestroyer)
 {
-  ListNode *Curr,*Next;
-
   if (! ListStart) return; 
   ListClear(ListStart, ItemDestroyer);
   free(ListStart->Item);
@@ -166,7 +164,7 @@ return(Curr);
 
 ListNode *ListAddNamedItem(ListNode *ListStart,const char *Name,void *Item)
 {
-ListNode *Head, *Curr;
+ListNode *Curr;
 
 Curr=ListGetLast(ListStart);
 if (Curr==NULL) return(Curr);
@@ -192,7 +190,7 @@ if (Next) Next->Prev=Prev;
 
 void ListThreadNode(ListNode *Prev, ListNode *Node)
 {
-ListNode *NewItem, *Next;
+ListNode *Next;
 
 //Never thread something to itself!
 if (Prev==Node) return;
@@ -259,8 +257,8 @@ depth--;
 ListNode *ListFindNamedItemInsert(ListNode *Head, const char *Name)
 {
 ListNode *Prev, *Curr, *Start=NULL;
-int result, count=0, addjump=0;
-int hops=0, jumps=0, miss=0, ls;
+int result=0, count=0;
+int hops=0, jumps=0, miss=0;
 
 if (! StrLen(Name)) return(Head);
 Curr=ListGetNext(Head);
@@ -286,8 +284,6 @@ if ((Head->Flags & LIST_FLAG_CACHE) && (Head->Jump))
 	}
 }
 
-ls=ListSize(Head);
-addjump=100;
 
 Prev=Head;
 while (Curr)
@@ -315,12 +311,10 @@ while (Curr)
 		{
 			if (Head->Flags & LIST_FLAG_SELFORG) ListSwapItems(Curr->Prev, Curr);
 			if (Head->Flags & LIST_FLAG_CACHE) Head->Jump=Curr;
-				//printf("FOUND: h=%d j=%d m=%d ls=%d\n",hops,jumps,miss,ls);
 			return(Curr);
 		}
 		if ((result > 0) && (Head->Flags & LIST_FLAG_ORDERED)) 
 		{
-				//printf("MISS: h=%d j=%d m=%d ls=%d\n",hops,jumps,miss,ls);
 			return(Prev);
 		}
 	}
@@ -328,20 +322,6 @@ while (Curr)
 hops++;
 count++;
 
-/*
-if (Start->Jump && (! Curr->Jump)) 
-{
-Start=Curr;
-count=200;
-}
-
-
-if (count % addjump)
-{
- if (Start) OrderedListAddJump(Start, Curr);
- Start=NULL;
-}
-*/
 
 	Prev=Curr;
   Curr=ListGetNext(Curr);
@@ -650,9 +630,8 @@ return(Curr);
 
 void *ListDeleteNode(ListNode *Node)
 {
-ListNode *Prev, *Next, *Curr;
+ListNode *Prev, *Next;
 void *Contents;
-int result;
 
 if (Node==NULL)
 {
@@ -689,6 +668,8 @@ ListNode *Node;
 
 Node=ListFindItem(Head, Item);
 if (Node) ListDeleteNode(Node);
+
+return(NULL);
 }
 
 

@@ -4,7 +4,8 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
-
+#include <ctype.h>
+#include <unistd.h>
 
 
 int IsIP4Address(const char *Str)
@@ -74,7 +75,8 @@ for (count=0; count < len; count++)
 int IsSockConnected(int sock)
 {
 struct sockaddr_in sa;
-int salen, result;
+socklen_t salen;
+int result;
 
 if (sock==-1) return(FALSE);
 salen=sizeof(sa);
@@ -110,7 +112,7 @@ int sock;
 struct sockaddr_storage sa;
 struct sockaddr_in *sa4;
 struct sockaddr_in6 *sa6;
-int salen;
+socklen_t salen;
 int result;
 char *p_Addr=NULL, *ptr;
 
@@ -194,7 +196,7 @@ int InitServerSock(const char *Address, int Port)
 struct sockaddr_in sa;
 int result;
 const char *ptr;
-int salen;
+socklen_t salen;
 int sock;
 
 sa.sin_port=htons(Port);
@@ -244,7 +246,7 @@ int InitUnixServerSock(const char *Path)
 {
 int sock;
 struct sockaddr_un sa;
-int salen;
+socklen_t salen;
 int result;
 
 sock=socket(AF_UNIX,SOCK_STREAM,0);
@@ -277,7 +279,7 @@ return(-1);
 int TCPServerSockAccept(int ServerSock, char **Addr)
 {
 struct sockaddr_storage sa;
-int salen;
+socklen_t salen;
 int sock;
 
 salen=sizeof(sa);
@@ -294,7 +296,7 @@ return(sock);
 int UnixServerSockAccept(int ServerSock)
 {
 struct sockaddr_un sa;
-int salen;
+socklen_t salen;
 int sock;
 
 salen=sizeof(sa);
@@ -311,7 +313,8 @@ return(sock);
 #ifdef USE_INET6
 int GetSockDetails(int sock, char **LocalAddress, int *LocalPort, char **RemoteAddress, int *RemotePort)
 {
-int salen, result;
+socklen_t salen;
+int result;
 struct sockaddr_storage sa;
 char *Tempstr=NULL;
 
@@ -356,7 +359,8 @@ return(FALSE);
 
 int GetSockDetails(int sock, char **LocalAddress, int *LocalPort, char **RemoteAddress, int *RemotePort)
 {
-int salen, result;
+socklen_t salen;
+int result;
 struct sockaddr_in sa;
 
 *LocalPort=0;
@@ -399,7 +403,8 @@ return(FALSE);
 /* the name... */
 int ReconnectSock(int sock, const char *Host, int Port, int Flags)
 {
-int salen, result;
+socklen_t salen;
+int result;
 struct sockaddr_in sa;
 struct hostent *hostdata;
 
@@ -482,7 +487,7 @@ return(FALSE);
 
 int  ProcessIncommingBytes(DownloadContext *CTX)
 {
-int inchar, FoundTerm=FALSE, err;
+int inchar, FoundTerm=FALSE;
 
  inchar=STREAMReadChar(CTX->Input);
 
@@ -493,7 +498,6 @@ int inchar, FoundTerm=FALSE, err;
  {
      if (CTX->TermPos==0) STREAMWriteChar(CTX->Output, (char) inchar);
      inchar=STREAMReadChar(CTX->Input);
-     err=errno;
      FoundTerm=CheckForTerm(CTX, (char) inchar);
  }
 if (inchar==EOF) return(TRUE);
@@ -519,7 +523,7 @@ return(TRUE);
 
 int DownloadToDot(STREAM *Connection, STREAM *SaveFile)
 {
-DownloadToTermStr2(Connection,SaveFile,"\r\n.\r\n");
+return(DownloadToTermStr2(Connection,SaveFile,"\r\n.\r\n"));
 }
 
 
@@ -563,7 +567,8 @@ return((char *) inet_ntoa(*(struct in_addr *) *hostdata->h_addr_list));
 char *GetRemoteIP(int sock)
 {
 struct sockaddr_in sa;
-int salen, result;
+socklen_t salen;
+int result;
 
 salen=sizeof(struct sockaddr_in);
 result=getpeername(sock,(struct sockaddr *) &sa, &salen);
@@ -667,7 +672,7 @@ return(result);
 int STREAMConnectToHost(STREAM *S, const char *DesiredHost, int DesiredPort,int Flags)
 {
 ListNode *Curr;
-char *Token=NULL, *ptr;
+char *Token=NULL;
 int result=FALSE;
 int HopNo=0, val=0;
 ListNode *LastHop=NULL;
@@ -677,7 +682,7 @@ S->Path=FormatStr(S->Path,"tcp:%s:%d",DesiredHost,DesiredPort);
 Curr=ListGetNext(S->Values);
 while (Curr)
 {
-ptr=GetToken(Curr->Tag,":",&Token,0);
+GetToken(Curr->Tag,":",&Token,0);
 if (strcasecmp(Token,"ConnectHop")==0) LastHop=Curr;
 Curr=ListGetNext(Curr);
 }
@@ -686,7 +691,7 @@ STREAMSetFlushType(S,FLUSH_LINE,0);
 Curr=ListGetNext(S->Values);
 while (Curr)
 {
-ptr=GetToken(Curr->Tag,":",&Token,0);
+GetToken(Curr->Tag,":",&Token,0);
 
 if (strcasecmp(Token,"ConnectHop")==0) result=STREAMProcessConnectHop(S, (char *) Curr->Item,Curr==LastHop);
 
@@ -758,7 +763,7 @@ int OpenUDPSock(int Port)
 int STREAMSendDgram(STREAM *S, const char *Host, int Port, char *Bytes, int len)
 {
 struct sockaddr_in sa;
-int salen;
+socklen_t salen;
 struct hostent *hostdata;
 
 sa.sin_port=htons(Port);

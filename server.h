@@ -14,8 +14,11 @@ typedef enum {METHOD_HEAD, METHOD_GET,METHOD_POST,METHOD_PUT,METHOD_DELETE,METHO
 
 HTTPSession *HTTPSessionCreate();
 void HTTPServerHandleConnection(HTTPSession *Session);
+void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags);
+void HTTPServerSendHTML(STREAM *S, HTTPSession *Session, char *Title, char *Body);
 void HTTPServerSendResponse(STREAM *S, HTTPSession *Heads, char *ResponseLine, char *ContentType, char *Body);
 
 void HTTPServerSendFile(STREAM *S, HTTPSession *Session, char *Path, ListNode *Vars, int SendData);
+void HTTPServerSendDocument(STREAM *S, HTTPSession *Session, char *Path, int Flags);
 
 #endif

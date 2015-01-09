@@ -565,8 +565,7 @@ int AuthNativeFile(HTTPSession *Session, int HTTPDigest, char **RealUser, char *
 STREAM *S;
 char *Tempstr=NULL, *ptr;
 char *Name=NULL, *Pass=NULL, *PasswordType=NULL, *Trash=NULL;
-int RetVal=USER_UNKNOWN, result;
-struct passwd *pass_struct;
+int RetVal=USER_UNKNOWN;
 
 
 S=STREAMOpenFile(Settings.AuthPath,O_RDONLY);
@@ -702,10 +701,10 @@ else return(FALSE);
 
 int Authenticate(HTTPSession *Session)
 {
-int result=0, Authenticated=FALSE;
+int result=0;
 char *Token=NULL, *RealUser=NULL, *HomeDir=NULL, *UserSettings=NULL, *ptr;
 struct passwd *pwent;
-struct group *grent;
+//struct group *grent;
 
 AuthenticationsTried=CopyStr(AuthenticationsTried,"");
 

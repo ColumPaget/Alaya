@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g -O2
+CFLAGS = -g -O2 -Wall
 LIBS = -lcrypt -lcrypto -lssl -lpam -lcap -lz 
 INSTALL=/bin/install -c
 prefix=/usr/local

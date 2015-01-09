@@ -1,6 +1,6 @@
 #include "FileProperties.h"
 #include "MimeType.h"
-
+#include "ID3.h"
 
 #ifdef USE_XATTR
  #include <sys/types.h>
@@ -40,7 +40,6 @@ return(result);
 
 int LoadFileXAttr(char *Path, ListNode *PropList)
 {
-ListNode *Curr;
 int result=FALSE, len;
 char *AttrNamesList=NULL, *Attr=NULL, *Value=NULL;
 char *ptr, *end;
@@ -110,7 +109,7 @@ DestroyString(FName);
 
 void SaveDirPropsFile(char *Dir, char *RequestedFile, ListNode *Props)
 {
-char *Tempstr=NULL, *Token=NULL, *ptr;
+char *Tempstr=NULL, *Token=NULL;
 ListNode *Curr;
 STREAM *S;
 
@@ -144,7 +143,6 @@ DestroyString(Token);
 int PropertiesLoadFromStream(char *FName, STREAM *S, ListNode *Vars)
 {
 char *Buffer=NULL;
-int result;
 TFileMagic *FM=NULL;
 struct stat FileStat;
 
@@ -243,7 +241,6 @@ return(FType);
 int SaveFileProperties(char *Path, ListNode *PropList)
 {
 char *Dir=NULL, *ptr;
-int FType;
 
 ptr=GetToken(Path,"/",&Dir,0);
 
@@ -261,7 +258,7 @@ SetVar(PropList,"getcontenttype",GetVar(PropList,"ContentType"));
 SetVar(PropList,"executable",GetVar(PropList,"IsExecutable"));
 */
 
-return(FType);
+return(TRUE);
 }
 
 
@@ -269,7 +266,7 @@ return(FType);
 void SetProperties(char *File, ListNode *Props)
 {
 char *Token=NULL, *Dir=NULL, *FName=NULL, *ptr;
-ListNode *Curr, *FProps, *Node;
+ListNode *Curr, *FProps;
 
 ptr=strrchr(File,'/');
 if (ptr) 
@@ -303,6 +300,7 @@ DestroyString(Token);
 DestroyString(Dir);
 DestroyString(FName);
 }
+
 
 
 

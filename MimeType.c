@@ -103,6 +103,7 @@ char *Tempstr=NULL, *Token=NULL, *ContentType=NULL, *ptr;
 TFileMagic *FM;
 
 S=STREAMOpenFile(MagicsPath,O_RDONLY);
+if (! S) return(FALSE);
 Tempstr=STREAMReadLine(Tempstr,S);
 while (Tempstr)
 {
@@ -128,6 +129,8 @@ DestroyString(Tempstr);
 DestroyString(Token);
 DestroyString(ContentType);
 STREAMClose(S);
+
+return(TRUE);
 }
 
 
@@ -154,7 +157,6 @@ void LoadFileMagics(char *MimeTypesPath, char *MagicsPath)
 {
 STREAM *S;
 char *Tempstr=NULL, *Token=NULL, *ContentType=NULL, *ptr;
-int len;
 
 if (! FileMagics) FileMagics=ListCreate();
 

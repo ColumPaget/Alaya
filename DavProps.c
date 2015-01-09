@@ -1,7 +1,7 @@
 #include "DavProps.h"
 #include "MimeType.h"
 #include "server.h"
-
+#include "FileProperties.h"
 
 char *Props[]={"creationdate","displayname","getcontentlanguage","getcontentlength","getcontenttype","getetag","getlastmodified","lockdiscovery","resourcetype","source","supportedlock","iscollection","ishidden","isreadonly","executable",NULL};
 typedef enum {PROP_CREATE_DATE,PROP_DISPLAY_NAME,PROP_CONTENT_LANG, PROP_CONTENT_SIZE, PROP_CONTENT_TYPE,PROP_ETAG,PROP_LASTMODIFIED,PROP_LOCK_CHECK,PROP_RESOURCE_TYPE,PROP_SOURCE,PROP_SUPPORTEDLOCK, PROP_ISCOLLECTION,PROP_ISHIDDEN, PROP_ISREADONLY, PROP_EXECUTABLE};
@@ -310,7 +310,6 @@ return(RetStr);
 void HTTPServerPropFind(STREAM *S,HTTPSession *Heads)
 {
 char *Tempstr=NULL, *XML=NULL;
-int BuffSize=4096, result;
 ListNode *PropList;
 
 
@@ -343,7 +342,6 @@ DestroyString(XML);
 void HTTPServerPropPatch(STREAM *S,HTTPSession *Heads)
 {
 char *Tempstr=NULL, *XML=NULL;
-int BuffSize=4096, result;
 ListNode *PropList, *Curr;
 
 

@@ -1,4 +1,5 @@
 #include "upload.h"
+#include "server.h"
 
 #define UPLOAD_DONE 1
 #define UPLOAD_UNPACK 2
@@ -54,11 +55,7 @@ int MultipartReadFile(STREAM *S,char *FName,char *Boundary, int BoundaryLen)
 char *Tempstr=NULL, *ptr;
 int result, RetVal=FALSE;
 STREAM *FOut=NULL;
-struct stat Stat;
 off_t fsize;
-
-//result=stat(FName,&Stat);
-//if ((result==-1) || (S_ISREG(Stat.st_mode)) ) 
 
 FOut=STREAMOpenFile(FName,O_CREAT | O_TRUNC | O_WRONLY);
 
@@ -97,11 +94,10 @@ return(RetVal);
 }
 
 
-int HTTPServerHandleMultipartPost(STREAM *S, HTTPSession *Session)
+void HTTPServerHandleMultipartPost(STREAM *S, HTTPSession *Session)
 {
-char *Tempstr=NULL, *Name=NULL, *FileName=NULL, *ptr;
-struct stat Stat;
-int result, blen=0;
+char *Tempstr=NULL, *Name=NULL, *FileName=NULL;
+int blen=0;
 
 blen=StrLen(Session->ContentBoundary);
 
@@ -175,4 +171,5 @@ HTTPServerSendResponse(S, Session, "200 OK","text/html",HTML);
 DestroyString(HTML);
 DestroyString(Tempstr);
 }
+
 

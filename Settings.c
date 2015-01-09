@@ -450,9 +450,11 @@ void HandleUserSetup(char *Operation, int argc, char *argv[])
 	if (strcmp(Operation,"list")==0) ListNativeFile(Settings.AuthPath);
 	else if (! StrLen(UserName)) printf("ERROR: NO USERNAME GIVEN\n");
 	else if ((strcmp(Operation,"add")==0) && (! StrLen(Password))) printf("ERROR: NO PASSWORD GIVEN\n");
-	else result=UpdateNativeFile(Settings.AuthPath, UserName, PassType, Password, HomeDir,RealUser, Args);
-
-	if (result==ERR_FILE) printf("ERROR: Cannot open file '%s'\n",Settings.AuthPath);
+	else 
+	{
+		result=UpdateNativeFile(Settings.AuthPath, UserName, PassType, Password, HomeDir,RealUser, Args);
+		if (result==ERR_FILE) printf("ERROR: Cannot open file '%s'\n",Settings.AuthPath);
+	}
 
  DestroyString(UserName);
  DestroyString(Password);
@@ -526,7 +528,7 @@ fprintf(stdout," List Users : alaya -user list\n\n");
 void ParseSettings(int argc, char *argv[], TSettings *Settings)
 {
 int i;
-char *Token=NULL, *ptr;
+char *Token=NULL;
 
 
 if (argc < 2) return;

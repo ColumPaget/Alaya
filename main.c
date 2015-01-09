@@ -24,6 +24,8 @@
 #include "common.h"
 #include "Authenticate.h"
 #include "Settings.h"
+#include "MimeType.h"
+#include "ChrootHelper.h"
 #include "server.h"
 #include <sys/resource.h>
 
@@ -35,23 +37,6 @@ void SigHandler(int sig)
 {
 if (sig==SIGHUP) Settings.Flags |= FLAG_SIGHUP_RECV;
 signal(SIGHUP, SigHandler);
-}
-
-void SetTimezoneEnv()
-{
-time_t Now;
-
-time(&Now);
-localtime(&Now);
-
-if (StrLen(tzname[1]))
-{
-   setenv("TZ",tzname[1],TRUE);
-}
-else if (StrLen(tzname[0]))
-{
-   setenv("TZ",tzname[0],TRUE);
-}
 }
 
 
@@ -79,8 +64,8 @@ HTTPSession *Session;
 
 void AcceptConnection(int ServiceSock)
 {
-int fd, infd, outfd, errfd;
-char *Tempstr=NULL, *ptr;
+int fd, infd, outfd;
+char *Tempstr=NULL;
 HTTPSession *Session;
 STREAM *S;
 int pid;
@@ -259,5 +244,5 @@ CollectChildProcesses();
 }
 
 LogFileFlushAll(TRUE);
-DestoryString(Tempstr);
+DestroyString(Tempstr);
 }

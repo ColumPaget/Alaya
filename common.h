@@ -194,8 +194,7 @@ HTTPSession *HTTPSessionCreate();
 void HTTPSessionClear(void *);
 void HTTPSessionDestroy(void *);
 
-
-
+void SetTimezoneEnv();
 
 void HandleError(int Flags, const char *FmtStr, ...);
 TPathItem *PathItemCreate(int Type, char *URL, char *Path);

@@ -9,6 +9,7 @@
 
 void AlayaLog(char *Msg);
 
+int ChrootProcessRequest(STREAM *S, HTTPSession *Session, char *Type, char *Path, char *SearchPath);
 int HandleChildProcessRequest(STREAM *S);
 
 void VPathMimeIcons(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendData);

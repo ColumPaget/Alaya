@@ -82,14 +82,6 @@ return(result);
 
 int ConvertSyncsafeBytes(uint8_t Top, uint8_t High, uint8_t Low)
 {
-int val;
-
-/*
-val=High;
-val >> 1;
-val |= Low;
-*/
-
 return((Top * 65536) + (High * 256) + Low);
 }
 
@@ -198,7 +190,6 @@ int ID3v3ReadTag(STREAM *S, ListNode *Vars)
 {
 char *Tempstr=NULL, *TagName=NULL;
 uint8_t Version, Revision;
-uint16_t ShortVal;
 int TagNameLen=4, len, result;
 
 //WPUB	Publishers official webpage
@@ -311,7 +302,7 @@ return(result);
 
 int OggReadHeader(STREAM *S, uint8_t *SegTable)
 {
-char *Tempstr=NULL, *ptr;
+char *Tempstr=NULL;
 uint8_t NoOfSegments=0;
 
 Tempstr=SetStrLen(Tempstr,4096);
@@ -323,13 +314,15 @@ if (strcmp(Tempstr,"OggS")==0)
 //Read ogg gubbins and throw it away
 STREAMReadBytes(S,Tempstr,22);
 STREAMReadBytes(S,(char *) &NoOfSegments,1);
-STREAMReadBytes(S,SegTable,NoOfSegments);
+STREAMReadBytes(S,(char *) SegTable,NoOfSegments);
 }
 
 DestroyString(Tempstr);
 
 return(NoOfSegments);
 }
+
+
 
 int OggReadData(STREAM *S, char **Data)
 {
@@ -348,7 +341,7 @@ NoOfSegments=OggReadHeader(S, SegTable);
 for (i=0; i < NoOfSegments; i++)
 {
 	memset(Tempstr,0,255);
-	result=STREAMReadBytes(S,Tempstr,SegTable[i]);
+	result=STREAMReadBytes(S,Tempstr,(int) SegTable[i]);
 	ptr=(*Data) +len;
 	memcpy(ptr,Tempstr,result);
 	len+=result;
@@ -458,13 +451,14 @@ else
 }
 
 //LogToFile(Settings.LogPath,"Offset: %d NoOfTags: %d",offset,NoOfTags);
+return(NoOfTags);
 }
 
 
 int JPEGReadHeader(STREAM *S, ListNode *Vars)
 {
 char *Data=NULL, *ptr;
-int len, w, l;
+int len;
 #define READ_LEN 1024
 
 Data=SetStrLen(Data,READ_LEN);
@@ -502,7 +496,6 @@ int PNGReadHeader(STREAM *S, ListNode *Vars)
 {
 char *Data=NULL, *Type=NULL;
 int val, w, l, d;
-uint16_t *ptr;
 
 Data=SetStrLen(Data,30);
 val=STREAMReadBytes(S,Data,30);
@@ -569,4 +562,5 @@ STREAMSeek(S,(double) 0, SEEK_SET);
 
 return(result);
 }
+
 

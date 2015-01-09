@@ -70,7 +70,7 @@ void DirectoryItemEdit(STREAM *S, HTTPSession *Session, char *Path)
 {
 char *HTML=NULL, *Tempstr=NULL, *URL=NULL, *Salt=NULL, *ptr;
 ListNode *Vars;
-int val, FType;
+int FType;
 
 
 HTML=MCopyStr(HTML,"<html>\r\n<head><title>Editing ",Session->URL,"</title></head>\r\n<body>\r\n<form>\r\n",NULL);
