@@ -2,6 +2,7 @@
 #include "server.h"
 #include "common.h"
 #include "MimeType.h"
+#include "Authenticate.h"
 #include "upload.h"
 
 
@@ -508,9 +509,14 @@ for (i=0; i < NoOfFiles; i++)
 {
 	if (InFileTypeList(Files[i]->Path,Settings.M3UFileTypes))
 	{
-		GenerateRandomBytes(&Salt,24,ENCODE_HEX);
-		AccessToken=MakeAccessToken(AccessToken, Salt, Session->UserName, Session->ClientIP, Files[i]->URL);
-		M3U=MCatStr(M3U,Files[i]->URL,"?AccessToken=",AccessToken,"&Salt=",Salt,"&User=",Session->UserName,"\n",NULL);
+		M3U=CatStr(M3U,Files[i]->URL);
+		if (AuthenticateExamineMethods(Settings.AuthMethods, FALSE) & AUTH_ACCESSTOKEN)
+		{
+			GenerateRandomBytes(&Salt,24,ENCODE_HEX);
+			AccessToken=MakeAccessToken(AccessToken, Salt, Session->UserName, Session->ClientIP, Files[i]->URL);
+			M3U=MCatStr(M3U,"?AccessToken=",AccessToken,"&Salt=",Salt,"&User=",Session->UserName,"\n",NULL);
+		}
+		M3U=CatStr(M3U,"\n");
 	}	
 }
 
