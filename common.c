@@ -223,7 +223,6 @@ if (StrLen(Settings.AccessTokenKey))
 	Tempstr=MCopyStr(Tempstr,Salt,":",User,":",Settings.AccessTokenKey,":",RequestingHost,":",RequestURL,NULL);
 	HashBytes(&RetStr,"sha1",Tempstr,StrLen(Tempstr),ENCODE_HEX);
 }
-LogToFile(Settings.LogPath, "AC2: [%s] [%s] [%s]",Settings.AccessTokenKey,Tempstr,RetStr);
 
 DestroyString(Tempstr);
 

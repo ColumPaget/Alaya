@@ -38,7 +38,7 @@ ptr=GetToken(ptr,",",&Token,0);
 
 Settings->HttpMethods=CopyStr(Settings->HttpMethods,Tempstr);
 
-AuthenticateExamineMethods(Settings->AuthMethods);
+AuthenticateExamineMethods(Settings->AuthMethods, TRUE);
 
 if (Settings->Port < 1)
 {

@@ -20,14 +20,9 @@
 
 char *AuthenticationsTried=NULL;
 
-char *AuthMethods[]={"native","pam","passwd","shadow","digest","accesstoken","open","none","deny",NULL};
+char *AuthMethods[]={"none","open","deny","native","pam","passwd","shadow","digest","accesstoken",NULL};
+typedef enum {AUTHTOK_NONE, AUTHTOK_OPEN, AUTHTOK_DENY, AUTHTOK_NATIVE, AUTHTOK_PAM, AUTHTOK_PASSWD, AUTHTOK_SHADOW, AUTHTOK_DIGEST, AUTHTOK_ACCESSTOKEN, AUTHTOK_ACCESSTOKEN_HTTP} TAuthTokens;
 
-#define AUTH_NONE 0
-#define AUTH_STD 1
-#define AUTH_DIGEST 2
-#define AUTH_DIGEST_STD 3
-#define AUTH_OPEN 4
-#define AUTH_OPEN_STD 5
 
 
 int CheckSSLAuthentication(HTTPSession *Session, char *UserName)
@@ -55,10 +50,10 @@ return(FALSE);
 
 
 
-void AuthenticateExamineMethods(char *Methods)
+int AuthenticateExamineMethods(char *Methods, int LogErrors)
 {
 char *ptr, *Token=NULL;
-int MethodFound=AUTH_NONE;
+int MethodsFound=0, val;
 
 
 LogToFile(Settings.LogPath,"CONSIDER AUTH METHODS: %s",Methods);
@@ -68,53 +63,74 @@ while (ptr)
 {
 	StripTrailingWhitespace(Token);
 	StripLeadingWhitespace(Token);
-	if (MatchTokenFromList(Token,AuthMethods,0) ==-1) LogToFile(Settings.LogPath,"WARNING: unknown authentication method '%s'",Token);
-	else if (strcasecmp(Token,"digest")==0) 
+	val=MatchTokenFromList(Token,AuthMethods,0); 
+	switch (val)
 	{
-		if (MethodFound==AUTH_NONE) MethodFound=AUTH_DIGEST;
-		else MethodFound=AUTH_DIGEST_STD;
-		Settings.AuthFlags |= FLAG_AUTH_DIGEST;
-	}
-	else if (strcasecmp(Token,"open")==0) 
-	{
-		if (MethodFound==AUTH_NONE) MethodFound=AUTH_OPEN;
-		else MethodFound=AUTH_OPEN_STD;
-		Settings.AuthFlags &= ~FLAG_AUTH_REQUIRED;
-	}
-	else switch (MethodFound)
-	{
-		case AUTH_DIGEST:
-		case AUTH_DIGEST_STD:
-			MethodFound=AUTH_DIGEST_STD;
+		case -1:
+			if (LogErrors) LogToFile(Settings.LogPath,"WARNING: unknown authentication method '%s'",Token);
 		break;
 
-		case AUTH_OPEN:
-		case AUTH_OPEN_STD:
-			MethodFound=AUTH_OPEN_STD;
+		case AUTHTOK_NONE: 
+		case AUTHTOK_OPEN:
+			MethodsFound |= AUTH_OPEN;
 		break;
 
-		case AUTH_NONE:
-		case AUTH_STD:
-			MethodFound=AUTH_STD;
+		case AUTHTOK_DENY:
+			MethodsFound |= AUTH_DENY;
+		break;
+
+		case AUTHTOK_NATIVE:
+			MethodsFound |= AUTH_NATIVE;
+		break;
+
+		case AUTHTOK_PAM:
+			MethodsFound |= AUTH_PAM;
+		break;
+
+		case AUTHTOK_PASSWD:
+			MethodsFound |= AUTH_PASSWD;
+		break;
+
+		case AUTHTOK_SHADOW:
+			MethodsFound |= AUTH_SHADOW;
+		break;
+
+		case AUTHTOK_DIGEST:
+			MethodsFound |= AUTH_DIGEST;
+		break;
+
+		case AUTHTOK_ACCESSTOKEN:
+			MethodsFound |= AUTH_ACCESSTOKEN;
+		break;
+
+		case AUTHTOK_ACCESSTOKEN_HTTP:
 		break;
 	}
+
 ptr=GetToken(ptr,",",&Token,0);
 }
 
-	if ((Settings.AuthFlags & FLAG_AUTH_REQUIRED) && (MethodFound==AUTH_NONE))
+
+
+if (LogErrors)
+{
+	if ((Settings.AuthFlags & FLAG_AUTH_REQUIRED) && (MethodsFound == 0))
 	{
-		 LogToFile(Settings.LogPath,"WARNING: NO AUTHENTICATION SYSTEM CONFIGURED, but not set to run as an 'open' system");
+	 LogToFile(Settings.LogPath,"WARNING: NO AUTHENTICATION SYSTEM CONFIGURED, but not set to run as an 'open' system");
 	}
-	else if (MethodFound==AUTH_OPEN_STD)
+	else if ((MethodsFound & AUTH_OPEN) && (MethodsFound != AUTH_OPEN))
 	{
 		LogToFile(Settings.LogPath,"WARNING: 'open' authentication is enabled along with other authentication types. 'open' authentication means no authentication, so other auth types will be disabled.");
 	}
-	else if (MethodFound==AUTH_DIGEST_STD)
+	else if (  (MethodsFound & AUTH_DIGEST) && (((MethodsFound & ~(AUTH_DIGEST | AUTH_ACCESSTOKEN)) !=0) ) )
 	{
 		LogToFile(Settings.LogPath,"WARNING: 'digest' authentication is enabled along with other authentication types. Digest authentication requires plain-text passwords in the *native* alaya authentication file, and cannot authenticate against /etc/passwd, /etc/shadow or PAM.  Most clients will use digest in preference to 'basic' authentication. Thus including 'digest' will thus disable other authentication types.");
 	}
+}
 
 DestroyString(Token);
+
+return(MethodsFound);
 }
 
 
@@ -719,13 +735,15 @@ ptr=GetToken(Settings.AuthMethods,",",&Token,0);
 while (ptr)
 {
 	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"AUTH: Try to authenticate '%s' via '%s'. Remaining authentication types: %s",Session->UserName, Token, ptr);
-	if (strcasecmp(Token,"native")==0) result=AuthNativeFile(Session,FALSE, &RealUser, &HomeDir, &UserSettings);
+	if (strcasecmp(Token,"open")==0) result=TRUE;
+	else if (strcasecmp(Token,"native")==0) result=AuthNativeFile(Session,FALSE, &RealUser, &HomeDir, &UserSettings);
 	else if (strcasecmp(Token,"digest")==0) result=AuthNativeFile(Session,TRUE, &RealUser, &HomeDir, &UserSettings);
 	else if (strcasecmp(Token,"passwd")==0) result=AuthPasswdFile(Session, &RealUser, &HomeDir);
 	else if (strcasecmp(Token,"shadow")==0) result=AuthShadowFile(Session);
 	else if (strcasecmp(Token,"accesstoken")==0) result=AuthAccessToken(Session);
 	#ifdef HAVE_LIBPAM
 	else if (strcasecmp(Token,"pam")==0) result=AuthPAM(Session);
+	#endif
 	else if (strcasecmp(Token,"none")==0) 
 	{
 		result=FALSE;
@@ -736,7 +754,6 @@ while (ptr)
 		result=FALSE;
 		break;
 	}
-	#endif
 
 	if (result==TRUE) break;
 	ptr=GetToken(ptr,",",&Token,0);
