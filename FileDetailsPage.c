@@ -1,3 +1,4 @@
+#include "FileDetailsPage.h"
 #include "directory_listing.h"
 #include "server.h"
 #include "common.h"
@@ -5,11 +6,19 @@
 #include "FileProperties.h"
 
 
-char *FormatFileProperties(char *HTML, int FType, char *URL, char *Path, ListNode *Vars)
+char *FormatFileProperties(char *HTML, HTTPSession *Session, int FType, char *URL, char *Path, ListNode *Vars, int Flags)
 {
 ListNode *Curr;
-char *Tempstr=NULL, *ptr;
+char *Tempstr=NULL, *Salt=NULL, *ptr;
 char *IgnoreFields[]={"FileSize","ContentType","CTime-Secs","MTime-Secs", "IsExecutable", "creationdate", "getlastmodified", "getcontentlength", "getcontenttype", "executable",NULL};
+
+
+	if (Flags & FDETAILS_ACCESSTOKEN)
+	{
+		GenerateRandomBytes(&Salt,24,ENCODE_HEX);
+		Tempstr=MakeAccessToken(Tempstr, Salt, Session->UserName, Session->ClientIP, URL);
+		HTML=MCatStr(HTML,"<tr bgcolor=#FFAAAA><td>Access Token</td><td colspan=2>",URL,"?AccessToken=",Tempstr,"&Salt=",Salt,"&User=",Session->UserName,"</td></tr>",NULL);
+	}
 
 	if (FType != FILE_DIR) 
 	{
@@ -57,6 +66,7 @@ char *IgnoreFields[]={"FileSize","ContentType","CTime-Secs","MTime-Secs", "IsExe
 	}
 
 DestroyString(Tempstr);
+DestroyString(Salt);
 
 return(HTML);
 }
@@ -66,7 +76,7 @@ return(HTML);
 
 //Path is the ACTUAL path to the item, not it's VPath or URL. Thus, use Session->URL
 //unless accessing the actual file
-void DirectoryItemEdit(STREAM *S, HTTPSession *Session, char *Path)
+void DirectoryItemEdit(STREAM *S, HTTPSession *Session, char *Path, int Flags)
 {
 char *HTML=NULL, *Tempstr=NULL, *URL=NULL, *Salt=NULL, *ptr;
 ListNode *Vars;
@@ -96,20 +106,22 @@ HTML=MCatStr(HTML,"<tr><td colspan=3><a href=\"",Tempstr,"\">.. (Parent Director
 
 HTML=MCatStr(HTML,"<tr bgcolor=#CCCCFF><td>Path</td><td colspan=2>",Session->URL,"</td></tr>",NULL);
 
-HTML=MCatStr(HTML,"<tr bgcolor=#FFCCCC><td>Actions</td><td colspan=2><input type=submit name='get:",URL,"' value=Get /> <input type=submit name='del:",URL,"' value=Del /> <input type=text name=renameto /><input type=submit name='renm:",URL,"' value=Rename /><input type=submit name='genaccess:",URL,"' value='Access Key'></td></tr>",NULL);
+HTML=MCatStr(HTML,"<tr bgcolor=#FFCCCC><td>Actions</td><td colspan=2><input type=submit name='get:",URL,"' value=Get /> <input type=submit name='del:",URL,"' value=Del /> <input type=text name=renameto /><input type=submit name='renm:",URL,"' value=Rename /><input type=submit name='genaccess:",URL,"' value='Access Token'></td></tr>",NULL);
 	
 
 URL=FormatURL(URL,Session,Session->URL);
-HTML=FormatFileProperties(HTML, FType, URL, Path, Vars);
+HTML=FormatFileProperties(HTML, Session, FType, URL, Path, Vars, Flags);
 
 	//We must use the URL that this file was asked under, not its directory path. The directory path may not be
 	//directly accessible to the user, and they may be accessing it via a VPATH
 
+	/* This feature not ready yet.
 	if (0)
 	{
 	Tempstr=CopyStr(Tempstr,GetVar(Vars,"Comment"));
 	HTML=MCatStr(HTML,"<tr><td>Comment</td><td><textarea rows=3 cols=40 name=fileproperty:comment>",Tempstr,"</textarea> <input type=submit name='sprops:",URL,"' value=change></td></tr>",NULL);
 	}
+	*/
 
 
 

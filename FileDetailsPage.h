@@ -3,8 +3,9 @@
 
 #include "common.h"
 
-char *FormatFileProperties(char *HTML, int FType, char *Path, ListNode *Vars);
+#define FDETAILS_ACCESSTOKEN 1
+
 void FileDetailsSaveProps(STREAM *S, HTTPSession *Session, char *Props);
-void DirectoryItemEdit(STREAM *S, HTTPSession *Session, char *Path);
+void DirectoryItemEdit(STREAM *S, HTTPSession *Session, char *Path, int Flags);
 
 #endif

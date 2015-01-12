@@ -9,7 +9,7 @@ typedef enum {EVENT_METHOD, EVENT_PATH, EVENT_USER, EVENT_PEERIP, EVENT_BADURL, 
 int EventHeadersMatch(char *TriggerMatch, HTTPSession *Session, char **MatchStr);
 int EventTriggerMatch(ListNode *Node, HTTPSession *Session, char **MatchStr);
 void ProcessEventTrigger(HTTPSession *Session, char *URL, char *TriggerScript, char *ExtraInfo);
-int ProcessSessionEventTriggers(HTTPSession *Session);
+void ProcessSessionEventTriggers(HTTPSession *Session);
 
 
 #endif

@@ -20,5 +20,6 @@ void HTTPServerSendResponse(STREAM *S, HTTPSession *Heads, char *ResponseLine, c
 
 void HTTPServerSendFile(STREAM *S, HTTPSession *Session, char *Path, ListNode *Vars, int SendData);
 void HTTPServerSendDocument(STREAM *S, HTTPSession *Session, char *Path, int Flags);
+int HTTPServerDecideToCompress(HTTPSession *Session, char *Path);
 
 #endif

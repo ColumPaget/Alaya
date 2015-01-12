@@ -1372,10 +1372,10 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 
 int HTTPServerProcessActions(STREAM *S, HTTPSession *Session)
 {
-typedef enum{ACT_NONE, ACT_GET, ACT_DEL, ACT_RENAME, ACT_EDIT, ACT_MKDIR, ACT_SAVE_PROPS} TServerActs;
+typedef enum {ACT_NONE, ACT_GET, ACT_DEL, ACT_RENAME, ACT_EDIT, ACT_MKDIR, ACT_SAVE_PROPS, ACT_EDIT_WITH_ACCESSTOKEN} TServerActs;
 char *QName=NULL, *QValue=NULL, *Name=NULL, *Value=NULL, *ptr;
 char *Arg1=NULL, *Arg2=NULL, *FileProperties=NULL;
-int Action=ACT_NONE;
+TServerActs Action=ACT_NONE;
 int result=FALSE;
 
 
@@ -1390,6 +1390,12 @@ int result=FALSE;
 		{
 			Action=ACT_EDIT;
 			Arg1=CopyStr(Arg1,Name+5);
+		}
+
+		if (strncasecmp(Name,"genaccess:",10)==0)
+		{
+			Action=ACT_EDIT_WITH_ACCESSTOKEN;
+			Arg1=CopyStr(Arg1,Name+10);
 		}
 
 		if (strncasecmp(Name,"renm:",5)==0) 
@@ -1431,8 +1437,13 @@ int result=FALSE;
 	}
 
 
+	//Most of these actions are handled in 'directory_listing.c' Many of them concern buttons on the 'edit' page for a file
+	//Look in the top of 'directory_listing.c' for an enum that each 'format=' argument will map to
 	switch (Action)
 	{
+		case ACT_NONE:
+		break;
+
 		case ACT_EDIT:
 		result=TRUE;
 		Value=MCopyStr(Value,Arg1,"?format=edit",NULL);
@@ -1440,7 +1451,15 @@ int result=FALSE;
 		HTTPServerSendResponse(S, Session, "302", "", Value);
 		result=TRUE;
 		break;
-	
+
+		case ACT_EDIT_WITH_ACCESSTOKEN:
+		result=TRUE;
+		Value=MCopyStr(Value,Arg1,"?format=editaccesstoken",NULL);
+		Session->LastModified=0;
+		HTTPServerSendResponse(S, Session, "302", "", Value);
+		result=TRUE;
+		break;
+
 	  case ACT_DEL:
 		result=TRUE;
 		Value=MCopyStr(Value,Arg1,"?format=delete",NULL);

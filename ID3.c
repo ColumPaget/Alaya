@@ -1,8 +1,8 @@
 #include "ID3.h"
 
 #define ID3v1_LEN 128
-char *TagTypes[]={"ID31TAGEND","TAG","ID3\x02","ID3\x03","ID3\0x4","Ogg","\x89PNG","\xFF\xD8\xFF",NULL};
-typedef enum {TAG_ID3_END,TAG_ID3,TAG_ID3v2,TAG_ID3v3,TAG_ID3v4,TAG_OGG,TAG_PNG,TAG_JPEG};
+char *TagTypes[]={"","ID31TAGEND","TAG","ID3\x02","ID3\x03","ID3\0x4","Ogg","\x89PNG","\xFF\xD8\xFF",NULL};
+typedef enum {TAG_NONE, TAG_ID3_END,TAG_ID3,TAG_ID3v2,TAG_ID3v3,TAG_ID3v4,TAG_OGG,TAG_PNG,TAG_JPEG} TTagType;
 
 
 typedef struct
@@ -188,13 +188,14 @@ return(TRUE);
 
 int ID3v3ReadTag(STREAM *S, ListNode *Vars)
 {
+//WPUB	Publishers official webpage
+char *ID3v3Fields[]={"TCOM","TALB","TIT2","COMM","TBPM","TPE1","TPE2","TYER","TLEN","TCON","TRCK","WCOM","WCOP","WOAF","WOAR","WOAS","WORS","WPUB","WXXX",NULL};
+typedef enum {TAG_COMPOSER,TAG_ALBUM,TAG_TITLE,TAG_COMMENT,TAG_BPM,TAG_ARTIST,TAG_BAND,TAG_YEAR,TAG_LEN,TAG_GENRE,TAG_TRACK,TAG_WEBPAGE_COM,TAG_WEBPAGE_COPYRIGHT,TAG_WEBPAGE_AUDIOFILE, TAG_WEBPAGE_ARTIST, TAG_WEBPAGE_AUDIOSOURCE, TAG_WEBPAGE_STATION,TAG_WEBPAGE_PUBLISHER,TAG_USER_URL} TID3TagType;
 char *Tempstr=NULL, *TagName=NULL;
 uint8_t Version, Revision;
 int TagNameLen=4, len, result;
+TID3TagType TagType;
 
-//WPUB	Publishers official webpage
-char *ID3v3Fields[]={"TCOM","TALB","TIT2","COMM","TBPM","TPE1","TPE2","TYER","TLEN","TCON","TRCK","WCOM","WCOP","WOAF","WOAR","WOAS","WORS","WPUB","WXXX",NULL};
-typedef enum {TAG_COMPOSER,TAG_ALBUM,TAG_TITLE,TAG_COMMENT,TAG_BPM,TAG_ARTIST,TAG_BAND,TAG_YEAR,TAG_LEN,TAG_GENRE,TAG_TRACK,TAG_WEBPAGE_COM,TAG_WEBPAGE_COPYRIGHT,TAG_WEBPAGE_AUDIOFILE, TAG_WEBPAGE_ARTIST, TAG_WEBPAGE_AUDIOSOURCE, TAG_WEBPAGE_STATION,TAG_WEBPAGE_PUBLISHER,TAG_USER_URL};
 
 Tempstr=SetStrLen(Tempstr,100);
 
@@ -235,9 +236,9 @@ Tempstr[result]='\0';
 
 if (StrLen(Tempstr))
 {
-	result=MatchTokenFromList(TagName,ID3v3Fields,0);
+	TagType=MatchTokenFromList(TagName,ID3v3Fields,0);
 	//LogToFile(Settings.LogPath,"v3 TAG: [%s] [%s] %d %d\n",TagName,Tempstr,result,len);
-	switch (result)
+	switch (TagType)
 	{
 		case TAG_ARTIST:
 		case TAG_BAND:
@@ -532,20 +533,22 @@ return(TRUE);
 
 int MediaReadDetails(STREAM *S, ListNode *Vars)
 {
-int result=FALSE;
+TTagType TagType=TAG_NONE;
+int result=0;
 
-result=ReadTagType(S);
-if (result==-1)
+TagType=ReadTagType(S);
+if (TagType==-1)
 {
 	STREAMSeek(S,(double) 0 - ID3v1_LEN,SEEK_END);
-	result=ReadTagType(S);
-	if (result==TAG_ID3) result=TAG_ID3_END;
-	else result=-1;
+	TagType=ReadTagType(S);
+	if (TagType==TAG_ID3) TagType=TAG_ID3_END;
+	else TagType=TAG_NONE;
 }
 
 
-switch (result)
+switch (TagType)
 {
+case TAG_NONE: break;
 case TAG_ID3: result=ID3v1ReadTag(S,Vars); break;
 case TAG_ID3_END: STREAMSeek(S,(double) 0 - ID3v1_LEN,SEEK_END); result=ID3v1ReadTag(S,Vars); break;
 case TAG_ID3v2: result=ID3v2ReadTag(S,Vars); break;

@@ -134,12 +134,11 @@ void ProcessEventTrigger(HTTPSession *Session, char *URL, char *TriggerScript, c
 
 //This function will always be called by the process handling a particular session, so changes
 //to values like "Settings.AuthMethods" will only effect that session
-int ProcessSessionEventTriggers(HTTPSession *Session)
+void ProcessSessionEventTriggers(HTTPSession *Session)
 {
 ListNode *Curr;
 char *Tempstr=NULL, *URL=NULL, *MatchStr=NULL;
 char *Token=NULL, *ptr;
-int RetVal=0;
 
 Curr=ListGetNext(Settings.Events);
 while (Curr)

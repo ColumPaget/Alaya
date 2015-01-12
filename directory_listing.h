@@ -4,7 +4,6 @@
 #include "common.h"
 
 void HTTPServerSendDirectory(STREAM *S, HTTPSession *Heads, char *Path, ListNode *Vars);
-void DirectoryItemEdit(STREAM *S, HTTPSession *Session, char *Path);
 
 #endif
 

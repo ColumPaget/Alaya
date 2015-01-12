@@ -4,8 +4,8 @@
 #include "MimeType.h"
 #include "Authenticate.h"
 #include "upload.h"
-
-
+#include "FileDetailsPage.h"
+#include "FileProperties.h"
 
 //These are defined like flags, but used like an enumberated type
 //This is because I might want to use them in combintation with other
@@ -20,8 +20,8 @@
 #define SORT_RTIME 7
 #define SORT_RSIZE 8
 
-char *DirActionTypes[]={"html","csv","m3u","rss","tar","tgz","tbz","txz","upload","edit","delete","rename","mkdir-query","mkdir","saveprops",NULL};
-typedef enum {ACTION_HTML,ACTION_CSV,ACTION_M3U,ACTION_RSS,ACTION_TAR,ACTION_TGZ,ACTION_TBZ,ACTION_TXZ,ACTION_UPLOAD,ACTION_EDIT,ACTION_DELETE,ACTION_RENAME, ACTION_MKDIRQUERY, ACTION_MKDIR, ACTION_SAVEPROPS} TDIRFORMAT;
+char *DirActionTypes[]={"html","csv","m3u","rss","tar","tgz","tbz","txz","upload","edit","delete","rename","mkdir-query","mkdir","saveprops","editaccesstoken",NULL};
+typedef enum {ACTION_HTML,ACTION_CSV,ACTION_M3U,ACTION_RSS,ACTION_TAR,ACTION_TGZ,ACTION_TBZ,ACTION_TXZ,ACTION_UPLOAD,ACTION_EDIT,ACTION_DELETE,ACTION_RENAME, ACTION_MKDIRQUERY, ACTION_MKDIR, ACTION_SAVEPROPS, ACTION_EDIT_ACCESSTOKEN} TDIRFORMAT;
 
 
 time_t Now;
@@ -136,7 +136,7 @@ return(0);
 //has to be passed into the function as a pointer
 int LoadDir(char *Path, HTTPSession *Session, int Flags, TPathItem ***fl_ptr)
 {
-char *Tempstr=NULL, *URL=NULL, *Dir=NULL, *ptr;
+char *Tempstr=NULL, *URL=NULL, *Dir=NULL;
 glob_t Glob;
 struct stat Stat;
 TPathItem *File, **Files;
@@ -276,7 +276,6 @@ char *FormatFancyDirItem(char *Buffer, int count, TPathItem *File)
 char *Tempstr=NULL, *FileType=NULL, *DateStr=NULL, *DisplayName=NULL, *RetStr=NULL, *Interact=NULL;
 char *Comment=NULL, *ptr;
 char *bgcolor;
-TFileMagic *FM;
 ListNode *Vars;
 
 	Vars=ListCreate();
@@ -348,8 +347,7 @@ return("");
 
 char *DisplayDirActions(char *Buffer, HTTPSession *Session, int Flags)
 {
-char *HTML=NULL, *Tempstr=NULL;
-int PackTypeCount=3;
+char *HTML=NULL;
 
 if (Flags & (DIR_TARBALLS | DIR_INTERACTIVE))
 {
@@ -432,9 +430,8 @@ return(MCatStr(Buffer,"<th><a href=\"",CurrURL,"?sort=",SortName,"\">",Name,"</a
 
 void HTTPServerSendDirList(STREAM *S, HTTPSession *Session, char *Path, int Flags, int NoOfFiles, TPathItem **Files)
 {
-char *ptr;
 char *HTML=NULL, *Tempstr=NULL;
-int i, max, HasMedia=FALSE;
+int i, HasMedia=FALSE;
 int FileCount=0, DirCount=0, ByteCount=0;
 
 
@@ -561,7 +558,6 @@ void HTTPServerSendPackedDir(STREAM *S, HTTPSession *Session,char *Dir)
 {
 char *Tempstr=NULL, *DirName=NULL, *FileName=NULL, *ptr;
 HTTPSession *Response;
-int result;
 
 	LogToFile(Settings.LogPath,"Sending Tar Pack of [%s]",Dir);
 	chdir(Dir);
@@ -572,7 +568,7 @@ int result;
 
 	DirName=CopyStr(DirName,Dir);
 	StripDirectorySlash(DirName);
-	ptr=basename(DirName);
+	ptr=GetBasename(DirName);
 
 	if (! StrLen(ptr)) ptr="rootdir";
 
@@ -667,10 +663,7 @@ return(Action);
 
 void DirectoryMkDirQuery(STREAM *S, HTTPSession *Session, char *Path)
 {
-char *HTML=NULL, *Tempstr=NULL, *URL=NULL, *ptr;
-ListNode *Vars;
-int val, FType;
-
+char *HTML=NULL, *Tempstr=NULL;
 
 HTML=MCopyStr(HTML,"<html>\r\n<head><title>MkDir in ",Session->URL,"</title></head>\r\n<body>\r\n<form>\r\n",NULL);
 
@@ -686,7 +679,6 @@ HTTPServerSendResponse(S, Session, "200 OKAY", "text/html",HTML);
 
 DestroyString(Tempstr);
 DestroyString(HTML);
-ListDestroy(Vars,DestroyString);
 }
 
 
@@ -754,7 +746,8 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 			//LoadDir in order to handle VPaths etc.
 			case ACTION_TAR: HTTPServerSendPackedDir(S,Session,Path); break;
 			case ACTION_UPLOAD: HtmlUploadPage(S,Session,Path); break;
-			case ACTION_EDIT: DirectoryItemEdit(S,Session,Path); break;
+			case ACTION_EDIT: DirectoryItemEdit(S,Session,Path,0); break;
+			case ACTION_EDIT_ACCESSTOKEN: DirectoryItemEdit(S,Session,Path, FDETAILS_ACCESSTOKEN); break;
 			case ACTION_MKDIRQUERY: DirectoryMkDirQuery(S,Session,Path); break;
 			case ACTION_MKDIR: 
 				Token=SessionGetArgument(Token, Session, "mkdir");

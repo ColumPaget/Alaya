@@ -163,22 +163,22 @@ DestroyString(Token);
 
 void ParseConfigItem(char *ConfigLine)
 {
-char *ConfTokens[]={"Chroot","Chshare","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","StreamDir","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","HostConnections","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack",NULL};
-typedef enum {CT_CHROOT, CT_CHSHARE, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_STREAMDIR, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_HOSTCONNECTIONS, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_HTTP_KEEP_ALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK};
+char *ConfTokens[]={"Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack",NULL};
+typedef enum {CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_HTTP_KEEP_ALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK} TConfigTokens;
 
 char *Token=NULL, *ptr;
 struct group *grent;
 struct stat Stat;
-int result;
+TConfigTokens TokType;
 
 
 ptr=GetToken(ConfigLine,"=|:",&Token,GETTOKEN_MULTI_SEPARATORS);
 
 StripLeadingWhitespace(Token);
 StripTrailingWhitespace(Token);
-result=MatchTokenFromList(Token,ConfTokens,0);
+TokType=MatchTokenFromList(Token,ConfTokens,0);
 
-switch(result)
+switch(TokType)
 {
 	case CT_PORT:
 		Settings.Port=atoi(ptr);
