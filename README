@@ -477,7 +477,7 @@ CACHING
 
 By default from version 1.3.2 alaya supports browser caching, and will tell browsers to cache files for 10 seconds. This is particularly useful for mime-type icons, as the same icon may appear many times in a directory listing.
 
-The amount of time that an item can be cached for can be increased using the '-cache' command-line argument or the '
+The amount of time that an item can be cached for can be increased using the '-cache' command-line argument or the "FileCacheTime" config file entry.
 
 
 EVENTS
