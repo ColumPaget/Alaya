@@ -387,22 +387,6 @@ return(Str);
 }
 
 
-void EraseString(char *Buff, char *Target)
-{
-char *ptr;
-int len;
-
-len=StrLen(Target);
-ptr=strstr(Buff,Target);
-while (ptr)
-{
-memset(ptr,' ',len);
-ptr=strstr(ptr,Target);
-}
-
-}
-
-
 
 int GenerateRandomBytes(char **RetBuff, int ReqLen, int Encoding)
 {

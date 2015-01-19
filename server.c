@@ -851,7 +851,10 @@ ListNode *Vars;
 	  Session->LastModified=atoi(GetVar(Vars,"MTime-secs"));
 
 		//If we are asking for details of a file then we treat that as a directory function
-		if ((result==FILE_DIR) || (strstr(Session->Arguments,"format="))) HTTPServerSendDirectory(S,Session,Path,Vars);
+		if ((result==FILE_DIR) || (strstr(Session->Arguments,"format=")))
+		{
+			HTTPServerSendDirectory(S,Session,Path,Vars);
+		}
 		else HTTPServerSendFile(S, Session, Path, Vars, Flags);
 	}
 
@@ -1429,8 +1432,8 @@ int result=FALSE;
 		}
 
 
-		if (strcasecmp(Name,"renameto")==0) Arg2=CopyStr(Arg2,Value);
-		if (strcasecmp(Name,"mkdir")==0) Arg2=CopyStr(Arg2,Value);
+		if (strcasecmp(Name,"renameto")==0) Arg2=HTTPUnQuote(Arg2,Value);
+		if (strcasecmp(Name,"mkdir")==0) Arg2=HTTPUnQuote(Arg2,Value);
 
 		if (strncasecmp(Name,"fileproperty:",13)==0) FileProperties=MCatStr(FileProperties,"&",Name,"=",Value,NULL);
 		ptr=GetNameValuePair(ptr,"&","=",&QName,&QValue);

@@ -265,7 +265,7 @@ while (ptr)
 {
 	if (strcasecmp(ReqName,Name)==0) 
 	{
-		RetStr=CopyStr(RetBuff,Value);
+		RetStr=HTTPUnQuote(RetBuff,Value);
 		break;
 	}
 ptr=GetNameValuePair(ptr, "&", "=", &Name, &Value);

@@ -174,7 +174,7 @@ return(CopyStr(NULL,Str));
 char *VFormatStr(char *InBuff, const char *InputFmtStr, va_list args)
 {
 int inc=100, count=1, result=0, FmtLen;
-char *Tempstr=NULL, *FmtStr=NULL;
+char *Tempstr=NULL, *FmtStr=NULL, *ptr;
 va_list argscopy;
 
 Tempstr=InBuff;
@@ -190,7 +190,14 @@ strncpy(FmtStr,InputFmtStr,FmtLen);
 FmtStr=CopyStr(FmtStr,InputFmtStr);
 #endif
 
-EraseString(FmtStr, "%n");
+//Deny %n. Replace it with %x which prints out the value of any supplied argument
+ptr=strstr(FmtStr,"%n");
+while (ptr)
+{
+  memcpy(ptr,"%x",2);
+  ptr++;
+  ptr=strstr(ptr,"%n");
+}
 
 
 inc=4 * FmtLen; //this should be a good average

@@ -641,13 +641,13 @@ if (! (Settings.DirListFlags & DIR_SHOWFILES)) return(DIR_REJECT);
 			if (strcmp(Name,"format")==0) Action=MatchTokenFromList(Value,DirActionTypes,0);
 			else if (strcmp(Name,"sort")==0)
 			{
-			if (strcmp(Value,"size")==0) *Flags=SORT_SIZE;
-			else if (strcmp(Value,"rsize")==0) *Flags=SORT_RSIZE;
-			else if (strcmp(Value,"time")==0) *Flags=SORT_TIME;
-			else if (strcmp(Value,"rtime")==0) *Flags=SORT_RTIME;
-			else if (strcmp(Value,"name")==0) *Flags=SORT_NAME;
-			else if (strcmp(Value,"rname")==0) *Flags=SORT_RNAME;
-			//if (strcmp(Value,"rss")==0) *SortFlags=DIR_RSS;
+				if (strcmp(Value,"size")==0) *Flags=SORT_SIZE;
+				else if (strcmp(Value,"rsize")==0) *Flags=SORT_RSIZE;
+				else if (strcmp(Value,"time")==0) *Flags=SORT_TIME;
+				else if (strcmp(Value,"rtime")==0) *Flags=SORT_RTIME;
+				else if (strcmp(Value,"name")==0) *Flags=SORT_NAME;
+				else if (strcmp(Value,"rname")==0) *Flags=SORT_RNAME;
+				//if (strcmp(Value,"rss")==0) *SortFlags=DIR_RSS;
 			}
 		}
 	ptr=GetNameValuePair(ptr,"&","=",&Name,&Value);
@@ -698,10 +698,10 @@ void HTTPServerSendToParentDir(STREAM *S, HTTPSession *Session)
 
 
 
-void HTTPServerSendDirectory(STREAM *S, HTTPSession *Session, char *InPath, ListNode *Vars)
+void HTTPServerSendDirectory(STREAM *S, HTTPSession *Session, char *Path, ListNode *Vars)
 {
 int DirSent=FALSE;
-char *Tempstr=NULL, *Path=NULL, *Token=NULL, *ptr;
+char *Tempstr=NULL, *Token=NULL, *ptr;
 int Flags=0, Format, max=0;
 TPathItem **Files;
 
@@ -715,7 +715,6 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 
 	//Get Time for uses like showing 'recent files'
 	time(&Now);
-	Path=CopyStr(Path,InPath);
 
 	if (HTTPServerDecideToCompress(Session,NULL)) Session->Flags |= HTTP_ENCODE_GZIP;
 
@@ -801,5 +800,4 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 
 DestroyString(Tempstr);
 DestroyString(Token);
-DestroyString(Path);
 }
