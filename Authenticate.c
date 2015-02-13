@@ -338,7 +338,7 @@ void ListNativeFile(char *Path)
 STREAM *S;
 char *Tempstr=NULL, *Token=NULL, *ptr;
 
-S=STREAMOpenFile(Settings.AuthPath,O_RDONLY);
+S=STREAMOpenFile(Settings.AuthPath,SF_RDONLY);
 if (S)
 {
 	Tempstr=STREAMReadLine(Tempstr,S);
@@ -377,7 +377,7 @@ int RetVal=ERR_FILE;
 
 
 Entries=ListCreate();
-S=STREAMOpenFile(Settings.AuthPath,O_RDONLY);
+S=STREAMOpenFile(Settings.AuthPath,SF_RDONLY);
 
 if (S)
 {
@@ -394,7 +394,7 @@ if (S)
 }
 
 
-S=STREAMOpenFile(Settings.AuthPath,O_WRONLY| O_CREAT | O_TRUNC);
+S=STREAMOpenFile(Settings.AuthPath,SF_WRONLY| SF_CREAT | SF_TRUNC);
 if (S)
 {
 	//First copy all other entries
@@ -584,7 +584,7 @@ char *Name=NULL, *Pass=NULL, *PasswordType=NULL, *Trash=NULL;
 int RetVal=USER_UNKNOWN;
 
 
-S=STREAMOpenFile(Settings.AuthPath,O_RDONLY);
+S=STREAMOpenFile(Settings.AuthPath,SF_RDONLY);
 if (! S) return(USER_UNKNOWN);
 
 Tempstr=STREAMReadLine(Tempstr,S);

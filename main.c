@@ -49,8 +49,8 @@ HTTPSession *Session;
 		ParentProcessPipe=STREAMFromDualFD(0,1);
 		Session=(HTTPSession *) Data;
 		Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
-		STREAMSetFlushType(Session->S,FLUSH_FULL,4096);
-		STREAMSetTimeout(Session->S,5);
+		STREAMSetFlushType(Session->S,FLUSH_FULL,0,4096);
+		STREAMSetTimeout(Session->S,500);
 
 		HTTPServerHandleConnection(Session);
 
@@ -76,7 +76,7 @@ int pid;
 		Session=HTTPSessionCreate();
 		fd=TCPServerSockAccept(ServiceSock,&Session->ClientIP);
 		Session->S=STREAMFromFD(fd);
-		STREAMSetFlushType(Session->S, FLUSH_FULL,0);
+		STREAMSetFlushType(Session->S, FLUSH_FULL,0,0);
 
 		pid=PipeSpawnFunction(&infd,&outfd,NULL, ChildFunc, Session);
 		Tempstr=FormatStr(Tempstr,"%d",pid);
@@ -127,7 +127,7 @@ localtime(&Now);
 void ReopenLogFile(char *Msg)
 {
 LogFileClose(Settings.LogPath);
-LogFileSetValues(Settings.LogPath, LOGFILE_LOGPID|LOGFILE_LOCK|LOGFILE_MILLISECS, Settings.MaxLogSize, 10);
+LogFileFindSetValues(Settings.LogPath, LOGFILE_LOGPID|LOGFILE_LOCK|LOGFILE_MILLISECS, Settings.MaxLogSize, Settings.MaxLogRotate, 10);
 LogToFile(Settings.LogPath, "%s",Msg);
 }
 
@@ -195,7 +195,7 @@ LoadFileMagics("/etc/mime.types","/etc/magic");
 //Allow 5 secs for any previous instance of alaya to shutdown
 for (i=0; i < 5; i++)
 {
-	fd=InitServerSock(Settings.BindAddress,Settings.Port);
+	fd=InitServerSock(SOCK_STREAM, Settings.BindAddress,Settings.Port);
 	if (fd != -1) break;
 	sleep(1);
 }

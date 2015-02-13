@@ -1,7 +1,7 @@
 #ifndef ALAYA_COMMON_H
 #define ALAYA_COMMON_H
 
-#include "libUseful-2.0/libUseful.h"
+#include "libUseful-2.1/libUseful.h"
 #include <glob.h>
 #include <sys/wait.h>
 #include <pwd.h>
@@ -135,6 +135,7 @@ ListNode *UserAgents;
 ListNode *Events;
 char *LogPath;
 int MaxLogSize;
+int MaxLogRotate;
 } TSettings;
 
 

@@ -328,11 +328,11 @@ if (S_ISDIR(FStat.st_mode))
 }
 else
 {
-	In=STREAMOpenFile(From,O_RDONLY);
+	In=STREAMOpenFile(From,SF_RDONLY);
 	if (In)
 	{
-		Out=STREAMOpenFile(To, O_CREAT| O_WRONLY | O_TRUNC);
-		if (Out) RetVal=STREAMSendFile(In, Out, 0);
+		Out=STREAMOpenFile(To, SF_CREAT| SF_WRONLY | SF_TRUNC);
+		if (Out) RetVal=STREAMSendFile(In, Out, 0, SENDFILE_KERNEL | SENDFILE_LOOP);
 	}
 }
 
@@ -364,8 +364,8 @@ if (IsLocalHost(Session,Host))
 	if (! IsLocalHost(Session,Host)) 
 	{
 			In=HTTPGet(From,User,Password);
-			if (In) Out=STREAMOpenFile(ToPath,O_CREAT|O_WRONLY|O_TRUNC);
-			if (Out) RetVal=STREAMSendFile(In, Out, 0);
+			if (In) Out=STREAMOpenFile(ToPath,SF_CREAT|SF_WRONLY|SF_TRUNC);
+			if (Out) RetVal=STREAMSendFile(In, Out, 0, SENDFILE_KERNEL | SENDFILE_LOOP);
 			STREAMClose(In);
 			STREAMClose(Out);
 	}

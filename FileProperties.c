@@ -82,7 +82,7 @@ STREAM *S;
 
 Tempstr=MCopyStr(Tempstr,Dir,"/.props",NULL);
 
-S=STREAMOpenFile(Tempstr,O_CREAT | O_RDWR);
+S=STREAMOpenFile(Tempstr,SF_CREAT | SF_RDWR);
 if (S)
 {
 	Tempstr=STREAMReadLine(Tempstr,S);
@@ -115,7 +115,7 @@ STREAM *S;
 
 Tempstr=MCopyStr(Tempstr,Dir,"/.props",NULL);
 
-S=STREAMOpenFile(Tempstr,O_CREAT | O_WRONLY | O_TRUNC);
+S=STREAMOpenFile(Tempstr,SF_CREAT | SF_WRONLY | SF_TRUNC);
 if (S)
 {
 	Curr=ListGetNext(Props);
@@ -202,7 +202,7 @@ int LoadFileRealProperties(char *FName, int ExamineContents, ListNode *Vars)
 STREAM *S=NULL;
 int result;
 
-if (ExamineContents) S=STREAMOpenFile(FName,O_RDONLY);
+if (ExamineContents) S=STREAMOpenFile(FName,SF_RDONLY);
 
 result=PropertiesLoadFromStream(FName, S, Vars);
 

@@ -57,7 +57,7 @@ int result, RetVal=FALSE;
 STREAM *FOut=NULL;
 off_t fsize;
 
-FOut=STREAMOpenFile(FName,O_CREAT | O_TRUNC | O_WRONLY);
+FOut=STREAMOpenFile(FName,SF_CREAT | SF_TRUNC | SF_WRONLY);
 
 	Tempstr=SetStrLen(Tempstr,4096);
 	result=STREAMReadBytesToTerm(S, Tempstr, 4096, '\n');
@@ -96,7 +96,7 @@ return(RetVal);
 
 void HTTPServerHandleMultipartPost(STREAM *S, HTTPSession *Session)
 {
-char *Tempstr=NULL, *Name=NULL, *FileName=NULL;
+char *Tempstr=NULL, *Name=NULL, *FileName=NULL, *QName=NULL, *QValue=NULL;
 int blen=0;
 
 blen=StrLen(Session->ContentBoundary);
@@ -128,7 +128,9 @@ while (Tempstr)
 			{
 				Tempstr=STREAMReadLine(Tempstr,S);
 				StripTrailingWhitespace(Tempstr);
-				Session->Arguments=MCatStr(Session->Arguments,"&",Name,"=",Tempstr,NULL);
+				QName=HTTPQuote(QName,Name);
+				QValue=HTTPQuote(QValue,Tempstr);
+				Session->Arguments=MCatStr(Session->Arguments,"&",QName,"=",QValue,NULL);
 			}
 		}
 	}
@@ -145,6 +147,8 @@ if (Session->ContentSize > 0) Session->ContentType=CopyStr(Session->ContentType,
 DestroyString(FileName);
 DestroyString(Tempstr);
 DestroyString(Name);
+DestroyString(QName);
+DestroyString(QValue);
 }
 
 

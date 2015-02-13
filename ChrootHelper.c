@@ -260,7 +260,7 @@ if (! ScriptPath) return(FALSE);
 if (! (Settings.Flags & FLAG_CHECK_SCRIPTS)) return(TRUE);
 
 
-S=STREAMOpenFile(Settings.ScriptHashFile,O_RDONLY);
+S=STREAMOpenFile(Settings.ScriptHashFile,SF_RDONLY);
 if (S)
 {
 	Tempstr=STREAMReadLine(Tempstr,S);
@@ -730,7 +730,7 @@ if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"CGI HEAD
 
 
 //Read remaining data from CGI
-STREAMSendFile(ParentProcessPipe, S, ContentLength);
+STREAMSendFile(ParentProcessPipe, S, ContentLength,SENDFILE_KERNEL|SENDFILE_LOOP);
 STREAMFlush(S);
 
 

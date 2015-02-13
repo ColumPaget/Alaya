@@ -750,7 +750,7 @@ LogToFile(Settings.LogPath,"Stream from Dir: %s, %d files",SearchPath,Glob.gl_pa
 
 for (i=0; i < Glob.gl_pathc; i++)
 {
-	S=STREAMOpenFile(Glob.gl_pathv[i],O_RDONLY);
+	S=STREAMOpenFile(Glob.gl_pathv[i],SF_RDONLY);
 	if (S)
 	{
 		IcecastSendData(S, Output, 4096000);
@@ -792,7 +792,7 @@ HTTPSession *Response;
 char *Buffer=NULL, *Tempstr=NULL;
 int ICYInterval=4096000;
 
-	Doc=STREAMOpenFile(Path, O_RDONLY);
+	Doc=STREAMOpenFile(Path, SF_RDONLY);
 	if (! Doc) HTTPServerSendHTML(S, Session, "403 Forbidden","You don't have permission for that.");
 	else
 	{
@@ -814,7 +814,7 @@ int ICYInterval=4096000;
 		if (Flags & HEADERS_SENDFILE)
 		{
 		if (Session->Flags & HTTP_ICECAST) IcecastSendData(Doc, S, ICYInterval);
-		else STREAMSendFile(Doc, S, 0);
+		else STREAMSendFile(Doc, S, 0, SENDFILE_KERNEL | SENDFILE_LOOP);
 		}
 
 	/* If HTTPServerSendHeaders set HTTP_REUSE_SESSION then set that in the Session object */
@@ -959,7 +959,7 @@ char *Buffer=NULL, *Tempstr=NULL;
 int BuffSize=4096;
 
 
-Doc=STREAMOpenFile(Heads->Path, O_CREAT | O_TRUNC | O_WRONLY);
+Doc=STREAMOpenFile(Heads->Path, SF_CREAT | SF_TRUNC | SF_WRONLY);
 
 if (! Doc) HTTPServerSendHTML(S, Heads, "403 Forbidden","Can't open document for write.");
 else
@@ -967,7 +967,7 @@ else
 	fchmod(Doc->in_fd,0660); 
 
 	Buffer=SetStrLen(Buffer,BuffSize);
-	STREAMSendFile(S,Doc,Heads->ContentSize);
+	STREAMSendFile(S,Doc,Heads->ContentSize, SENDFILE_KERNEL | SENDFILE_LOOP);
 	STREAMClose(Doc);
 
 	stat(Heads->Path,&FileStat);

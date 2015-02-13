@@ -714,6 +714,7 @@ SetTimezoneEnv();
 uname(&UnameData);
 memset(&Settings,0,sizeof(TSettings));
 Settings.MaxLogSize=999999;
+Settings.MaxLogRotate=5;
 Settings.LogPath=CopyStr(Settings.LogPath,"SYSLOG");
 Settings.ConfigPath=CopyStr(Settings.ConfigPath,"/etc/alaya.conf");
 Settings.DefaultDir=CopyStr(Settings.DefaultDir,"./");
@@ -748,7 +749,7 @@ STREAM *S;
 char *Tempstr=NULL;
 
 
-S=STREAMOpenFile(Settings->ConfigPath,O_RDONLY);
+S=STREAMOpenFile(Settings->ConfigPath,SF_RDONLY);
 if (S)
 {
 Tempstr=STREAMReadLine(Tempstr,S);

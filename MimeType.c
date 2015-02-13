@@ -102,7 +102,7 @@ STREAM *S;
 char *Tempstr=NULL, *Token=NULL, *ContentType=NULL, *ptr;
 TFileMagic *FM;
 
-S=STREAMOpenFile(MagicsPath,O_RDONLY);
+S=STREAMOpenFile(MagicsPath,SF_RDONLY);
 if (! S) return(FALSE);
 Tempstr=STREAMReadLine(Tempstr,S);
 while (Tempstr)
@@ -199,7 +199,7 @@ if (! FileMagics) FileMagics=ListCreate();
    MimeTypesAddItem("application/x-sh", FILEEXTN, "sh", 0);
 
 
-S=STREAMOpenFile(MimeTypesPath,O_RDONLY);
+S=STREAMOpenFile(MimeTypesPath,SF_RDONLY);
 if (S)
 {
 	Tempstr=STREAMReadLine(Tempstr,S);
