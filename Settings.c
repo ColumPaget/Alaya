@@ -81,7 +81,7 @@ DestroyString(Token);
 
 void ParsePathItem(char *Data)
 {
-char *PathTypes[]={"Files","Cgi","Stream","Logout","Proxy","MimeIcons",NULL};
+const char *PathTypes[]={"Files","Cgi","Stream","Logout","Proxy","MimeIcons",NULL};
 char *Type=NULL, *URL=NULL, *Path=NULL, *Tempstr=NULL, *ptr;
 TPathItem *PI;
 int val;
@@ -143,7 +143,7 @@ DestroyString(Token);
 
 void ParseEventConfig(char *ConfigLine)
 {
-char *EventTypeStrings[]={"Method","Path","User","ClientIP","BadURL","Header","ResponseCode",NULL};
+const char *EventTypeStrings[]={"Method","Path","User","ClientIP","BadURL","Header","ResponseCode",NULL};
 char *Token=NULL, *ptr;
 ListNode *Node;
 int Type;
@@ -163,8 +163,8 @@ DestroyString(Token);
 
 void ParseConfigItem(char *ConfigLine)
 {
-char *ConfTokens[]={"Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack",NULL};
-typedef enum {CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_HTTP_KEEP_ALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK} TConfigTokens;
+const char *ConfTokens[]={"Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack",NULL};
+typedef enum {CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEP_ALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK} TConfigTokens;
 
 char *Token=NULL, *ptr;
 struct group *grent;
@@ -361,7 +361,7 @@ switch(TokType)
 		Settings.DocumentCacheTime=strtol(ptr,NULL,10);
 	break;
 
-	case CT_HTTP_KEEP_ALIVE:
+	case CT_SESSION_KEEP_ALIVE:
 		if (YesNoTrueFalse(ptr)) Settings.Flags |= FLAG_KEEP_ALIVES;
 		else Settings.Flags &= ~FLAG_KEEP_ALIVES;
 	break;

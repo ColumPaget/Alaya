@@ -173,7 +173,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		else if (strcmp(Name,"RemoteAuthenticate")==0) Response->RemoteAuthenticate=CopyStr(Response->RemoteAuthenticate,Value);
 		else if (strcmp(Name,"Cipher")==0) Response->Cipher=CopyStr(Response->Cipher,Value);
 		else if (strcmp(Name,"Cookies")==0) Response->Cookies=CopyStr(Response->Cookies,Value);
-		else if (strcmp(Name,"KeepAlive")==0) Response->Flags |= HTTP_KEEP_ALIVE;
+		else if (strcmp(Name,"KeepAlive")==0) Response->Flags |= SESSION_KEEP_ALIVE;
 
 		ptr=GetNameValuePair(ptr," ","=",&Name,&Tempstr);
 	}
@@ -599,7 +599,7 @@ Tempstr=STREAMReadLine(Tempstr,S);
 if (! Tempstr) return(FALSE);
 
 StripTrailingWhitespace(Tempstr);
-//LogToFile(Settings.LogPath, "HCPR: %s",Tempstr);
+LogToFile(Settings.LogPath, "HCPR: %s",Tempstr);
 
 ptr=GetToken(Tempstr,"\\S",&Token,0);
 if (strcmp(Token,"EXEC")==0) result=HandleExecRequest(S,ptr);
@@ -627,8 +627,10 @@ char *ResponseLine=NULL, *Headers=NULL, *ptr;
 char *Quoted=NULL;
 int KeepAlive=FALSE, RetVal=FALSE;
 off_t ContentLength=0;
+int PostArguments=FALSE;
 
 if (! ParentProcessPipe) return(FALSE);
+if ((strcmp(Type, "PROXY") != 0) && (strcmp(Session->Method,"POST") ==0)) PostArguments=TRUE;
 
 PortStr=FormatStr(PortStr,"%d",Session->ServerPort);
 ContentLengthStr=FormatStr(ContentLengthStr,"%d",Session->ContentSize);
@@ -645,8 +647,10 @@ Tempstr=MCatStr(Tempstr, " Path='",Quoted,"'",NULL);
 Quoted=QuoteCharsInStr(Quoted,SearchPath,"'");
 Tempstr=MCatStr(Tempstr, " SearchPath='",Quoted,"'",NULL);
 
-Quoted=QuoteCharsInStr(Quoted,Session->Arguments,"'");
-Tempstr=MCatStr(Tempstr, " Arguments='",Quoted,"'", NULL);
+Tempstr=MCatStr(Tempstr," Method=",Session->Method," UserAgent='",Session->UserAgent,"' ContentType='",Session->ContentType,"' ContentLength='",ContentLengthStr,"'",NULL);
+Tempstr=MCatStr(Tempstr," ServerName=",Session->ServerName," ServerPort=",PortStr,NULL);
+if (StrLen(Session->Cipher)) Tempstr=MCatStr(Tempstr," Cipher='",Session->Cipher,"'",NULL);
+if (StrLen(Session->Cookies)) Tempstr=MCatStr(Tempstr," Cookies='",Session->Cookies,"'",NULL);
 
 Quoted=QuoteCharsInStr(Quoted,Session->StartDir,"'");
 Tempstr=MCatStr(Tempstr," StartDir='",Quoted,"'",NULL);
@@ -654,13 +658,16 @@ Tempstr=MCatStr(Tempstr," StartDir='",Quoted,"'",NULL);
 Quoted=QuoteCharsInStr(Quoted,Session->ClientReferrer,"'");
 Tempstr=MCatStr(Tempstr, " ClientReferrer='",Quoted,"'",NULL);
 
-if (Session->Flags & HTTP_KEEP_ALIVE) Tempstr=CatStr(Tempstr," KeepAlive=Y");
+if (Session->Flags & SESSION_KEEP_ALIVE) Tempstr=CatStr(Tempstr," KeepAlive=Y");
 if (StrLen(Session->UserName)) Tempstr=MCatStr(Tempstr," User='",Session->UserName,"'",NULL);
 if (StrLen(Session->RemoteAuthenticate)) Tempstr=MCatStr(Tempstr," RemoteAuthenticate='",Session->RemoteAuthenticate,"'",NULL);
-Tempstr=MCatStr(Tempstr," ServerName=",Session->ServerName," ServerPort=",PortStr,NULL);
-if (StrLen(Session->Cipher)) Tempstr=MCatStr(Tempstr," Cipher='",Session->Cipher,"'",NULL);
-Tempstr=MCatStr(Tempstr," Method=",Session->Method," UserAgent='",Session->UserAgent,"' ContentType='",Session->ContentType,"' ContentLength='",ContentLengthStr,"'",NULL);
-if (StrLen(Session->Cookies)) Tempstr=MCatStr(Tempstr," Cookies='",Session->Cookies,"'",NULL);
+
+if (! PostArguments)
+{
+Quoted=QuoteCharsInStr(Quoted,Session->Arguments,"'");
+Tempstr=MCatStr(Tempstr, " Arguments='",Quoted,"'", NULL);
+}
+
 Tempstr=CatStr(Tempstr,"\n");
 
 
@@ -670,12 +677,12 @@ STREAMWriteLine(Tempstr,ParentProcessPipe);
 STREAMFlush(ParentProcessPipe);
 
 
-if ((strcmp(Session->Method,"POST")==0) && StrLen(Session->Arguments))
+if (PostArguments && StrLen(Session->Arguments))
 {
 	//Wait till process outside of chroot responds to our request, (is ready)
 	//then send it the post data
 	while (STREAMCheckForBytes(ParentProcessPipe)==0) usleep(10000);
-	STREAMWriteLine(Session->Arguments,ParentProcessPipe);	
+	STREAMWriteLine(Session->Arguments,ParentProcessPipe);
 	//we shouldn't need this CR-LF, as we've sent 'Content-Length' characters
 	//but some CGI implementations seem to expect it, and it does no harm to
 	//provide it anyway
@@ -736,8 +743,8 @@ STREAMFlush(S);
 
 //if we're running a cgi program, then it will close the session when done, so
 //turn off the 'reuse session' flag
-if (KeepAlive) Session->Flags |= HTTP_REUSE_SESSION;
-else Session->Flags &= ~(HTTP_KEEP_ALIVE | HTTP_REUSE_SESSION);
+if (KeepAlive) Session->Flags |= SESSION_REUSE;
+else Session->Flags &= ~(SESSION_KEEP_ALIVE | SESSION_REUSE);
 
 
 DestroyString(Quoted);

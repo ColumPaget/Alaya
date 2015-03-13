@@ -10,7 +10,7 @@ char *FormatFileProperties(char *HTML, HTTPSession *Session, int FType, char *UR
 {
 ListNode *Curr;
 char *Tempstr=NULL, *Salt=NULL, *ptr;
-char *IgnoreFields[]={"FileSize","ContentType","CTime-Secs","MTime-Secs", "IsExecutable", "creationdate", "getlastmodified", "getcontentlength", "getcontenttype", "executable",NULL};
+const char *IgnoreFields[]={"FileSize","ContentType","CTime-Secs","MTime-Secs", "IsExecutable", "creationdate", "getlastmodified", "getcontentlength", "getcontenttype", "executable",NULL};
 
 
 	if (Flags & FDETAILS_ACCESSTOKEN)

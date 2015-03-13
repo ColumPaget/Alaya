@@ -8,7 +8,7 @@
 #endif
 
 
-char *PhysicalProperties[]={"creationdate","CTime-secs", "getlastmodified","MTime-secs","getcontentlength","FileSize","getcontenttype","ContentType","executable","IsExecutable"};
+const char *PhysicalProperties[]={"creationdate","CTime-secs", "getlastmodified","MTime-secs","getcontentlength","FileSize","getcontenttype","ContentType","executable","IsExecutable"};
 
 
 

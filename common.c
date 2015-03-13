@@ -97,8 +97,8 @@ HTTPSession *Trans;
 if (! p_Trans) return;
 Trans=(HTTPSession *) p_Trans;
 
-//Clear everything but HTTP_REUSE_SESSION, HTTP_AUTHENTICATED and HTTP_SSL, which are persistent
-Trans->Flags &= (HTTP_REUSE_SESSION | HTTP_AUTHENTICATED | HTTP_SSL);
+//Clear everything but SESSION_REUSE, SESSION_AUTHENTICATED and HTTP_SSL, which are persistent
+Trans->Flags &= (SESSION_REUSE | SESSION_AUTHENTICATED | HTTP_SSL);
 
 Trans->Method=CopyStr(Trans->Method,"");
 Trans->ResponseCode=CopyStr(Trans->ResponseCode,"");
@@ -354,7 +354,7 @@ STREAM *In=NULL, *Out=NULL;
 
 ParseURL(To, &Tempstr, &Host, &Tempstr, NULL, NULL, &ToPath, NULL);
 
-if ((access(ToPath,F_OK)==0) && (! (Session->Flags & HTTP_OVERWRITE))) RetVal=EEXIST;
+if ((access(ToPath,F_OK)==0) && (! (Session->Flags & SESSION_OVERWRITE))) RetVal=EEXIST;
 
 //If the TO Host is local
 if (IsLocalHost(Session,Host))

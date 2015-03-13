@@ -1,7 +1,7 @@
 #include "ID3.h"
 
 #define ID3v1_LEN 128
-char *TagTypes[]={"","ID31TAGEND","TAG","ID3\x02","ID3\x03","ID3\0x4","Ogg","\x89PNG","\xFF\xD8\xFF",NULL};
+const char *TagTypes[]={"","ID31TAGEND","TAG","ID3\x02","ID3\x03","ID3\0x4","Ogg","\x89PNG","\xFF\xD8\xFF",NULL};
 typedef enum {TAG_NONE, TAG_ID3_END,TAG_ID3,TAG_ID3v2,TAG_ID3v3,TAG_ID3v4,TAG_OGG,TAG_PNG,TAG_JPEG} TTagType;
 
 
@@ -95,7 +95,7 @@ uint32_t Len;
 int TagNameLen=3, result;
 
 //Some of these don't exist, but are left as placeholders to match against TID3Tags
-char *ID3v2Fields[]={"TCM","TAL","TT2","COM","BPM","TP1","TP2","TYE","TLE","TCO","TRK","WCOM","WCP","WAF","WAR","WAS","WORS","WPB","WXX","PIC",NULL};
+const char *ID3v2Fields[]={"TCM","TAL","TT2","COM","BPM","TP1","TP2","TYE","TLE","TCO","TRK","WCOM","WCP","WAF","WAR","WAS","WORS","WPB","WXX","PIC",NULL};
 
 Tempstr=SetStrLen(Tempstr,100);
 
@@ -189,7 +189,7 @@ return(TRUE);
 int ID3v3ReadTag(STREAM *S, ListNode *Vars)
 {
 //WPUB	Publishers official webpage
-char *ID3v3Fields[]={"TCOM","TALB","TIT2","COMM","TBPM","TPE1","TPE2","TYER","TLEN","TCON","TRCK","WCOM","WCOP","WOAF","WOAR","WOAS","WORS","WPUB","WXXX",NULL};
+const char *ID3v3Fields[]={"TCOM","TALB","TIT2","COMM","TBPM","TPE1","TPE2","TYER","TLEN","TCON","TRCK","WCOM","WCOP","WOAF","WOAR","WOAS","WORS","WPUB","WXXX",NULL};
 typedef enum {TAG_COMPOSER,TAG_ALBUM,TAG_TITLE,TAG_COMMENT,TAG_BPM,TAG_ARTIST,TAG_BAND,TAG_YEAR,TAG_LEN,TAG_GENRE,TAG_TRACK,TAG_WEBPAGE_COM,TAG_WEBPAGE_COPYRIGHT,TAG_WEBPAGE_AUDIOFILE, TAG_WEBPAGE_ARTIST, TAG_WEBPAGE_AUDIOSOURCE, TAG_WEBPAGE_STATION,TAG_WEBPAGE_PUBLISHER,TAG_USER_URL} TID3TagType;
 char *Tempstr=NULL, *TagName=NULL;
 uint8_t Version, Revision;

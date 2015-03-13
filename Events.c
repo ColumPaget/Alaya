@@ -78,7 +78,7 @@ while (ptr)
 			break;
 
 			case EVENT_BADURL:
-			if (Session->Flags & HTTP_ERR_BADURL)
+			if (Session->Flags & SESSION_ERR_BADURL)
 			{
 				*MatchStr=MCatStr(*MatchStr, "Bad URL: ",Session->Path,", ",NULL);
 				result=TRUE;

@@ -20,7 +20,7 @@
 
 char *AuthenticationsTried=NULL;
 
-char *AuthMethods[]={"none","open","deny","native","pam","passwd","shadow","digest","accesstoken",NULL};
+const char *AuthMethods[]={"none","open","deny","native","pam","passwd","shadow","digest","accesstoken",NULL};
 typedef enum {AUTHTOK_NONE, AUTHTOK_OPEN, AUTHTOK_DENY, AUTHTOK_NATIVE, AUTHTOK_PAM, AUTHTOK_PASSWD, AUTHTOK_SHADOW, AUTHTOK_DIGEST, AUTHTOK_ACCESSTOKEN, AUTHTOK_ACCESSTOKEN_HTTP} TAuthTokens;
 
 

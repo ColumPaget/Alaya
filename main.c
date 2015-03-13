@@ -127,7 +127,7 @@ localtime(&Now);
 void ReopenLogFile(char *Msg)
 {
 LogFileClose(Settings.LogPath);
-LogFileFindSetValues(Settings.LogPath, LOGFILE_LOGPID|LOGFILE_LOCK|LOGFILE_MILLISECS, Settings.MaxLogSize, Settings.MaxLogRotate, 10);
+LogFileFindSetValues(Settings.LogPath, LOGFILE_LOGPID|LOGFILE_LOCK|LOGFILE_TIMESTAMP|LOGFILE_MILLISECS, Settings.MaxLogSize, Settings.MaxLogRotate, 10);
 LogToFile(Settings.LogPath, "%s",Msg);
 }
 

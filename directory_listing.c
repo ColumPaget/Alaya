@@ -20,7 +20,7 @@
 #define SORT_RTIME 7
 #define SORT_RSIZE 8
 
-char *DirActionTypes[]={"html","csv","m3u","rss","tar","tgz","tbz","txz","upload","edit","delete","rename","mkdir-query","mkdir","saveprops","editaccesstoken",NULL};
+const char *DirActionTypes[]={"html","csv","m3u","rss","tar","tgz","tbz","txz","upload","edit","delete","rename","mkdir-query","mkdir","saveprops","editaccesstoken",NULL};
 typedef enum {ACTION_HTML,ACTION_CSV,ACTION_M3U,ACTION_RSS,ACTION_TAR,ACTION_TGZ,ACTION_TBZ,ACTION_TXZ,ACTION_UPLOAD,ACTION_EDIT,ACTION_DELETE,ACTION_RENAME, ACTION_MKDIRQUERY, ACTION_MKDIR, ACTION_SAVEPROPS, ACTION_EDIT_ACCESSTOKEN} TDIRFORMAT;
 
 
@@ -716,7 +716,7 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 	//Get Time for uses like showing 'recent files'
 	time(&Now);
 
-	if (HTTPServerDecideToCompress(Session,NULL)) Session->Flags |= HTTP_ENCODE_GZIP;
+	if (HTTPServerDecideToCompress(Session,NULL)) Session->Flags |= SESSION_ENCODE_GZIP;
 
 	if (Settings.DirListFlags & DIR_INDEX_FILES)
 	{

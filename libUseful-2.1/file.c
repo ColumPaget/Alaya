@@ -465,7 +465,7 @@ if (Flags & SF_WRONLY) Mode=O_WRONLY;
 else if (Flags & SF_RDONLY) Mode=O_RDONLY;
 else Mode=O_RDWR;
 
-if (Flags & SF_CREATE) Flags |= O_CREAT;
+if (Flags & SF_CREATE) Mode |= O_CREAT;
 
 if (strcmp(FilePath,"-")==0)
 {
@@ -1260,7 +1260,7 @@ else ListAddNamedItem(S->Items,Name,Value);
 
 int STREAMSendFile(STREAM *In, STREAM *Out, off_t Max, int Flags)
 {
-off_t bytes_read=0;
+long bytes_read=0;
 int result;
 int UseSendFile=FALSE;
 
@@ -1326,9 +1326,14 @@ while (len > 0)
 		//if outbuff smaller than len, then shrink len
 		if (len > val) len=val;
 
-		//if inbuff remaining is smaller than len, then shrik that
-  	STREAMReadCharsToBuffer(In);
 		val=In->InEnd - In->InStart;
+  	if (val < 1)
+		{
+			STREAMReadCharsToBuffer(In);
+			val=In->InEnd - In->InStart;
+		}
+
+		//if inbuff remaining is smaller than len, then shrink that
 		if (len > val) len=val;
 		if (len <0) len=0;
 		if ((len==0) && (Out->OutEnd <= 0)) break;
