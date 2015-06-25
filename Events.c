@@ -100,24 +100,23 @@ return(result);
 
 
 
-void ProcessEventTrigger(HTTPSession *Session, char *URL, char *TriggerScript, char *ExtraInfo)
+void ProcessEventScript(HTTPSession *Session, char *URL, char *TriggerScript, char *ExtraInfo, ListNode *Vars)
 {
-	char *Tempstr=NULL;
+	char *Tempstr=NULL, *Args=NULL, *Command=NULL, *ptr;
 	int result;
 
 		LogToFile(Settings.LogPath, "EVENT TRIGGERED: Source='%s@%s (%s)' REQUEST='%s' TriggeredScript='%s' MatchInfo='%s'",Session->UserName, Session->ClientHost, Session->ClientIP, URL, TriggerScript, ExtraInfo);
-	
+
 		if (ParentProcessPipe)
 		{
-			Tempstr=MCopyStr(Tempstr, "EVENT ", TriggerScript, " '", Session->ClientIP,"' '", URL, "' '", ExtraInfo, "'\n",NULL);
+			Tempstr=MCopyStr(Tempstr, "EVENT ",TriggerScript,"\n",NULL);
 			STREAMWriteLine(Tempstr,ParentProcessPipe);
 			STREAMFlush(ParentProcessPipe);
 			Tempstr=STREAMReadLine(Tempstr,ParentProcessPipe);
 		}
   	else 
 		{
-			Tempstr=MCopyStr(Tempstr, TriggerScript, " '", Session->ClientIP,"' '", URL, "'",NULL);
-
+			Tempstr=MCopyStr(Tempstr, TriggerScript,"\n",NULL);
 			if (getuid()==0) result=Spawn(Tempstr,Settings.DefaultUser,Settings.DefaultGroup,NULL);
 			else result=Spawn(Tempstr,NULL,NULL,NULL);
 
@@ -127,9 +126,54 @@ void ProcessEventTrigger(HTTPSession *Session, char *URL, char *TriggerScript, c
 			}
 		}
 
+	DestroyString(Command);
 	DestroyString(Tempstr);
+	DestroyString(Args);
 }
 
+
+
+void ProcessEventTrigger(HTTPSession *Session, char *URL, char *Trigger, char *ExtraInfo, ListNode *Vars)
+{
+char *ptr, *Type=NULL, *Token=NULL, *Tempstr=NULL, *LogStr=NULL;
+
+
+	LogToFile(Settings.LogPath,"TRIGGER: %s\n",Trigger);
+		Tempstr=SubstituteVarsInString(Tempstr,Trigger,Vars,0);
+		StripTrailingWhitespace(Tempstr);
+		ptr=GetToken(Tempstr,"\\S",&Type,GETTOKEN_QUOTES);
+
+		LogStr=FormatStr(LogStr, "WARN: Event Rule encountered (%s on %s).",ExtraInfo,URL);
+
+    if (strcasecmp(Type,"log")==0) 
+		{
+			if (StrLen(ptr)) LogStr=CopyStr(LogStr, ptr);
+			LogToFile(Settings.LogPath,"%s",LogStr);
+		}
+    else if (strcasecmp(Type,"logfile")==0) 
+		{
+		ptr=GetToken(ptr,"\\S",&Token,GETTOKEN_QUOTES);
+		if (StrLen(ptr)) LogStr=CopyStr(LogStr, ptr);
+    LogToFile(Token,"%s",LogStr);
+		}
+    else if (strcasecmp(Type,"syslog")==0) 
+		{
+			if (StrLen(ptr)) LogStr=CopyStr(LogStr, ptr);
+			syslog(LOG_WARNING, "%s",LogStr);
+		}
+		else if (strcasecmp(Type,"deny") ==0)
+		{
+			if (StrLen(ptr)) LogStr=CopyStr(LogStr, ptr);
+			LogToFile(Settings.LogPath,"WARN: 'Deny' Event Rule encountered (%s on %s). Denying Authentication",ExtraInfo,URL);
+			Settings.AuthMethods=CopyStr(Settings.AuthMethods, "deny");
+		}
+		else ProcessEventScript(Session, URL, Tempstr, ExtraInfo, Vars);
+
+	DestroyString(Type);
+	DestroyString(Token);
+	DestroyString(LogStr);
+	DestroyString(Tempstr);
+}
 
 
 //This function will always be called by the process handling a particular session, so changes
@@ -139,37 +183,40 @@ void ProcessSessionEventTriggers(HTTPSession *Session)
 ListNode *Curr;
 char *Tempstr=NULL, *URL=NULL, *MatchStr=NULL;
 char *Token=NULL, *ptr;
+ListNode *Vars;
 
+Vars=ListCreate();
+SetVar(Vars,"URL",Session->URL);
+SetVar(Vars,"Method",Session->Method);
+SetVar(Vars,"UserName",Session->UserName);
+SetVar(Vars,"ClientIP",Session->ClientIP);
+SetVar(Vars,"UserAgent",Session->UserAgent);
 Curr=ListGetNext(Settings.Events);
 while (Curr)
 {	
-		Tempstr=MCopyStr(Tempstr,Session->Method," ",Session->URL,NULL);
-		URL=QuoteCharsInStr(URL,Tempstr,"'$;");
+	Tempstr=MCopyStr(Tempstr,Session->Method," ",Session->URL,NULL);
+	URL=QuoteCharsInStr(URL,Tempstr,"'$;`");
 
 	if (EventTriggerMatch(Curr, Session, &MatchStr))
 	{
+		SetVar(Vars,"Match",MatchStr);
 		ptr=GetToken((char *) Curr->Item,",",&Token,GETTOKEN_QUOTES);
 		while (ptr)
 		{
-    	if (strcasecmp(Token,"ignore")==0)
+	    if (strcasecmp(Token,"ignore")==0)
 			{
 				Curr=NULL;
 				break;
 			}
-      else if (strcasecmp(Token,"log")==0) LogToFile(Settings.LogPath,"WARN: Event Rule encountered (%s on %s).",MatchStr,Tempstr);
-      else if (strcasecmp(Token,"syslog")==0) syslog(LOG_WARNING, "WARN: Event Rule encountered (%s on %s).",MatchStr,Tempstr);
-			else if (strcasecmp(Token,"deny") ==0)
-			{
-				LogToFile(Settings.LogPath,"WARN: 'Deny' Event Rule encountered (%s on %s). Denying Authentication",MatchStr,Tempstr);
-				Settings.AuthMethods=CopyStr(Settings.AuthMethods, "deny");
-			}
-			else ProcessEventTrigger(Session, Tempstr, Token, MatchStr);
+			ProcessEventTrigger(Session, Tempstr, Token, MatchStr, Vars);
+
 			ptr=GetToken(ptr,",",&Token,GETTOKEN_QUOTES);
 		}
 	}
 	Curr=ListGetNext(Curr);
 }
 
+ListDestroy(Vars,DestroyString);
 DestroyString(MatchStr);
 DestroyString(Tempstr);
 DestroyString(Token);

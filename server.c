@@ -873,6 +873,50 @@ ListDestroy(Vars,DestroyString);
 
 
 
+void HTTPServerHandlePost(STREAM *S, HTTPSession *Session, int PathType)
+{
+char *Tempstr=NULL;
+int bytes_read=0, result;
+
+
+//disallow any 'Get' style arguments previously read. Post sends arguments on stdin
+Session->Arguments=CopyStr(Session->Arguments,"");
+
+if (strcmp(Session->ContentType,"application/x-www-form-urlencoded")==0)
+{
+	if (Session->ContentSize > 0)
+	{
+		Session->Arguments=SetStrLen(Session->Arguments,Session->ContentSize);
+		STREAMReadBytes(S,Session->Arguments,Session->ContentSize);
+	}
+	else
+	{
+		Tempstr=STREAMReadLine(Tempstr,S);
+		while (Tempstr)
+		{
+			Session->Arguments=CatStr(Session->Arguments,Tempstr);
+			Tempstr=STREAMReadLine(Tempstr,S);
+		}
+	}
+}
+else if ((PathType != PATHTYPE_CGI) && (strncmp(Session->ContentType,"multipart/",10)==0)) HTTPServerHandleMultipartPost(S, Session);
+else if (Session->ContentSize > 0)
+{
+  Session->Arguments=SetStrLen(Session->Arguments,Session->ContentSize);
+  while (bytes_read < Session->ContentSize)
+  {
+  result=STREAMReadBytes(S, Session->Arguments+bytes_read, Session->ContentSize-bytes_read);
+  if (result < 1) break;
+  bytes_read+=result;
+  }
+}
+
+
+DestroyString(Tempstr);
+}
+
+
+
 //This function checks the Paths configured in the server for virtual 
 //documents like cgi scripts or streams, or for directories to which we
 //are allowed access from outside chroot
@@ -900,6 +944,7 @@ char *Path=NULL, *Tempstr=NULL, *ptr;
 	{
 		PI=(TPathItem *) Curr->Item;
 		
+		if (Flags & HEADERS_POST) HTTPServerHandlePost(Session->S,Session,PI->Type);
 		LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s]",PI->Type,Curr->Tag,PI->Path);
 		switch (PI->Type)
 		{
@@ -947,6 +992,7 @@ char *Path=NULL, *Tempstr=NULL, *ptr;
 	}
 	else 
 	{
+		if (Flags & HEADERS_POST) HTTPServerHandlePost(Session->S,Session,0);
 		ptr=Session->StartDir;
 		if (*ptr=='.') ptr++;
 		if (strcmp(ptr,"/")==0) Path=CopyStr(Path,Session->Path);
@@ -1523,47 +1569,6 @@ return(result);
 }
 
 
-void HTTPServerHandlePost(STREAM *S, HTTPSession *Session)
-{
-char *Tempstr=NULL;
-int bytes_read=0, result;
-
-
-//disallow any 'Get' style arguments previously read. Post sends arguments on stdin
-Session->Arguments=CopyStr(Session->Arguments,"");
-
-if (strcmp(Session->ContentType,"application/x-www-form-urlencoded")==0)
-{
-	if (Session->ContentSize > 0)
-	{
-		Session->Arguments=SetStrLen(Session->Arguments,Session->ContentSize);
-		STREAMReadBytes(S,Session->Arguments,Session->ContentSize);
-	}
-	else
-	{
-		Tempstr=STREAMReadLine(Tempstr,S);
-		while (Tempstr)
-		{
-			Session->Arguments=CatStr(Session->Arguments,Tempstr);
-			Tempstr=STREAMReadLine(Tempstr,S);
-		}
-	}
-}
-else if (strncmp(Session->ContentType,"multipart/",10)==0) HTTPServerHandleMultipartPost(S, Session);
-else if (Session->ContentSize > 0)
-{
-  Session->Arguments=SetStrLen(Session->Arguments,Session->ContentSize);
-  while (bytes_read < Session->ContentSize)
-  {
-  result=STREAMReadBytes(S, Session->Arguments+bytes_read, Session->ContentSize-bytes_read);
-  if (result < 1) break;
-  bytes_read+=result;
-  }
-}
-
-DestroyString(Tempstr);
-}
-
 
 
 
@@ -1604,11 +1609,11 @@ if (Settings.AuthFlags & (FLAG_AUTH_CERT_REQUIRED | FLAG_AUTH_CERT_SUFFICIENT | 
 
 if (DoSSLServerNegotiation(Session->S,Flags))
 {
-	LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed with %s %s. Error was %s",Session->ClientHost,Session->ClientIP,STREAMGetValue(Session->S,"SSL-Error"));
 	Session->Flags |= HTTP_SSL;
 	return(TRUE);
 }
 
+LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed with %s %s. Error was %s",Session->ClientHost,Session->ClientIP,STREAMGetValue(Session->S,"SSL-Error"));
 return(FALSE);
 }
 
@@ -1666,8 +1671,7 @@ if (! (Session->Flags & SESSION_REUSE)) HTTPServerSetUserContext(Session);
 switch (Session->MethodID)
 {
 	case METHOD_POST:
-		HTTPServerHandlePost(Session->S,Session);
-		HTTPServerFindAndSendDocument(Session->S,Session,HEADERS_SENDFILE);
+		HTTPServerFindAndSendDocument(Session->S,Session,HEADERS_SENDFILE | HEADERS_POST);
 	break;
 
 	case METHOD_GET:

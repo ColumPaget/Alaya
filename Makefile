@@ -11,10 +11,10 @@ OBJ=Authenticate.o MimeType.o DavProps.o Settings.o common.o server.o FileProper
 EXE=alaya
 
 all: $(OBJ)
-	gcc $(FLAGS) -o $(EXE) $(OBJ) main.c $(LIBS) libUseful-2.1/libUseful-2.1.a
+	gcc $(FLAGS) -o $(EXE) $(OBJ) main.c $(LIBS) libUseful-2.3/libUseful-2.3.a
 
-libUseful-2.1/libUseful-2.1.a: 
-	@cd libUseful-2.1; $(MAKE)
+libUseful-2.3/libUseful-2.3.a: 
+	@cd libUseful-2.3; $(MAKE)
 
 Authenticate.o: Authenticate.c Authenticate.h
 	gcc $(FLAGS) -c Authenticate.c

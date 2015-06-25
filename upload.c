@@ -58,7 +58,8 @@ STREAM *FOut=NULL;
 off_t fsize;
 
 FOut=STREAMOpenFile(FName,SF_CREAT | SF_TRUNC | SF_WRONLY);
-
+if (FOut)
+{
 	Tempstr=SetStrLen(Tempstr,4096);
 	result=STREAMReadBytesToTerm(S, Tempstr, 4096, '\n');
 	while (result > -1)
@@ -85,6 +86,7 @@ fsize=(off_t) STREAMTell(FOut);
 if (fsize > 0) ftruncate(FOut->out_fd,fsize-2);
 
 STREAMClose(FOut);
+}
 
 if (result==-1) RetVal=UPLOAD_DONE;
 

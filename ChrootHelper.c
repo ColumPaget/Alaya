@@ -27,20 +27,17 @@ DestroyString(Tempstr);
 }
 
 
-char *CleanStr(char *Buffer, char *Data)
+void CleanStr(char *Data)
 {
-char *RetStr=NULL;
 char *BadChars=";|`&";
 char *ptr;
 
-RetStr=DeQuoteStr(Buffer,Data);
 
-for (ptr=RetStr; *ptr !='\0'; ptr++)
+for (ptr=Data; *ptr !='\0'; ptr++)
 {
 	if (strchr(BadChars,*ptr)) *ptr='?';
 	else if (! isprint(*ptr)) *ptr='?';
 }
-return(RetStr);
 }
 
 
@@ -118,7 +115,7 @@ return(RetStr);
 void SetEnvironmentVariable(const char *Name, const char *Value)
 {
 char *Tempstr=NULL, *ptr;
-char *ForbiddenStrings[]={"() {",";","`",NULL};
+char *ForbiddenStrings[]={"() {","`",NULL};
 int i;
 
 Tempstr=CopyStr(Tempstr, Value);
@@ -133,6 +130,8 @@ for (i=0; ForbiddenStrings[i] !=NULL; i++)
 }
 
 setenv(Name, Tempstr, TRUE);
+
+LogToFile(Settings.LogPath,"ENV: %s: %s", Name, Tempstr);
 
 DestroyString(Tempstr);
 }
@@ -160,8 +159,8 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		else if (strcmp(Name,"UserAgent")==0) Response->UserAgent=CopyStr(Response->UserAgent,Value);
 		else if (strcmp(Name,"Method")==0) Response->Method=CopyStr(Response->Method,Value);
 		else if (strcmp(Name,"ContentType")==0) Response->ContentType=CopyStr(Response->ContentType,Value);
-		else if (strcmp(Name,"SearchPath")==0) Response->SearchPath=CleanStr(Response->SearchPath,Value);
-		else if (strcmp(Name,"Path")==0) Response->Path=CleanStr(Response->Path,Value);
+		else if (strcmp(Name,"SearchPath")==0) Response->SearchPath=DeQuoteStr(Response->SearchPath,Value);
+		else if (strcmp(Name,"Path")==0) Response->Path=DeQuoteStr(Response->Path,Value);
 		else if (strcmp(Name,"URL")==0) Response->URL=DeQuoteStr(Response->URL,Value);
 		else if (strcmp(Name,"Arguments")==0) Response->Arguments=SanitizeQueryString(Response->Arguments,Value);
 		else if (strcmp(Name,"ServerName")==0) Response->ServerName=CopyStr(Response->ServerName,Value);
@@ -201,6 +200,8 @@ char *Tempstr=NULL, *ptr;
 	SetEnvironmentVariable("SERVER_PORT",Tempstr);
 	Tempstr=FormatStr(Tempstr,"%d",Session->ContentSize);
 	SetEnvironmentVariable("CONTENT_LENGTH",Tempstr);
+
+
 	SetEnvironmentVariable("CONTENT_TYPE",Session->ContentType);
 	ptr=strrchr(Session->Path,'/');
 	if (ptr) ptr++;
@@ -329,6 +330,9 @@ HTTPSession *Response;
 	//by the process we spawn off
 	ClientCon->State |= SS_EMBARGOED;
 	Response=ParseSessionInfo(Data);
+	CleanStr(Response->Path);
+	CleanStr(Response->SearchPath);
+	CleanStr(Response->StartDir);
 	ScriptPath=FindFileInPath(ScriptPath,Response->Path,Response->SearchPath);
 	LogToFile(Settings.LogPath,"Script: Found=[%s] SearchPath=[%s] ScriptName=[%s] Arguments=[%s]",ScriptPath,Response->SearchPath,Response->Path,Response->Arguments);
 
@@ -585,6 +589,7 @@ void RunEventScript(STREAM *S, const char *Script)
 	{
         LogToFile(Settings.LogPath, "ERROR: Failed to run event script '%s'. Error was: %s",Script, strerror(errno));
 	}
+  else LogToFile(Settings.LogPath, "Script: '%s'. Error was: %s",Script, strerror(errno));
 	STREAMWriteLine("okay\n",S);
 }
 
@@ -638,24 +643,28 @@ ContentLengthStr=FormatStr(ContentLengthStr,"%d",Session->ContentSize);
 //Trying to do this all as one string causes a problem!
 Tempstr=MCopyStr(Tempstr,Type," Host='",Session->Host, "' ClientIP='",Session->ClientIP, "'",NULL);
 
-Quoted=QuoteCharsInStr(Quoted,Session->URL,"'");
+Quoted=QuoteCharsInStr(Quoted,Session->URL,"'&");
 Tempstr=MCatStr(Tempstr, " URL='",Quoted,"'",NULL);
 
-Quoted=QuoteCharsInStr(Quoted,Path,"'");
+Quoted=QuoteCharsInStr(Quoted,Path,"'&");
 Tempstr=MCatStr(Tempstr, " Path='",Quoted,"'",NULL);
 
-Quoted=QuoteCharsInStr(Quoted,SearchPath,"'");
+Quoted=QuoteCharsInStr(Quoted,SearchPath,"'&");
 Tempstr=MCatStr(Tempstr, " SearchPath='",Quoted,"'",NULL);
 
-Tempstr=MCatStr(Tempstr," Method=",Session->Method," UserAgent='",Session->UserAgent,"' ContentType='",Session->ContentType,"' ContentLength='",ContentLengthStr,"'",NULL);
+Tempstr=MCatStr(Tempstr," Method=",Session->Method," UserAgent='",Session->UserAgent,"' ContentLength='",ContentLengthStr,"'",NULL);
+
+if (StrLen(Session->ContentBoundary) > 2) Tempstr=MCatStr(Tempstr, " ContentType='",Session->ContentType, "; boundary=",Session->ContentBoundary+2, "'",NULL);
+else Tempstr=MCatStr(Tempstr, " ContentType='",Session->ContentType,"'", NULL);
+
 Tempstr=MCatStr(Tempstr," ServerName=",Session->ServerName," ServerPort=",PortStr,NULL);
 if (StrLen(Session->Cipher)) Tempstr=MCatStr(Tempstr," Cipher='",Session->Cipher,"'",NULL);
 if (StrLen(Session->Cookies)) Tempstr=MCatStr(Tempstr," Cookies='",Session->Cookies,"'",NULL);
 
-Quoted=QuoteCharsInStr(Quoted,Session->StartDir,"'");
+Quoted=QuoteCharsInStr(Quoted,Session->StartDir,"'&");
 Tempstr=MCatStr(Tempstr," StartDir='",Quoted,"'",NULL);
 
-Quoted=QuoteCharsInStr(Quoted,Session->ClientReferrer,"'");
+Quoted=QuoteCharsInStr(Quoted,Session->ClientReferrer,"'&");
 Tempstr=MCatStr(Tempstr, " ClientReferrer='",Quoted,"'",NULL);
 
 if (Session->Flags & SESSION_KEEP_ALIVE) Tempstr=CatStr(Tempstr," KeepAlive=Y");
@@ -664,7 +673,7 @@ if (StrLen(Session->RemoteAuthenticate)) Tempstr=MCatStr(Tempstr," RemoteAuthent
 
 if (! PostArguments)
 {
-Quoted=QuoteCharsInStr(Quoted,Session->Arguments,"'");
+Quoted=QuoteCharsInStr(Quoted,Session->Arguments,"'&");
 Tempstr=MCatStr(Tempstr, " Arguments='",Quoted,"'", NULL);
 }
 
@@ -683,6 +692,8 @@ if (PostArguments && StrLen(Session->Arguments))
 	//then send it the post data
 	while (STREAMCheckForBytes(ParentProcessPipe)==0) usleep(10000);
 	STREAMWriteLine(Session->Arguments,ParentProcessPipe);
+
+LogToFile(Settings.LogPath,"POST: [%s]",Session->Arguments);
 	//we shouldn't need this CR-LF, as we've sent 'Content-Length' characters
 	//but some CGI implementations seem to expect it, and it does no harm to
 	//provide it anyway
