@@ -19,6 +19,56 @@ const char *HeaderStrings[]={"Authorization","Proxy-Authorization","Host","Desti
 typedef enum {HEAD_AUTH, HEAD_PROXYAUTH, HEAD_HOST, HEAD_DEST, HEAD_CONTENT_TYPE, HEAD_CONTENT_LENGTH, HEAD_DEPTH, HEAD_OVERWRITE, HEAD_AGENT, HEAD_COOKIE, HEAD_IFMOD_SINCE, HEAD_ACCEPT_ENCODING, HEAD_ICECAST,HEAD_REFERER, HEAD_CONNECTION} THeaders;
 
 
+int GetHostARP(const char *IP, char **Device, char **MAC)
+{
+char *Tempstr=NULL, *Token=NULL;
+int result=FALSE;
+const char *ptr;
+FILE *F;
+
+Tempstr=SetStrLen(Tempstr, 255);
+F=fopen("/proc/net/arp","r");
+if (F)
+{
+	*Device=CopyStr(*Device,"remote");
+	*MAC=CopyStr(*MAC,"remote");
+	//Read Title Line
+	fgets(Tempstr,255,F);
+
+	while (fgets(Tempstr,255,F))
+	{
+		StripTrailingWhitespace(Tempstr);
+		ptr=GetToken(Tempstr," ",&Token,0);
+		if (strcmp(Token,IP)==0)
+		{
+			while (isspace(*ptr)) ptr++;
+			ptr=GetToken(ptr," ",&Token,0);
+
+			while (isspace(*ptr)) ptr++;
+			ptr=GetToken(ptr," ",&Token,0);
+
+			while (isspace(*ptr)) ptr++;
+			ptr=GetToken(ptr," ",MAC,0);
+			strlwr(*MAC);
+
+			while (isspace(*ptr)) ptr++;
+			ptr=GetToken(ptr," ",&Token,0);
+
+			while (isspace(*ptr)) ptr++;
+			ptr=GetToken(ptr," ",Device,0);
+
+			result=TRUE;
+		}
+	}
+fclose(F);
+}
+
+DestroyString(Tempstr);
+DestroyString(Token);
+
+return(result);
+}
+
 
 char *DecodeBase64(char *Return, int *len, char *Text)
 {
@@ -192,6 +242,7 @@ char *Token=NULL, *ptr, *tmp_ptr;
 int val;
 
 GetSockDetails(S->in_fd,&Session->ServerName,&Session->ServerPort,&Session->ClientIP,&val);
+GetHostARP(Session->ClientIP, &Token, &Session->ClientMAC);
 if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrLen(Session->ClientIP)) Session->ClientHost=CopyStr(Session->ClientHost,IPStrToHostName(Session->ClientIP));
 
 LogToFile(Settings.LogPath,"");

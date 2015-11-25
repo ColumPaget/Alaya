@@ -1,17 +1,17 @@
 CC = gcc
 CFLAGS = -g -O2
-LIBS = -lcrypt -lcrypto -lssl -lpam -lz  #-lUseful-2.1
+LIBS = -lcrypt -lcrypto -lssl -lpam -lz  #-lUseful-2.3
 INSTALL=/bin/install -c
 prefix=/usr/local
 exec_prefix=${prefix}
 bindir=${exec_prefix}/sbin
 sysconfdir=${prefix}/etc
 FLAGS=$(CFLAGS) -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DSTDC_HEADERS=1 -D_FILE_OFFSET_BITS=64 -DHAVE_LIBZ=1 -DHAVE_SYS_TYPES_H=1 -DHAVE_SYS_STAT_H=1 -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_MEMORY_H=1 -DHAVE_STRINGS_H=1 -DHAVE_INTTYPES_H=1 -DHAVE_STDINT_H=1 -DHAVE_UNISTD_H=1 -DUSE_XATTR=1 -DUSE_LINUX_CAPABILITIES=1 -DHAVE_LIBPAM=1 -DHAVE_LIBSSL=1 -DHAVE_LIBCRYPTO=1 -DHAVE_LIBCRYPT=1 -DHAVE_SHADOW_H=1 
-OBJ=Authenticate.o MimeType.o DavProps.o Settings.o common.o server.o FileProperties.o directory_listing.o FileDetailsPage.o ChrootHelper.o Events.o ID3.o upload.o proxy.o
+OBJ=Authenticate.o MimeType.o DavProps.o Settings.o common.o server.o FileProperties.o directory_listing.o FileDetailsPage.o ChrootHelper.o Events.o ID3.o upload.o proxy.o libUseful-2.3/libUseful-2.3.a 
 EXE=alaya
 
 all: $(OBJ)
-	gcc $(FLAGS) -o $(EXE) $(OBJ) main.c $(LIBS) libUseful-2.3/libUseful-2.3.a
+	gcc $(FLAGS) -o $(EXE) $(OBJ) main.c $(LIBS) 
 
 libUseful-2.3/libUseful-2.3.a: 
 	@cd libUseful-2.3; $(MAKE)

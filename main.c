@@ -50,7 +50,7 @@ HTTPSession *Session;
 		Session=(HTTPSession *) Data;
 		Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 		STREAMSetFlushType(Session->S,FLUSH_FULL,0,4096);
-		STREAMSetTimeout(Session->S,500);
+		STREAMSetTimeout(Session->S,Settings.ActivityTimeout);
 
 		HTTPServerHandleConnection(Session);
 

@@ -218,54 +218,58 @@ return(fcount);
 }
 
 
-char *FormatFileType(char *RetStr, TPathItem *File)
+char *FormatFileType(char *RetStr, TPathItem *File, ListNode *Vars)
 {
-char *FileType=NULL, *Tempstr=NULL, *URL=NULL, *ptr;
+char *Tempstr=NULL, *URL=NULL, *ptr;
 TFileMagic *FM;
 ListNode *Curr;
 TPathItem *PathItem;
 
-    if (File->Type==PATHTYPE_DIR)
-    {
-      FileType=CopyStr(FileType,"DIR");
-    }
-    else
-    {
-      FM=GetFileTypeInfo(File->Name);
-      if (! FM)
-      {
-        FileType=CopyStr(FileType,"FILE");
-      }
-      else FileType=CopyStr(FileType,FM->ContentType);
-    }
+RetStr=CopyStr(RetStr, "???");
+if (File->Type==PATHTYPE_DIR)
+{
+	RetStr=CopyStr(RetStr,"DIR");
+}
+else
+{
+	FM=GetFileTypeInfo(File->Name);
+	if (! FM)
+	{
+		RetStr=CopyStr(RetStr,"FILE");
+	}
+	else RetStr=CopyStr(RetStr,FM->ContentType);
+}
 
+/*
+	ptr=GetVar(Vars,"Thumbnail");
+	if (StrLen(ptr))
+	{
+		RetStr=CopyStr(RetStr, ptr);
+	}
+	else*/ if (Settings.DirListFlags & DIR_MIMEICONS)
+	{
+		Curr=ListGetNext(Settings.VPaths);
+		while (Curr)
+		{
+			PathItem=(TPathItem *) Curr->Item;
+			if (PathItem->Type == PATHTYPE_MIMEICONS)
+			{
+				ptr=strrchr(File->Name,'.');
+				if (ptr) ptr++;
 
-
-    if (Settings.DirListFlags & DIR_MIMEICONS)
-    {
-      Curr=ListGetNext(Settings.VPaths);
-      while (Curr)
-      {
-        PathItem=(TPathItem *) Curr->Item;
-        if (PathItem->Type == PATHTYPE_MIMEICONS)
-        {
-					ptr=strrchr(File->Name,'.');
-					if (ptr) ptr++;
-
-					if (File->Type==PATHTYPE_DIR) URL=MCopyStr(URL,PathItem->URL,"?MimeType=inode/directory&FileType=folder&FileExtn=",NULL);
-					else URL=MCopyStr(URL,PathItem->URL,"?MimeType=",FileType,"&FileExtn=",ptr,NULL);
-          Tempstr=MCopyStr(Tempstr,"<img src=\"",URL,"\" alt=\"",FileType,"\">",NULL);
-					FileType=CopyStr(FileType,Tempstr);
-          break;
-        }
-        Curr=ListGetNext(Curr);
-      }
-    }
+					if (File->Type==PATHTYPE_DIR) URL=MCopyStr(URL,PathItem->URL,"?MimeType=inode/directory&RetStr=folder&FileExtn=",NULL);
+					else URL=MCopyStr(URL,PathItem->URL,"?MimeType=",RetStr,"&FileExtn=",ptr,NULL);
+					RetStr=MCopyStr(RetStr,"<img src=\"",URL,"\" alt=\"",RetStr,"\">",NULL);
+					break;
+			}
+			Curr=ListGetNext(Curr);
+		}
+	}
 
 DestroyString(Tempstr);
 DestroyString(URL);
 
-return(FileType);
+return(RetStr);
 }
 
 
@@ -302,7 +306,7 @@ ListNode *Vars;
 		}
 		else DisplayName=CopyStr(DisplayName,File->Name);
 
-		FileType=FormatFileType(FileType, File);
+		FileType=FormatFileType(FileType, File, Vars);
 
 		if (Settings.DirListFlags & DIR_INTERACTIVE) 
 		{

@@ -181,11 +181,7 @@ if (FM)
 	// if 'S' open then ExamineContents WAS set
 	if (S) 
 	{
-	if (FM->Flags & (FM_MEDIA_TAG | FM_IMAGE_TAG))
-	{
-		MediaReadDetails(S, Vars);
-		STREAMSeek(S,0,SEEK_SET);
-	}
+	if (FM->Flags & (FM_MEDIA_TAG | FM_IMAGE_TAG)) MediaReadDetails(S, Vars);
 	}
 }
 

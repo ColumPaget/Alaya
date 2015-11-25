@@ -166,6 +166,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		else if (strcmp(Name,"ServerName")==0) Response->ServerName=CopyStr(Response->ServerName,Value);
 		else if (strcmp(Name,"ServerPort")==0) Response->ServerPort=atoi(Value);
 		else if (strcmp(Name,"ClientIP")==0) Response->ClientIP=CopyStr(Response->ClientIP,Value);
+		else if (strcmp(Name,"ClientMAC")==0) Response->ClientMAC=CopyStr(Response->ClientMAC,Value);
 		else if (strcmp(Name,"ContentLength")==0) Response->ContentSize=atoi(Value);
 		else if (strcmp(Name,"StartDir")==0) Response->StartDir=DeQuoteStr(Response->StartDir,Value);
 		else if (strcmp(Name,"ClientReferrer")==0) Response->ClientReferrer=DeQuoteStr(Response->ClientReferrer,Value);
@@ -195,6 +196,7 @@ char *Tempstr=NULL, *ptr;
 	SetEnvironmentVariable("REMOTE_USER",Session->UserName);
 	SetEnvironmentVariable("REMOTE_HOST",Session->ClientHost);
 	SetEnvironmentVariable("REMOTE_ADDR",Session->ClientIP);
+	SetEnvironmentVariable("REMOTE_MAC",Session->ClientMAC);
 	SetEnvironmentVariable("SERVER_NAME",Session->ServerName);
 	Tempstr=FormatStr(Tempstr,"%d",Session->ServerPort);
 	SetEnvironmentVariable("SERVER_PORT",Tempstr);
@@ -641,7 +643,7 @@ PortStr=FormatStr(PortStr,"%d",Session->ServerPort);
 ContentLengthStr=FormatStr(ContentLengthStr,"%d",Session->ContentSize);
 
 //Trying to do this all as one string causes a problem!
-Tempstr=MCopyStr(Tempstr,Type," Host='",Session->Host, "' ClientIP='",Session->ClientIP, "'",NULL);
+Tempstr=MCopyStr(Tempstr,Type," Host='",Session->Host, "' ClientIP='",Session->ClientIP, "' ClientMAC='",Session->ClientMAC,"'",NULL);
 
 Quoted=QuoteCharsInStr(Quoted,Session->URL,"'&");
 Tempstr=MCatStr(Tempstr, " URL='",Quoted,"'",NULL);

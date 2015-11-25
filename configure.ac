@@ -5,7 +5,7 @@ AC_INIT([main.c])
 VERSION="1.1.2" 
 AC_SUBST(VERSION) 
 
-AC_CONFIG_SUBDIRS([libUseful-2.0])
+AC_CONFIG_SUBDIRS([libUseful-2.3])
 
 AC_PROG_CC 
 AC_LANG_C 

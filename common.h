@@ -137,6 +137,7 @@ ListNode *Events;
 char *LogPath;
 int MaxLogSize;
 int MaxLogRotate;
+int ActivityTimeout;
 } TSettings;
 
 
@@ -172,6 +173,7 @@ char *AuthType;
 char *Host;
 char *ClientIP;
 char *ClientHost;
+char *ClientMAC;
 char *ClientReferrer;
 char *UserAgent;
 char *ServerName;

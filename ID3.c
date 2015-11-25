@@ -85,7 +85,41 @@ int ConvertSyncsafeBytes(uint8_t Top, uint8_t High, uint8_t Low)
 return((Top * 65536) + (High * 256) + Low);
 }
 
+
 typedef enum {TAG_COMPOSER,TAG_ALBUM,TAG_TITLE,TAG_COMMENT,TAG_BPM,TAG_ARTIST,TAG_BAND,TAG_YEAR,TAG_LEN,TAG_GENRE,TAG_TRACK,TAG_WEBPAGE_COM,TAG_WEBPAGE_COPYRIGHT,TAG_WEBPAGE_AUDIOFILE, TAG_WEBPAGE_ARTIST, TAG_WEBPAGE_AUDIOSOURCE, TAG_WEBPAGE_STATION,TAG_WEBPAGE_PUBLISHER,TAG_USER_URL,TAG_IMAGE} TID3Tags;
+
+
+void ID3v2ReadPicture(char *Data, int Len, ListNode *Vars)
+{
+char *ptr, *imgtype;
+int offset;
+char *Tempstr=NULL, *Encoded=NULL;
+
+	ptr=Data;
+
+	//text encoding
+	ptr++; 
+
+	if (strncmp(ptr,"JPG",3)==0) imgtype="image/jpeg";
+	if (strncmp(ptr,"PNG",3)==0) imgtype="image/png";
+	ptr+=4; //4 includes the image type byte
+	
+	for (; ptr != '\0'; ptr++) /*description string*/ ;
+	ptr++;
+
+	offset=ptr-Data;
+	if (ptr)
+	{
+		Encoded=EncodeBytes(Encoded, ptr,Len-offset,ENCODE_BASE64);
+		Tempstr=MCopyStr(Tempstr,"<img src='data:",imgtype,";base64,",Encoded,"'>",NULL);
+		SetVar(Vars,"Thumbnail",Tempstr);
+		LogToFile(Settings.LogPath,"IMG TAG: [%s] %d\n", Tempstr, Len);
+	}
+
+DestroyString(Tempstr);
+DestroyString(Encoded);
+}
+
 
 int ID3v2ReadTag(STREAM *S, ListNode *Vars)
 {
@@ -119,7 +153,7 @@ if (*TagName=='\0') break;
 
 //Flags
 STREAMReadBytes(S,Tempstr,3);
-Len=ConvertSyncsafeBytes(0, Tempstr[1], Tempstr[2]);
+Len=ConvertSyncsafeBytes(Tempstr[0], Tempstr[1], Tempstr[2]);
 if (Len < 1) break;
 
 
@@ -133,7 +167,7 @@ Tempstr[result]='\0';
 if (result > 0)
 {
 	result=MatchTokenFromList(TagName,ID3v2Fields,0);
-	//LogToFile(Settings.LogPath,"v2 TAG: [%s] [%s] %d\n",TagName,Tempstr,result);
+	LogToFile(Settings.LogPath,"v2 TAG: [%s] [%s] %d\n",TagName,Tempstr,result);
 	switch (result)
 	{
 		case TAG_ARTIST:
@@ -163,15 +197,7 @@ if (result > 0)
 		break;
 
 		case TAG_IMAGE:
-			ptr=NULL;
-			if (strcmp(Tempstr+1,"JPG")==0) ptr="image/jpeg";
-			if (strcmp(Tempstr+1,"PNG")==0) ptr="image/png";
-			if (ptr)
-			{
-				TagName=EncodeBytes(TagName,Tempstr+5,Len-5,ENCODE_BASE64);
-				Tempstr=MCopyStr(Tempstr,"<img src='data:",ptr,";base64,",TagName,"'>",NULL);
-				SetVar(Vars,"Thumbnail",Tempstr); break;
-			}
+			ID3v2ReadPicture(Tempstr, Len, Vars);
 		break;
 	}
 }
@@ -545,7 +571,6 @@ if (TagType==-1)
 	else TagType=TAG_NONE;
 }
 
-
 switch (TagType)
 {
 case TAG_NONE: break;
@@ -555,8 +580,8 @@ case TAG_ID3v2: result=ID3v2ReadTag(S,Vars); break;
 case TAG_ID3v3: result=ID3v3ReadTag(S,Vars); break;
 case TAG_ID3v4: result=ID3v3ReadTag(S,Vars); break;
 case TAG_OGG: result=OggReadTag(S,Vars); break;
-case TAG_JPEG: result=JPEGReadHeader(S,Vars); break;
-case TAG_PNG: result=PNGReadHeader(S,Vars); break;
+//case TAG_JPEG: result=JPEGReadHeader(S,Vars); break;
+//case TAG_PNG: result=PNGReadHeader(S,Vars); break;
 //case TAG_TIFF: STREAMSeek(S,(double) 0, SEEK_SET); result=TIFFReadHeader(S,Vars); break;
 }
 
