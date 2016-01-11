@@ -9,7 +9,9 @@
 
 void AlayaLog(char *Msg);
 
-int ChrootProcessRequest(STREAM *S, HTTPSession *Session, char *Type, char *Path, char *SearchPath);
+
+STREAM *ChrootSendRequest(HTTPSession *Session, const char *Type, const char *Path, const char *SearchPath);
+int ChrootProcessRequest(STREAM *S, HTTPSession *Session, const char *Type, const char *Path, const char *SearchPath);
 int HandleChildProcessRequest(STREAM *S);
 
 void VPathMimeIcons(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendData);

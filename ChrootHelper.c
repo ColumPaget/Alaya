@@ -319,9 +319,97 @@ DestroyString(Hash);
 return(result);
 }
 
+int HandleWebsocketExecRequest(STREAM *ClientCon, char *Data)
+{
+char *Tempstr=NULL, *Name=NULL, *Value=NULL;
+char *ScriptPath=NULL;
+int result, i;
+HTTPSession *Response;
+
+	//We will never read from this stream again. Any further data will be read
+	//by the process we spawn off
+	ClientCon->State |= SS_EMBARGOED;
+	Response=ParseSessionInfo(Data);
+	CleanStr(Response->Path);
+	CleanStr(Response->SearchPath);
+	CleanStr(Response->StartDir);
+	ScriptPath=FindFileInPath(ScriptPath,Response->Path,Response->SearchPath);
+	LogToFile(Settings.LogPath,"Script: Found=[%s] SearchPath=[%s] ScriptName=[%s] Arguments=[%s]",ScriptPath,Response->SearchPath,Response->Path,Response->Arguments);
+
+	if (access(ScriptPath,F_OK) !=0)
+	{
+			LogToFile(Settings.LogPath,"No such script: %s in path %s = %s",Response->Path,Response->SearchPath,ScriptPath);
+	}
+	else if (
+					(access(ScriptPath,X_OK) !=0) || 
+					(! CheckScriptIntegrity(ScriptPath))
+			)
+	{
+			LogToFile(Settings.LogPath,"Cannot execute script: %s",ScriptPath);
+	}
+	else
+	{
+		STREAMFlush(ClientCon);
+		result=fork();
+		if (result==0)
+		{
+			//do this so that when we exec the script, anything output goes to the client
+			close(0);
+			dup(ClientCon->in_fd);
+			close(1);
+			dup(ClientCon->out_fd);
 
 
-int HandleExecRequest(STREAM *ClientCon, char *Data)
+      //Switch to Cgi/Default user. ALAYA WILL NOT RUN SCRIPTS AS ROOT!
+      if (! SwitchUser(Settings.CgiUser))
+      {
+        LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s using handler '%s'",Settings.CgiUser,ScriptPath,Tempstr);
+        _exit(1);
+      }
+
+			if (geteuid()==0)
+			{
+				LogToFile(Settings.LogPath, "Failed to switch user to '%s' for running a .cgi program. Will not run programs as 'root'. Set 'DefaultUser' in config file or command line.",Settings.CgiUser);
+			}
+			else
+			{
+				SetupEnvironment(Response);
+				Tempstr=FindScriptHandlerForScript(Tempstr,ScriptPath);
+				if (Tempstr) LogToFile(Settings.LogPath,"Execute script: %s using handler '%s'",ScriptPath,Tempstr);
+				else LogToFile(Settings.LogPath,"Execute script: %s QUERY_STRING= '%s'",ScriptPath,getenv("QUERY_STRING"));
+
+				//Only do this late! Otherwise logging won't work.
+				for (i=3; i < 1000; i++) close(i);
+
+				if (StrLen(Tempstr)) execl(Tempstr, Tempstr, ScriptPath,NULL);
+				else execl(ScriptPath,ScriptPath,NULL);
+
+				//Logging won't work after we've closed all the file descriptors!
+				LogToFile(Settings.LogPath,"Cannot execute script: %s",ScriptPath);
+		}
+		_exit(0);
+	}
+	else
+	{
+
+	}
+}
+
+
+HTTPSessionDestroy(Response);
+DestroyString(ScriptPath);
+DestroyString(Tempstr);
+DestroyString(Name);
+DestroyString(Value);
+
+
+//Always return false, so that pipe gets closed
+return(FALSE);
+}
+
+
+
+int HandleCGIExecRequest(STREAM *ClientCon, char *Data)
 {
 char *Tempstr=NULL, *Name=NULL, *Value=NULL;
 char *ScriptPath=NULL;
@@ -609,7 +697,8 @@ StripTrailingWhitespace(Tempstr);
 LogToFile(Settings.LogPath, "HCPR: %s",Tempstr);
 
 ptr=GetToken(Tempstr,"\\S",&Token,0);
-if (strcmp(Token,"EXEC")==0) result=HandleExecRequest(S,ptr);
+if (strcmp(Token,"EXEC")==0) result=HandleCGIExecRequest(S,ptr);
+else if (strcmp(Token,"WEBSOCKET")==0) result=HandleWebsocketExecRequest(S,ptr);
 else if (strcmp(Token,"LOG")==0) LogToFile(Settings.LogPath,ptr);
 else if (strcmp(Token,"GETF")==0) HandleGetFileRequest(S,ptr);
 else if (strcmp(Token,"GETIP")==0) HandleResolveIPRequest(S,ptr);
@@ -627,19 +716,16 @@ return(result);
 }
 
 
-int ChrootProcessRequest(STREAM *S, HTTPSession *Session, char *Type, char *Path, char *SearchPath)
+
+STREAM *ChrootSendRequest(HTTPSession *Session, const char *Type, const char *Path, const char *SearchPath)
 {
-char *Tempstr=NULL, *PortStr=NULL, *ContentLengthStr=NULL;
-char *ResponseLine=NULL, *Headers=NULL, *ptr;
+char *Tempstr=NULL, *ContentLengthStr=NULL;
 char *Quoted=NULL;
-int KeepAlive=FALSE, RetVal=FALSE;
-off_t ContentLength=0;
 int PostArguments=FALSE;
 
-if (! ParentProcessPipe) return(FALSE);
+if (! ParentProcessPipe) return(NULL);
 if ((strcmp(Type, "PROXY") != 0) && (strcmp(Session->Method,"POST") ==0)) PostArguments=TRUE;
 
-PortStr=FormatStr(PortStr,"%d",Session->ServerPort);
 ContentLengthStr=FormatStr(ContentLengthStr,"%d",Session->ContentSize);
 
 //Trying to do this all as one string causes a problem!
@@ -659,7 +745,8 @@ Tempstr=MCatStr(Tempstr," Method=",Session->Method," UserAgent='",Session->UserA
 if (StrLen(Session->ContentBoundary) > 2) Tempstr=MCatStr(Tempstr, " ContentType='",Session->ContentType, "; boundary=",Session->ContentBoundary+2, "'",NULL);
 else Tempstr=MCatStr(Tempstr, " ContentType='",Session->ContentType,"'", NULL);
 
-Tempstr=MCatStr(Tempstr," ServerName=",Session->ServerName," ServerPort=",PortStr,NULL);
+Quoted=FormatStr(Quoted,"%d",Session->ServerPort);
+Tempstr=MCatStr(Tempstr," ServerName=",Session->ServerName," ServerPort=",Quoted,NULL);
 if (StrLen(Session->Cipher)) Tempstr=MCatStr(Tempstr," Cipher='",Session->Cipher,"'",NULL);
 if (StrLen(Session->Cookies)) Tempstr=MCatStr(Tempstr," Cookies='",Session->Cookies,"'",NULL);
 
@@ -681,12 +768,31 @@ Tempstr=MCatStr(Tempstr, " Arguments='",Quoted,"'", NULL);
 
 Tempstr=CatStr(Tempstr,"\n");
 
-
 //if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) 
 LogToFile(Settings.LogPath,"REQUESTING DATA FROM OUTSIDE CHROOT: [%s]",Tempstr);
 STREAMWriteLine(Tempstr,ParentProcessPipe);
 STREAMFlush(ParentProcessPipe);
 
+DestroyString(Tempstr);
+DestroyString(Quoted);
+DestroyString(ContentLengthStr);
+
+return(ParentProcessPipe);
+}
+
+
+
+
+int ChrootProcessRequest(STREAM *S, HTTPSession *Session, const char *Type, const char *Path, const char *SearchPath)
+{
+char *Tempstr=NULL;
+char *ResponseLine=NULL, *Headers=NULL, *ptr;
+off_t ContentLength=0;
+int PostArguments=FALSE, KeepAlive=FALSE, RetVal=FALSE;
+
+
+if (! ChrootSendRequest(Session, Type, Path, SearchPath)) return(FALSE);
+if ((strcmp(Type, "PROXY") != 0) && (strcmp(Session->Method,"POST") ==0)) PostArguments=TRUE;
 
 if (PostArguments && StrLen(Session->Arguments))
 {
@@ -760,11 +866,8 @@ if (KeepAlive) Session->Flags |= SESSION_REUSE;
 else Session->Flags &= ~(SESSION_KEEP_ALIVE | SESSION_REUSE);
 
 
-DestroyString(Quoted);
 DestroyString(Tempstr);
-DestroyString(PortStr);
 DestroyString(Headers);
-DestroyString(ContentLengthStr);
 DestroyString(ResponseLine);
 
 return(RetVal);

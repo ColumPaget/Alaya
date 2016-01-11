@@ -477,7 +477,7 @@ else
 	NoOfTags=(ntohs(* (uint16_t *) ptr));
 }
 
-//LogToFile(Settings.LogPath,"Offset: %d NoOfTags: %d",offset,NoOfTags);
+LogToFile(Settings.LogPath,"Offset: %d NoOfTags: %d",offset,NoOfTags);
 return(NoOfTags);
 }
 
@@ -508,6 +508,7 @@ if (
 	)
 	{
 		ptr+=10;
+LogToFile(Settings.LogPath,"TIFF!");
 		TIFFParseHeader(ptr,(Data+READ_LEN)-ptr, Vars);
 	}
 }

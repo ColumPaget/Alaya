@@ -240,31 +240,32 @@ else
 	else RetStr=CopyStr(RetStr,FM->ContentType);
 }
 
-/*
-	ptr=GetVar(Vars,"Thumbnail");
-	if (StrLen(ptr))
+ptr=GetVar(Vars,"Thumbnail");
+fprintf(stderr,"TN: %s\n",ptr);
+if (StrLen(ptr))
+{
+	RetStr=CopyStr(RetStr, ptr);
+}
+else if (Settings.DirListFlags & DIR_MIMEICONS)
+{
+	Curr=ListGetNext(Settings.VPaths);
+	while (Curr)
 	{
-		RetStr=CopyStr(RetStr, ptr);
-	}
-	else*/ if (Settings.DirListFlags & DIR_MIMEICONS)
-	{
-		Curr=ListGetNext(Settings.VPaths);
-		while (Curr)
+		PathItem=(TPathItem *) Curr->Item;
+		if (PathItem->Type == PATHTYPE_MIMEICONS)
 		{
-			PathItem=(TPathItem *) Curr->Item;
-			if (PathItem->Type == PATHTYPE_MIMEICONS)
-			{
 				ptr=strrchr(File->Name,'.');
 				if (ptr) ptr++;
 
 					if (File->Type==PATHTYPE_DIR) URL=MCopyStr(URL,PathItem->URL,"?MimeType=inode/directory&RetStr=folder&FileExtn=",NULL);
 					else URL=MCopyStr(URL,PathItem->URL,"?MimeType=",RetStr,"&FileExtn=",ptr,NULL);
-					RetStr=MCopyStr(RetStr,"<img src=\"",URL,"\" alt=\"",RetStr,"\">",NULL);
+					Tempstr=MCopyStr(Tempstr,"<img src=\"",URL,"\" alt=\"",RetStr,"\">",NULL);
+					RetStr=CopyStr(RetStr, Tempstr);
 					break;
-			}
-			Curr=ListGetNext(Curr);
 		}
+		Curr=ListGetNext(Curr);
 	}
+}
 
 DestroyString(Tempstr);
 DestroyString(URL);

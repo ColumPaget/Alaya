@@ -81,7 +81,7 @@ DestroyString(Token);
 
 void ParsePathItem(char *Data)
 {
-const char *PathTypes[]={"Files","Cgi","Stream","Logout","Proxy","MimeIcons",NULL};
+const char *PathTypes[]={"Files","Cgi","Websocket","Stream","Logout","Proxy","MimeIcons",NULL};
 char *Type=NULL, *URL=NULL, *Path=NULL, *Tempstr=NULL, *ptr;
 TPathItem *PI;
 int val;
@@ -163,8 +163,8 @@ DestroyString(Token);
 
 void ParseConfigItem(char *ConfigLine)
 {
-const char *ConfTokens[]={"Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout",NULL};
-typedef enum {CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEP_ALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT} TConfigTokens;
+const char *ConfTokens[]={"Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","WebsocketHandler","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout",NULL};
+typedef enum {CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEP_ALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT} TConfigTokens;
 
 char *Token=NULL, *ptr;
 struct group *grent;
@@ -302,13 +302,19 @@ switch(TokType)
   case CT_SCRIPTHANDLER:
     ptr=GetToken(ptr,"=",&Token,0);
     if (! Settings.ScriptHandlers) Settings.ScriptHandlers=ListCreate();
-    SetVar(Settings.ScriptHandlers,Token,ptr);
+    SetTypedVar(Settings.ScriptHandlers,Token,ptr,PATHTYPE_CGI);
   break;
 
 	case CT_SCRIPTHASHFILE:
 		Settings.ScriptHashFile=CopyStr(Settings.ScriptHashFile,ptr);
 		Settings.Flags |= FLAG_CHECK_SCRIPTS;
 	break;
+
+  case CT_WEBSOCKETHANDLER:
+    if (! Settings.ScriptHandlers) Settings.ScriptHandlers=ListCreate();
+		ptr=GetToken(ptr,"=",&Token,0);
+    SetTypedVar(Settings.ScriptHandlers,Token,ptr,PATHTYPE_WEBSOCKET);
+  break;
 
 	case CT_SANITIZEALLOW:
 		if (! Settings.SanitizeArgumentsAllowedTags) Settings.SanitizeArgumentsAllowedTags=ListCreate();
@@ -739,7 +745,7 @@ Settings.LoginEntries=ListCreate();
 Settings.DocumentCacheTime=10;
 Settings.AddressSpace=CopyStr(Settings.AddressSpace, "50M");
 Settings.StackSize=CopyStr(Settings.StackSize, "500k");
-Settings.ActivityTimeout=30;
+Settings.ActivityTimeout=10000;
 
 GenerateRandomBytes(&Settings.AccessTokenKey,32,ENCODE_BASE64);
 //this will be set to 80 or 443 in 'PostProcessSettings'

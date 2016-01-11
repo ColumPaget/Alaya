@@ -15,8 +15,9 @@
 
 const char *HTTPMethods[]={"HEAD","GET","POST","PUT","DELETE","MKCOL","PROPFIND","PROPPATCH","MOVE","COPY","OPTIONS","CONNECT",NULL};
 
-const char *HeaderStrings[]={"Authorization","Proxy-Authorization","Host","Destination","Content-Type","Content-Length","Depth","Overwrite","User-Agent","Cookie","If-Modified-Since","Accept-Encoding","Icy-MetaData","Referer","Connection",NULL};
-typedef enum {HEAD_AUTH, HEAD_PROXYAUTH, HEAD_HOST, HEAD_DEST, HEAD_CONTENT_TYPE, HEAD_CONTENT_LENGTH, HEAD_DEPTH, HEAD_OVERWRITE, HEAD_AGENT, HEAD_COOKIE, HEAD_IFMOD_SINCE, HEAD_ACCEPT_ENCODING, HEAD_ICECAST,HEAD_REFERER, HEAD_CONNECTION} THeaders;
+const char *HeaderStrings[]={"Authorization","Proxy-Authorization","Host","Destination","Content-Type","Content-Length","Depth","Overwrite","User-Agent","Cookie","If-Modified-Since","Accept-Encoding","Icy-MetaData","Referer","Connection","Upgrade","Sec-WebSocket-Key","Sec-Websocket-Key1", "Sec-Websocket-Key2","Sec-WebSocket-Protocol","Sec-WebSocket-Version","Origin", NULL};
+
+typedef enum {HEAD_AUTH, HEAD_PROXYAUTH, HEAD_HOST, HEAD_DEST, HEAD_CONTENT_TYPE, HEAD_CONTENT_LENGTH, HEAD_DEPTH, HEAD_OVERWRITE, HEAD_AGENT, HEAD_COOKIE, HEAD_IFMOD_SINCE, HEAD_ACCEPT_ENCODING, HEAD_ICECAST,HEAD_REFERER, HEAD_CONNECTION, HEAD_UPGRADE, HEAD_WEBSOCK_KEY, HEAD_WEBSOCK_KEY1, HEAD_WEBSOCK_KEY2, HEAD_WEBSOCK_PROTOCOL, HEAD_WEBSOCK_VERSION, HEAD_ORIGIN} THeaders;
 
 
 int GetHostARP(const char *IP, char **Device, char **MAC)
@@ -412,10 +413,6 @@ while (StrLen(Tempstr) )
 
 	case HEAD_CONNECTION:
 		if ((Settings.Flags & FLAG_KEEP_ALIVES) && (strcasecmp(ptr,"Keep-Alive")==0)) Session->Flags |= SESSION_KEEP_ALIVE;
-		if ((strcasecmp(ptr,"Upgrade")==0) && SSLAvailable())
-		{
-			if (! ActivateSSL(Session,Settings.SSLKeys)) return;
-		} 
 	break;
 
 	case HEAD_AGENT:
@@ -457,6 +454,38 @@ while (StrLen(Tempstr) )
 
 	case HEAD_IFMOD_SINCE:
 		Session->IfModifiedSince=DateStrToSecs("%a, %d %b %Y %H:%M:%S %Z",ptr,NULL);
+	break;
+
+	case HEAD_UPGRADE:
+		if ((strcasecmp(ptr,"Upgrade")==0) && SSLAvailable())
+		{
+			if (! ActivateSSL(Session,Settings.SSLKeys)) return;
+		} 
+		else if (strcasecmp(ptr,"websocket")==0) Session->MethodID = METHOD_WEBSOCKET;
+	break;
+
+	case HEAD_WEBSOCK_KEY:
+		Session->ContentBoundary=CopyStr(Session->ContentBoundary, ptr);
+	break;
+
+	case HEAD_WEBSOCK_KEY1:
+		Session->ContentBoundary=CopyStr(Session->ContentBoundary, ptr);
+		if (Session->MethodID==METHOD_WEBSOCKET) Session->MethodID = METHOD_WEBSOCKET75;
+	break;
+
+	case HEAD_WEBSOCK_KEY2:
+		Session->Cookies=CopyStr(Session->Cookies, ptr);
+		if (Session->MethodID==METHOD_WEBSOCKET) Session->MethodID = METHOD_WEBSOCKET75;
+	break;
+
+	case HEAD_WEBSOCK_PROTOCOL:
+		Session->ContentType=CopyStr(Session->ContentType, ptr);
+	break;
+
+	case HEAD_WEBSOCK_VERSION:
+	break;
+
+	case HEAD_ORIGIN:
 	break;
 	}
 
@@ -527,6 +556,8 @@ if (Flags & HEADERS_AUTH)
 	}
 }
 
+
+
 //Special headers passed in for this transaction
 Curr=ListGetNext(Session->Headers);
 while (Curr)
@@ -544,35 +575,44 @@ while (Curr)
 	Curr=ListGetNext(Curr);
 }
 
-if ((Flags & HEADERS_USECACHE) && (Settings.DocumentCacheTime > 0))
+
+
+
+if (Session->MethodID==METHOD_WEBSOCKET)
 {
-	Tempstr=FormatStr(Tempstr,"max-age=%d",Settings.DocumentCacheTime);
-	HTTPServerSendHeader(S, "Cache-Control", Tempstr);
-	HTTPServerSendHeader(S,"Expires",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",time(NULL) + Settings.DocumentCacheTime,NULL));
+	HTTPServerSendHeader(S, "Upgrade", "WebSocket");
+	HTTPServerSendHeader(S, "Connection", "Upgrade");
 }
 else 
 {
+	if ((Flags & HEADERS_USECACHE) && (Settings.DocumentCacheTime > 0))
+	{
+	Tempstr=FormatStr(Tempstr,"max-age=%d",Settings.DocumentCacheTime);
+	HTTPServerSendHeader(S, "Cache-Control", Tempstr);
+	HTTPServerSendHeader(S,"Expires",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",time(NULL) + Settings.DocumentCacheTime,NULL));
+	}
+	else 
+	{
 	HTTPServerSendHeader(S, "Cache-Control", "no-cache");
 	HTTPServerSendHeader(S, "Pragma", "no-cache");
-}
+	}
 
-
-if ((Session->Flags & SESSION_KEEP_ALIVE) && (Flags & HEADERS_KEEPALIVE))
-{
-	HTTPServerSendHeader(S, "Connection", "Keep-Alive");
-	Session->Flags |= SESSION_REUSE;
-}
-else
-{
-	HTTPServerSendHeader(S, "Connection", "close");
-	Session->Flags &= ~SESSION_REUSE;
-}
-
-//Offer Upgrade to SSL if we have it
-if ((! Session->Flags & HTTP_SSL) &&  SSLAvailable()) 
-{
+	//Offer Upgrade to SSL if we have it
+	if ((! Session->Flags & HTTP_SSL) &&  SSLAvailable()) 
+	{
 	HTTPServerSendHeader(S, "Upgrade", "TLS/1.0");
-}
+	}
+
+	if ((Session->Flags & SESSION_KEEP_ALIVE) && (Flags & HEADERS_KEEPALIVE))
+	{
+		HTTPServerSendHeader(S, "Connection", "Keep-Alive");
+		Session->Flags |= SESSION_REUSE;
+	}
+	else
+	{
+		HTTPServerSendHeader(S, "Connection", "close");
+		Session->Flags &= ~SESSION_REUSE;
+	}
 
 
 //If we are running a CGI script, then the script will handle all headers relating to content
@@ -596,6 +636,7 @@ if (! (Flags & HEADERS_CGI))
 	
 	//Blank line to end headers
 	STREAMWriteLine("\r\n",S);
+}
 }
 
 DestroyString(Tempstr);
@@ -644,14 +685,15 @@ else Tempstr=CopyStr(Tempstr,Body);
 
 
 if ((ResponseCode==401) || (ResponseCode==407)) HTTPServerSendHeaders(S, Response,HEADERS_AUTH);
+else HTTPServerSendHeaders(S, Response, HEADERS_KEEPALIVE);
 
-else HTTPServerSendHeaders(S, Response,HEADERS_KEEPALIVE);
 STREAMWriteBytes(S,Tempstr,Response->ContentSize);
 STREAMFlush(S);
 
 /* If HTTPServerSendHeaders set SESSION_REUSE then set that in the Session object */
 if (Response->Flags & SESSION_REUSE) Session->Flags |= SESSION_REUSE;
 else Session->Flags &= ~SESSION_REUSE;
+
 
 ProcessSessionEventTriggers(Response);
 HTTPSessionDestroy(Response);
@@ -1773,6 +1815,11 @@ switch (Session->MethodID)
 
 	case METHOD_CONNECT:
 		HTTPProxyConnect(Session->S,Session);
+		break;
+
+	case METHOD_WEBSOCKET:
+	case METHOD_WEBSOCKET75:
+		WebsocketConnect(Session->S,Session);
 		break;
 
 
