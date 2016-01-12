@@ -1,6 +1,7 @@
 #include "Authenticate.h"
 #include <pwd.h>
 
+#define USER_UNKNOWN -1
 
 #define ENC_MD5_HEX 0
 #define ENC_MD5_BASE64 1
@@ -14,14 +15,14 @@
 
 #ifdef HAVE_LIBPAM
 #include <security/pam_appl.h>
+static pam_handle_t *pamh=NULL;
 #endif
 
-#define USER_UNKNOWN -1
 
 char *AuthenticationsTried=NULL;
 
-const char *AuthMethods[]={"none","open","deny","native","pam","passwd","shadow","digest","accesstoken",NULL};
-typedef enum {AUTHTOK_NONE, AUTHTOK_OPEN, AUTHTOK_DENY, AUTHTOK_NATIVE, AUTHTOK_PAM, AUTHTOK_PASSWD, AUTHTOK_SHADOW, AUTHTOK_DIGEST, AUTHTOK_ACCESSTOKEN, AUTHTOK_ACCESSTOKEN_HTTP} TAuthTokens;
+const char *AuthMethods[]={"none","open","deny","native","pam","pam-account","passwd","shadow","digest","accesstoken",NULL};
+typedef enum {AUTHTOK_NONE, AUTHTOK_OPEN, AUTHTOK_DENY, AUTHTOK_NATIVE, AUTHTOK_PAM, AUTHTOK_PAM_ACCT, AUTHTOK_PASSWD, AUTHTOK_SHADOW, AUTHTOK_DIGEST, AUTHTOK_ACCESSTOKEN, AUTHTOK_ACCESSTOKEN_HTTP} TAuthTokens;
 
 
 
@@ -667,39 +668,45 @@ return(PAM_SUCCESS);
 }
 
 
+int PAMStart(HTTPSession *Session, const char *User)
+{
+static struct pam_conv  PAMConvStruct = {PAMConvFunc, NULL };
+const char *PAMConfigs[]={"alaya","httpd","other",NULL};
+int result=PAM_PERM_DENIED, i;
+
+  PAMConvStruct.appdata_ptr=(void *)Session->Password;
+
+  for (i=0; (PAMConfigs[i] != NULL) && (result != PAM_SUCCESS); i++)
+  {
+    result=pam_start(PAMConfigs[i],User,&PAMConvStruct,&pamh);
+  }
+
+  if (result==PAM_SUCCESS)
+  {
+  pam_set_item(pamh,PAM_RUSER,Session->UserName);
+  if (StrLen(Session->ClientHost) > 0) pam_set_item(pamh,PAM_RHOST,Session->ClientHost);
+  else if (StrLen(Session->ClientIP) > 0) pam_set_item(pamh,PAM_RHOST,Session->ClientIP);
+  else pam_set_item(pamh,PAM_RHOST,"");
+  return(TRUE);
+  }
+
+  return(FALSE);
+}
 
 
 int AuthPAM(HTTPSession *Session)
 {
-static pam_handle_t *pamh;
 static struct pam_conv  PAMConvStruct = {PAMConvFunc, NULL };
 int result;
 
-PAMConvStruct.appdata_ptr=(void *)Session->Password;
-
-result=pam_start("alaya",Session->UserName,&PAMConvStruct,&pamh); 
-
-if (result != PAM_SUCCESS)
-{
-		pam_end(pamh,result);
-		result=pam_start("other",Session->UserName,&PAMConvStruct,&pamh);
-}
-
+result=PAMStart(Session, Session->UserName);
 if (result != PAM_SUCCESS)
 {
 	pam_end(pamh,result);
   return(USER_UNKNOWN);
 }
 
-/* set the credentials for the remote user and remote host */
-pam_set_item(pamh,PAM_RUSER,Session->UserName);
-if (StrLen(Session->ClientHost) > 0) pam_set_item(pamh,PAM_RHOST,Session->ClientHost);
-else if (StrLen(Session->ClientIP) > 0) pam_set_item(pamh,PAM_RHOST,Session->ClientIP);
-else pam_set_item(pamh,PAM_RHOST,"");
-
 result=pam_authenticate(pamh,0);
-
-pam_end(pamh,PAM_SUCCESS);
 
 AuthenticationsTried=CatStr(AuthenticationsTried,"pam ");
 
@@ -709,6 +716,35 @@ if (result==PAM_SUCCESS)
  return(TRUE);
 }
 else return(FALSE);
+}
+
+
+
+
+int AuthPAMCheckAccount(HTTPSession *Session)
+{
+if (! pamh)
+{
+  if (! PAMStart(Session, Session->RealUser)) return(FALSE);
+}
+
+if (pam_acct_mgmt(pamh, 0)==PAM_SUCCESS)
+{
+  pam_open_session(pamh, 0);
+  return(TRUE);
+}
+return(FALSE);
+}
+
+
+
+void AuthPAMClose()
+{
+  if (pamh)
+  {
+  pam_close_session(pamh, 0);
+  pam_end(pamh,PAM_SUCCESS);
+  }
 }
 #endif
 
@@ -720,6 +756,7 @@ int Authenticate(HTTPSession *Session)
 int result=0;
 char *Token=NULL, *RealUser=NULL, *HomeDir=NULL, *UserSettings=NULL, *ptr;
 struct passwd *pwent;
+int PAMAccount=FALSE;
 //struct group *grent;
 
 AuthenticationsTried=CopyStr(AuthenticationsTried,"");
@@ -728,6 +765,15 @@ if (! CheckServerAllowDenyLists(Session->UserName))
 {
 	LogToFile(Settings.LogPath,"AUTH: Authentication failed for UserName '%s'. User not allowed to log in",Session->UserName);
 	return(FALSE);
+}
+
+
+//check for this as it changes behavior of other auth types
+ptr=GetToken(Settings.AuthMethods,",",&Token,0);
+while (ptr)
+{
+  if (strcasecmp(Token,"pam-account")==0) PAMAccount=TRUE;
+  ptr=GetToken(ptr,",",&Token,0);
 }
 
 ptr=GetToken(Settings.AuthMethods,",",&Token,0);
@@ -742,7 +788,11 @@ while (ptr)
 	else if (strcasecmp(Token,"shadow")==0) result=AuthShadowFile(Session);
 	else if (strcasecmp(Token,"accesstoken")==0) result=AuthAccessToken(Session);
 	#ifdef HAVE_LIBPAM
-	else if (strcasecmp(Token,"pam")==0) result=AuthPAM(Session);
+	else if (strcasecmp(Token,"pam")==0) 
+	{
+		result=AuthPAM(Session);
+		if (result==TRUE) PAMAccount=TRUE;
+	}
 	#endif
 	else if (strcasecmp(Token,"none")==0) 
 	{
@@ -763,6 +813,7 @@ while (ptr)
 switch (result)
 {
 case TRUE:
+
 //Don't let them authenticate if HomeDir and user mapping not set
 
 if (! StrLen(RealUser)) 
@@ -773,6 +824,7 @@ if (! StrLen(RealUser))
 	if (! pwent) RealUser=CopyStr(RealUser,Settings.DefaultUser);
 }
 
+//Have to do this again in case first try failed
 pwent=getpwnam(RealUser);
 
 if (pwent)
@@ -780,10 +832,10 @@ if (pwent)
 	Session->RealUser=CopyStr(Session->RealUser, RealUser);
 	Session->RealUserUID=pwent->pw_uid;
 
-if (StrLen(HomeDir)) Session->HomeDir=CopyStr(Session->HomeDir,HomeDir);
-else Session->HomeDir=CopyStr(Session->HomeDir,pwent->pw_dir);
-Session->UserSettings=CopyStr(Session->UserSettings,UserSettings);	
-//grent=getgrnam(Session->Group);
+	if (StrLen(HomeDir)) Session->HomeDir=CopyStr(Session->HomeDir,HomeDir);
+	else Session->HomeDir=CopyStr(Session->HomeDir,pwent->pw_dir);
+	Session->UserSettings=CopyStr(Session->UserSettings,UserSettings);	
+	//grent=getgrnam(Session->Group);
 }
 else
 {
@@ -797,6 +849,20 @@ if (! StrLen(Session->HomeDir))
 	LogToFile(Settings.LogPath,"AUTH: No 'HomeDir' set for '%s'. Login Denied",Session->UserName);
 	result=FALSE;
 }
+
+//check again, because may have changed in above block
+if (result && PAMAccount)
+{
+#ifdef HAVE_LIBPAM
+  if (! AuthPAMCheckAccount(Session))
+  {
+    LogToFile(Settings.LogPath,"PAM Account invalid for '%s'. Login Denied",Session->UserName);
+    result=FALSE;
+  }
+#endif
+}
+
+
 break;
 
 

@@ -131,8 +131,6 @@ for (i=0; ForbiddenStrings[i] !=NULL; i++)
 
 setenv(Name, Tempstr, TRUE);
 
-LogToFile(Settings.LogPath,"ENV: %s: %s", Name, Tempstr);
-
 DestroyString(Tempstr);
 }
 
