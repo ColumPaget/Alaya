@@ -1,8 +1,8 @@
 #include "ID3.h"
 
 #define ID3v1_LEN 128
-const char *TagTypes[]={"","ID31TAGEND","TAG","ID3\x02","ID3\x03","ID3\0x4","Ogg","\x89PNG","\xFF\xD8\xFF",NULL};
-typedef enum {TAG_NONE, TAG_ID3_END,TAG_ID3,TAG_ID3v2,TAG_ID3v3,TAG_ID3v4,TAG_OGG,TAG_PNG,TAG_JPEG} TTagType;
+const char *TagTypes[]={"","ID31TAGEND","TAG","ID3\x02","ID3\x03","ID3\x04","Ogg","\x89PNG","\xFF\xD8\xFF","BM",NULL};
+typedef enum {TAG_NONE, TAG_ID3_END,TAG_ID3,TAG_ID3v2,TAG_ID3v3,TAG_ID3v4,TAG_OGG,TAG_PNG,TAG_JPEG,TAG_BMP} TTagType;
 
 
 typedef struct
@@ -308,13 +308,16 @@ return(TRUE);
 int ReadTagType(STREAM *S)
 {
 char *Tempstr=NULL;
-int result;
+int result=-1, i;
 	
 Tempstr=SetStrLen(Tempstr,20);
 memset(Tempstr,0,20);
 STREAMReadBytes(S,Tempstr,20);
 
-result=MatchTokenFromList(Tempstr,TagTypes,MATCH_TOKEN_PART|MATCH_TOKEN_CASE);
+for (i=0; TagTypes[i] !=NULL; i++)
+{
+	if (memcmp(Tempstr, TagTypes[i], StrLen(TagTypes[i]))==0) result=i;
+}
 STREAMSeek(S,(double) 0, SEEK_SET); 
 
 //LogToFile(Settings.LogPath,"TAGTYPE: %d [%s]\n",result,Tempstr);
@@ -481,27 +484,63 @@ LogToFile(Settings.LogPath,"Offset: %d NoOfTags: %d",offset,NoOfTags);
 return(NoOfTags);
 }
 
+const char *JPEGParseAPP0(const char *Data, ListNode *Vars)
+{
+const char *ptr;
+unsigned int len, x, y;
+char *Tempstr=NULL;
+
+ptr=Data;
+
+//first two bytes are the length of this APP0 packet. But we don'tcare
+len=ntohs(* (uint16_t *) ptr);
+ptr+=2;
+if (memcmp(ptr,"JFIF\0",5)!=0) return(NULL);
+ptr+=5;
+
+//next two are JFIF version
+ptr+=2;
+
+//single byte that's 0==pixels, 1==pixels per inch 2==pixels per cm
+if (*ptr==0)
+{
+ptr++;
+
+x=(unsigned int) * (uint16_t *) ptr;
+ptr+=2;
+y=(unsigned int) * (uint16_t *) ptr;
+
+Tempstr=FormatStr(Tempstr,"%ux%u",x,y);
+SetVar(Vars,"Media-Resolution",Tempstr);
+}
+
+DestroyString(Tempstr);
+
+return(Data+len);
+}
+
+
 
 int JPEGReadHeader(STREAM *S, ListNode *Vars)
 {
-char *Data=NULL, *ptr;
+char *Data=NULL;
+const char *ptr;
 int len;
 #define READ_LEN 1024
 
 Data=SetStrLen(Data,READ_LEN);
 len=STREAMReadBytes(S,Data,READ_LEN);
 
-if (len==READ_LEN)
+ptr=Data;
+if ((len==READ_LEN) && (memcmp(ptr,"\xFF\xD8",2)==0 ))
 {
-if (memcmp(Data+6,"JFIF",4)==0) 
-{
-	len=ntohs(* (uint16_t *) (Data+4));
-	ptr=Data+len+4;
-}
-else ptr=Data+2;
+ptr+=2;
+if (memcmp(ptr,"\xFF\xE0",2)==0) ptr=JPEGParseAPP0(ptr+2, Vars);
+
 
 //LogToFile(Settings.LogPath,"PTR: [%s] [%x] [%x] [%s]",Data,ptr[0],ptr[1],ptr+4);
 
+/*
 if (
 		(memcmp(ptr,"\xFF\xE1",2)==0) &&
 		(memcmp(ptr+4,"Exif\x00\x00",6)==0) 
@@ -511,8 +550,9 @@ if (
 LogToFile(Settings.LogPath,"TIFF!");
 		TIFFParseHeader(ptr,(Data+READ_LEN)-ptr, Vars);
 	}
-}
+*/
 
+}
 DestroyString(Data);
 
 return(TRUE);
@@ -557,6 +597,54 @@ return(TRUE);
 }
 
 
+//BMP HEADER
+/*
+uint32_t size;
+uint32_t Reserved;
+uint32_t DataStart;
+uint32_t BMISize;
+uint32_t ImageWidth;
+uint32_t ImageHeight;
+uint16_t BitPlanes;
+uint16_t BitCount;
+uint32_t Compression;
+uint32_t ImageSize;
+uint32_t XPixPerMeter;
+uint32_t YPixPerMeter;
+uint32_t NoOfColors;
+uint32_t NoOfImportantColors;
+*/
+
+int BMPReadHeader(STREAM *S, ListNode *Vars)
+{
+char *Data=NULL, *Tempstr=NULL;
+const char *ptr;
+int x, y, result;
+
+Data=SetStrLen(Data,255);
+result=STREAMReadBytes(S,Data,255);
+ptr=Data;
+
+ptr+=2; //'BM'
+ptr+=4; //32 bit file size
+ptr+=4; //32 bit 'reserved'
+ptr+=4; //32 bit image data offset
+ptr+=4; //32 bit image bmi size
+
+x=* (int32_t *) ptr;  //32 bit image width in pixels
+ptr+=4;
+y=* (int32_t *) ptr;  //32 bit image height in pixels
+
+Tempstr=FormatStr(Tempstr,"%ux%u",x,y);
+SetVar(Vars,"Media-Resolution",Tempstr);
+
+
+DestroyString(Tempstr);
+return(TRUE);
+}
+
+
+
 
 int MediaReadDetails(STREAM *S, ListNode *Vars)
 {
@@ -581,7 +669,8 @@ case TAG_ID3v2: result=ID3v2ReadTag(S,Vars); break;
 case TAG_ID3v3: result=ID3v3ReadTag(S,Vars); break;
 case TAG_ID3v4: result=ID3v3ReadTag(S,Vars); break;
 case TAG_OGG: result=OggReadTag(S,Vars); break;
-//case TAG_JPEG: result=JPEGReadHeader(S,Vars); break;
+case TAG_JPEG: result=JPEGReadHeader(S,Vars); break;
+case TAG_BMP: result=BMPReadHeader(S,Vars); break;
 //case TAG_PNG: result=PNGReadHeader(S,Vars); break;
 //case TAG_TIFF: STREAMSeek(S,(double) 0, SEEK_SET); result=TIFFReadHeader(S,Vars); break;
 }

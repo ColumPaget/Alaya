@@ -353,7 +353,7 @@ ListNode *Vars;
 		}
 		else Interact=CopyStr(Interact,"");
 
-		Tempstr=FormatStr(Tempstr,"<td title=\"%s\">%s</td><td><a href=\"%s\">%s</a></td><td align=right> &nbsp; %s</td><td align=right> &nbsp; %s</td>%s</td>",Comment,FileType,File->URL, DisplayName,DateStr,GetHumanReadableDataQty((double) File->Size,0),Interact);
+		Tempstr=FormatStr(Tempstr,"<td title=\"%s\">%s</td><td><a href=\"%s\" title=\"%s\">%s</a></td><td align=right> &nbsp; %s</td><td align=right> &nbsp; %s</td>%s</td>",Comment,FileType,File->URL, File->Path, DisplayName, DateStr, GetHumanReadableDataQty((double) File->Size,0), Interact);
 
 		//Append it all to our output
 		RetStr=MCatStr(RetStr,Tempstr,"</tr>\r\n",NULL);
