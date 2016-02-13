@@ -56,9 +56,16 @@ switch (*eptr)
 	case '\\':
 	//if we got a quoted character we can't have found
 	//the separator, so return false
+	if (Flags & GETTOKEN_BACKSLASH)
+	{
+	if (*eptr != *pptr) return(FALSE);
+	}
+	else
+	{
 	eptr++;
 	*start=eptr;
 	return(FALSE);
+	}
 	break;
 
 	case '"':
@@ -118,7 +125,7 @@ start_ptr=String;
 
 while (*start_ptr != '\0')
 {
-if (*start_ptr=='\\')
+if ((*start_ptr=='\\') && (! Flags & GETTOKEN_BACKSLASH))
 {
   start_ptr++;
   start_ptr++;
@@ -166,10 +173,22 @@ const char *sptr, *eptr;
 if (! SearchStr) return(NULL);
 if (*SearchStr=='\0') return(NULL);
 
-GetTokenFindSeparator(Separator, SearchStr,&SepStart,&SepEnd, Flags);
+GetTokenFindSeparator(Separator, SearchStr, &SepStart, &SepEnd, Flags);
 
 sptr=SearchStr;
-eptr=SepStart;
+
+if (Flags & GETTOKEN_INCLUDE_SEP)
+{
+	if (SepStart==SearchStr) eptr=SepEnd;
+	else 
+	{
+		eptr=SepStart;
+		SepEnd=SepStart;
+	}
+}
+else if (Flags & GETTOKEN_APPEND_SEP) eptr=SepEnd;
+else eptr=SepStart;
+
 if (Flags & GETTOKEN_STRIP_QUOTES)
 {
 	if ((*sptr=='"') || (*sptr=='\'')) 

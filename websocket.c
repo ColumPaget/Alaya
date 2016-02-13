@@ -6,9 +6,14 @@
 
 #define WEBSOCKET_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
+
+#define WEBSOCKET_CONT  0
+#define WEBSOCKET_TEXT  1
+#define WEBSOCKET_CLOSE 8
+#define WEBSOCKET_PING  9
+#define WEBSOCKET_PONG  10
 #define WEBSOCKET_FIN  1024
 #define WEBSOCKET_MASK 2048
-#define WEBSOCKET_CLOSE 8
 
 
 typedef struct
@@ -34,7 +39,7 @@ unsigned int Masked: 1;
 } TWSHeader;
 
 
-char *WebsocketFindMatchingHelper(const char *Path, const char *Protocols)
+const char *WebsocketFindMatchingHelper(const char *Path, const char *Protocols, char **Proto)
 {
 ListNode *Curr;
 char *ptr, *p_Proto, *Token=NULL;
@@ -53,6 +58,7 @@ while (Curr)
 			{
 			if (strcasecmp(p_Proto, Token)==0)
 			{
+				*Proto=CopyStr(*Proto, Token);
 				DestroyString(Token);
 				return(Curr->Item);
 			}
@@ -80,7 +86,6 @@ OpCode=Head.OpCode;
 
 if (Head.Fin)  OpCode |= WEBSOCKET_FIN;
 if (Head.Masked)  OpCode |= WEBSOCKET_MASK;
-fprintf(stderr,"XX: %d %d %d %u\n",Head.Fin, Head.Masked, Head.OpCode, Head.Len);
 
 if (Head.Len==126) 
 {
@@ -96,7 +101,8 @@ return(OpCode);
 }
 
 
-void WebsocketReadData(STREAM *S, STREAM *Out, int len, int mask)
+
+void WebsocketCopyData(STREAM *S, STREAM *Out, int len, int mask)
 {
 int result, data;
 
@@ -114,6 +120,20 @@ while (len > 0)
 }
 
 
+
+void WebsocketHandlePing(STREAM *S, int len, int mask)
+{
+TWSHeader Head;
+
+memset(&Head,0,2);
+Head.OpCode=WEBSOCKET_PONG;
+Head.Len=len;
+
+WebsocketCopyData(S, S, len, mask);
+}
+
+
+
 void WebsocketWriteData(STREAM *S, const char *Data, int len, int mask, int flags)
 {
 TWSHeader Head;
@@ -125,7 +145,7 @@ if (flags & WEBSOCKET_FIN) Head.Fin=1;
 
 if (len > 125) Head.Len=126;
 else Head.Len=len;
-Head.OpCode=1;
+Head.OpCode=WEBSOCKET_TEXT;
 //if (flags & WEBSOCKET_MASK) Tempstr[1] |= 0x1;
 
 STREAMWriteBytes(S, &Head, 2);
@@ -151,6 +171,7 @@ ListNode *Streams, *S;
 
 	Streams=ListCreate();
 	Prog=ChrootSendRequest(Session, "WEBSOCKET", Helper, "/bin:/usr/bin");
+	STREAMSetFlushType(Prog, FLUSH_FULL, 0, 4096);
 	ListAddItem(Streams, Prog);
 	ListAddItem(Streams, Client);
 	do
@@ -160,8 +181,21 @@ ListNode *Streams, *S;
 		if (S==Client)
 		{
 			OpCode=WebsocketReadHeader(Client, &len, &mask);
-			WebsocketReadData(Client, Prog, len, mask);
-			if (OpCode & WEBSOCKET_FIN) STREAMFlush(Prog);
+			switch (OpCode & 0xFF) 
+			{
+				case WEBSOCKET_PING: WebsocketHandlePing(Client, len, mask); break;
+
+				case WEBSOCKET_PONG: 
+					Tempstr=SetStrLen(Tempstr, len);
+					STREAMReadBytes(Client, Tempstr, len);
+				break;
+
+				case WEBSOCKET_CONT:
+				case WEBSOCKET_TEXT:
+				WebsocketCopyData(Client, Prog, len, mask);
+				if (OpCode & WEBSOCKET_FIN) STREAMFlush(Prog);
+				break;
+			}
 		}
 
 		if (S==Prog)
@@ -171,9 +205,12 @@ ListNode *Streams, *S;
 			STREAMFlush(Client);
 		}
 	} while((OpCode & 0xFF) != WEBSOCKET_CLOSE);
+
+fprintf(stderr,"WEBSOCK CLOSE!\n");
+
 	STREAMClose(Prog);
 
-	ListDestroy(Streams, NULL);
+ListDestroy(Streams, NULL);
 DestroyString(Tempstr);
 }
 
@@ -240,15 +277,14 @@ DestroyString(String);
 
 int WebsocketConnect(STREAM *S, HTTPSession *Session)
 {
-char *Tempstr=NULL, *Key=NULL, *Helper=NULL;
+char *Tempstr=NULL, *Key=NULL, *Helper=NULL, *Proto=NULL;
 HTTPSession *Response;
 int val;
 
 Response=HTTPSessionCreate();
 Response->MethodID=METHOD_WEBSOCKET;
-SetVar(Response->Headers,"Sec-WebSocket-Protocol",Session->ContentType);
 //SetVar(Response->Headers,"Sec-WebSocket-Origin", "file://");
-Helper=CopyStr(Helper, WebsocketFindMatchingHelper(Session->Path, Session->ContentType));
+Helper=CopyStr(Helper, WebsocketFindMatchingHelper(Session->Path, Session->ContentType, &Proto));
 if (StrLen(Helper))
 {
 	if (Session->MethodID==METHOD_WEBSOCKET75) 
@@ -262,6 +298,7 @@ if (StrLen(Helper))
 	SetVar(Response->Headers,"Sec-WebSocket-Accept",Key);
 	}
 
+	SetVar(Response->Headers,"Sec-WebSocket-Protocol",Proto);
 	Response->ResponseCode=CopyStr(Response->ResponseCode, "101 Switching Protocols");
 	HTTPServerSendHeaders(S, Response, HEADERS_KEEPALIVE);
 	STREAMWriteLine("\r\n",S);
@@ -284,6 +321,7 @@ HTTPSessionDestroy(Response);
 
 DestroyString(Tempstr);
 DestroyString(Helper);
+DestroyString(Proto);
 DestroyString(Key);
 }
 

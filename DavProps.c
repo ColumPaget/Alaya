@@ -86,23 +86,7 @@ char *XML=NULL, *Tag=NULL, *Args=NULL,  *Data=NULL, *Tempstr=NULL;
 char *ptr;
 
 
-if (Heads->ContentSize > 0) 
-{
-XML=SetStrLen(XML,Heads->ContentSize+10);
-STREAMReadBytes(S,XML,Heads->ContentSize);
-}
-else
-{
-	Tempstr=STREAMReadLine(Tempstr,S);
-
-	while (Tempstr)
-	{
-		XML=CatStr(XML,Tempstr);
-		Tempstr=STREAMReadLine(Tempstr,S);
-	}
-
-}
-
+HTTPServerReadBody(Heads, &Tempstr);
 
 ptr=HtmlGetTag(XML,&Tempstr,&Args);
 while (ptr)

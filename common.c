@@ -48,6 +48,7 @@ Session->ClientMAC=CopyStr(Session->ClientMAC,"");
 Session->ClientReferrer=CopyStr(Session->ClientReferrer,"");
 Session->StartDir=CopyStr(Session->StartDir,"");
 Session->Depth=1;
+Session->CacheTime=Settings.DocumentCacheTime;
 Session->Headers=ListCreate();
 
 return(Session);
@@ -163,6 +164,7 @@ PI->Type=Type;
 PI->Path=CopyStr(PI->Path,Path);
 PI->Name=CopyStr(PI->Name,GetBasename(Path));
 PI->URL=CopyStr(PI->URL,URL);
+PI->ContentType=CopyStr(PI->ContentType, "");
 return(PI);
 }
 
@@ -174,6 +176,7 @@ PI=(TPathItem *) pi_ptr;
 DestroyString(PI->Path);
 DestroyString(PI->URL);
 DestroyString(PI->Name);
+DestroyString(PI->ContentType);
 free(PI);
 }
 

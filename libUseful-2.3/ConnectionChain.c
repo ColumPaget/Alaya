@@ -195,7 +195,7 @@ if (strncmp(Pass,"keyfile:",8)==0)
 			if (STREAMExpectAndReply(AuthS,"assword:",Token)) break;
 			}
 		}
-		STREAMSetTimeout(AuthS,1);
+		STREAMSetTimeout(AuthS,100);
 		//STREAMExpectSilence(AuthS);
 		sleep(3);
 

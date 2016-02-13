@@ -2,12 +2,19 @@
 #define LIBUSEFUL_TOKEN_H
 
 #include <stdarg.h>
-#include <string.h> //for strlen, used below in StrLen
+#include <string.h>
 
 #define GETTOKEN_MULTI_SEPARATORS 1
+#define GETTOKEN_MULTI_SEP 1
 #define GETTOKEN_HONOR_QUOTES 2
 #define GETTOKEN_STRIP_QUOTES 4
 #define GETTOKEN_QUOTES 6
+#define GETTOKEN_INCLUDE_SEPARATORS 8
+#define GETTOKEN_INCLUDE_SEP 8
+#define GETTOKEN_APPEND_SEPARATORS 16
+#define GETTOKEN_APPEND_SEP 16
+#define GETTOKEN_BACKSLASH  32
+
 
 #ifdef __cplusplus
 extern "C" {

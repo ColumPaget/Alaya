@@ -50,9 +50,9 @@ return(DirPath);
 }
 
 
-int MakeDirPath(char *Path, int DirMask)
+int MakeDirPath(const char *Path, int DirMask)
 {
- char *ptr;
+ const char *ptr;
  char *Tempstr=NULL;
  int result=-1;
 
@@ -73,7 +73,7 @@ int MakeDirPath(char *Path, int DirMask)
 
 
 
-int ChangeFileExtension(char *FilePath, char *NewExt)
+int ChangeFileExtension(const char *FilePath, const char *NewExt)
 {
 char *ptr;
 char *Tempstr=NULL;
@@ -96,7 +96,7 @@ else return(FALSE);
 }
 
 
-int FindFilesInPath(char *File, char *Path, ListNode *Files)
+int FindFilesInPath(const char *File, const char *Path, ListNode *Files)
 {
 char *Tempstr=NULL, *CurrPath=NULL, *ptr;
 int i;
@@ -128,7 +128,7 @@ return(ListSize(Files));
 
 
 
-char *FindFileInPath(char *InBuff, char *File, char *Path)
+char *FindFileInPath(char *InBuff, const char *File, const char *Path)
 {
 char *Tempstr=NULL, *CurrPath=NULL, *RetStr=NULL, *ptr;
 
@@ -163,7 +163,7 @@ return(RetStr);
 
 /* This checks if a certain file exists (not if we can open it etc, just if */
 /* we can stat it, this is useful for checking pid files etc).              */
-int FileExists(char *FileName)
+int FileExists(const char *FileName)
 {
 struct stat StatData;
 
@@ -208,7 +208,7 @@ else return(0);
 */
 
 
-int FileNotifyInit(char *Path, int Flags)
+int FileNotifyInit(const char *Path, int Flags)
 {
 char *Token=NULL, *ptr;
 int fd;
@@ -219,7 +219,6 @@ if (fd==-1) return(fd);
 ptr=GetToken(Path,":",&Token,0);
 while (ptr)
 {
-	printf("FAM: [%s]\n",Token);
 	fanotify_mark(fd, FAN_MARK_ADD, FAN_CLOSE_WRITE, -1, NULL);
 
 	ptr=GetToken(ptr,":",&Token,0);

@@ -145,6 +145,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 	Response->ContentType=CopyStr(Response->ContentType,"");
 	Response->ContentSize=0;
 	Response->LastModified=0;
+	Response->CacheTime=Settings.DocumentCacheTime;
 
 	ptr=GetNameValuePair(Data," ","=",&Name,&Tempstr);
 	while (ptr)
@@ -172,6 +173,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		else if (strcmp(Name,"Cipher")==0) Response->Cipher=CopyStr(Response->Cipher,Value);
 		else if (strcmp(Name,"Cookies")==0) Response->Cookies=CopyStr(Response->Cookies,Value);
 		else if (strcmp(Name,"KeepAlive")==0) Response->Flags |= SESSION_KEEP_ALIVE;
+		else if (strcmp(Name,"Cache")==0) Response->CacheTime=atoi(Value);
 
 		ptr=GetNameValuePair(ptr," ","=",&Name,&Tempstr);
 	}
@@ -317,7 +319,7 @@ DestroyString(Hash);
 return(result);
 }
 
-int HandleWebsocketExecRequest(STREAM *ClientCon, char *Data)
+pid_t HandleWebsocketExecRequest(STREAM *ClientCon, char *Data)
 {
 char *Tempstr=NULL, *Name=NULL, *Value=NULL;
 char *ScriptPath=NULL;
@@ -362,7 +364,7 @@ HTTPSession *Response;
       if (! SwitchUser(Settings.CgiUser))
       {
         LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s using handler '%s'",Settings.CgiUser,ScriptPath,Tempstr);
-        _exit(1);
+        _exit(0);
       }
 
 			if (geteuid()==0)
@@ -401,13 +403,14 @@ DestroyString(Name);
 DestroyString(Value);
 
 
-//Always return false, so that pipe gets closed
-return(FALSE);
+//Always return STREAM_CLOSED, so that pipe gets closed regardless of exit status of 
+//forked helper process
+return(STREAM_CLOSED);
 }
 
 
 
-int HandleCGIExecRequest(STREAM *ClientCon, char *Data)
+pid_t HandleCGIExecRequest(STREAM *ClientCon, char *Data)
 {
 char *Tempstr=NULL, *Name=NULL, *Value=NULL;
 char *ScriptPath=NULL;
@@ -454,7 +457,7 @@ HTTPSession *Response;
       if (! SwitchUser(Settings.CgiUser))
       {
         LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s using handler '%s'",Settings.CgiUser,ScriptPath,Tempstr);
-        _exit(1);
+        _exit(0);
       }
 
 			if (geteuid()==0)
@@ -502,43 +505,48 @@ DestroyString(Name);
 DestroyString(Value);
 
 
-//Always return false, so that pipe gets closed
-return(FALSE);
+//Always return STREAM_CLOSED, so that pipe gets closed regardless of exit status of 
+//forked helper process
+return(STREAM_CLOSED);
+
 }
 
 
 
-void HandleGetFileRequest(STREAM *ClientCon, char *Data)
+pid_t HandleGetFileRequest(STREAM *ClientCon, char *Data)
 {
 HTTPSession *Response;
 char *Tempstr=NULL;
-int result;
+pid_t pid;
 
 
 Response=ParseSessionInfo(Data);
-result=fork();
-if (result==0)
+pid=fork();
+if (pid==0)
 {
 	Tempstr=FindFileInPath(Tempstr,Response->Path,Response->SearchPath);
 	HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 		
-	STREAMFlush(ClientCon);
+	//exit 1 means that we can keep connection alive for re-use
+	if (Response->Flags & SESSION_REUSE) _exit(1);
 	_exit(0);
 }
 
 DestroyString(Tempstr);
+
+return(pid);
 }
 
 
 
 
-void HandleIconRequest(STREAM *ClientCon, char *Data)
+pid_t HandleIconRequest(STREAM *ClientCon, char *Data)
 {
 HTTPSession *Response;
 char *Name=NULL, *Value=NULL, *ptr, *tptr;
 char *Tempstr=NULL;
 ListNode *Vars;
-int result;
+pid_t pid;
 
 Response=ParseSessionInfo(Data);
 Vars=ListCreate();
@@ -557,25 +565,27 @@ while (ptr)
 }
 
 
-result=fork();
-if (result==0)
+pid=fork();
+if (pid==0)
 {
-	ptr=GetToken(Response->SearchPath,",",&Value,0);
+	ptr=GetToken(Response->SearchPath,":",&Value,0);
 	while (ptr)
 	{
 		Tempstr=SubstituteVarsInString(Tempstr,Value,Vars,0);
 		if (access(Tempstr,R_OK)==0) break;
-		ptr=GetToken(ptr,",",&Value,0);
+		ptr=GetToken(ptr,":",&Value,0);
 	}
 		
 	HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
-	STREAMClose(ClientCon);
-	_exit(0);
+	//exit 1 means we can keep connection alive for reuse
+	_exit(1);
 }
 
 DestroyString(Name);
 DestroyString(Value);
 DestroyString(Tempstr);
+
+return(pid);
 }
 
 
@@ -583,31 +593,31 @@ DestroyString(Tempstr);
 
 
 
-int HandleProxyRequest(STREAM *ClientCon, char *Data)
+pid_t HandleProxyRequest(STREAM *ClientCon, char *Data)
 {
 HTTPSession *Response;
 char *Tempstr=NULL;
-int result;
+int pid;
 
 Response=ParseSessionInfo(Data);
-result=fork();
-if (result==0)
+pid=fork();
+if (pid==0)
 {
 	HTTPProxyRGETURL(ClientCon,Response);
 	//void HTTPProxyConnect(STREAM *S,HTTPSession *ClientHeads);
 
 		
 	STREAMFlush(ClientCon);
-	_exit(0);
+	_exit(1);
 }
 
 DestroyString(Tempstr);
 
-return(FALSE);
+return(pid);
 }
 
 
-void HandleResolveIPRequest(STREAM *ClientCon, char *Data)
+pid_t HandleResolveIPRequest(STREAM *ClientCon, char *Data)
 {
 char *Tempstr=NULL;
 
@@ -619,10 +629,12 @@ Tempstr=CatStr(Tempstr,"\n");
 STREAMWriteLine(Tempstr,ClientCon);
 
 DestroyString(Tempstr);
+
+return(0);
 }
 
 
-void HandleChildRegisterRequest(STREAM *S, char *Data)
+pid_t HandleChildRegisterRequest(STREAM *S, char *Data)
 {
 char *Tempstr=NULL, *Host=NULL, *ptr;
 int Flags=0;
@@ -668,10 +680,12 @@ STREAMFlush(S);
 
 DestroyString(Tempstr);
 DestroyString(Host);
+
+return(0);
 }
 
 
-void RunEventScript(STREAM *S, const char *Script)
+pid_t RunEventScript(STREAM *S, const char *Script)
 {
 	if (Spawn(Script,Settings.CgiUser,"",NULL) ==-1)
 	{
@@ -679,13 +693,15 @@ void RunEventScript(STREAM *S, const char *Script)
 	}
   else LogToFile(Settings.LogPath, "Script: '%s'. Error was: %s",Script, strerror(errno));
 	STREAMWriteLine("okay\n",S);
+
+return(0);
 }
 
 
-int HandleChildProcessRequest(STREAM *S)
+pid_t HandleChildProcessRequest(STREAM *S)
 {
 char *Tempstr=NULL, *Token=NULL, *ptr;
-int result=TRUE;
+pid_t Pid=0;
 
 Tempstr=STREAMReadLine(Tempstr,S);
 
@@ -695,22 +711,26 @@ StripTrailingWhitespace(Tempstr);
 LogToFile(Settings.LogPath, "HCPR: %s",Tempstr);
 
 ptr=GetToken(Tempstr,"\\S",&Token,0);
-if (strcmp(Token,"EXEC")==0) result=HandleCGIExecRequest(S,ptr);
-else if (strcmp(Token,"WEBSOCKET")==0) result=HandleWebsocketExecRequest(S,ptr);
-else if (strcmp(Token,"LOG")==0) LogToFile(Settings.LogPath,ptr);
-else if (strcmp(Token,"GETF")==0) HandleGetFileRequest(S,ptr);
-else if (strcmp(Token,"GETIP")==0) HandleResolveIPRequest(S,ptr);
-else if (strcmp(Token,"REG")==0) HandleChildRegisterRequest(S,ptr);
-else if (strcmp(Token,"PROXY")==0) result=HandleProxyRequest(S,ptr);
-else if (strcmp(Token,"MIMEICON")==0) HandleIconRequest(S, ptr);
-else if (strcmp(Token,"EVENT")==0) RunEventScript(S, ptr);
+if (strcmp(Token,"EXEC")==0) Pid=HandleCGIExecRequest(S,ptr);
+else if (strcmp(Token,"WEBSOCKET")==0) Pid=HandleWebsocketExecRequest(S,ptr);
+else if (strcmp(Token,"LOG")==0) 
+{
+	LogToFile(Settings.LogPath,ptr);
+	Pid=0;
+}
+else if (strcmp(Token,"GETF")==0) Pid=HandleGetFileRequest(S,ptr);
+else if (strcmp(Token,"GETIP")==0) Pid=HandleResolveIPRequest(S,ptr);
+else if (strcmp(Token,"REG")==0) Pid=HandleChildRegisterRequest(S,ptr);
+else if (strcmp(Token,"PROXY")==0) Pid=HandleProxyRequest(S,ptr);
+else if (strcmp(Token,"MIMEICON")==0) Pid=HandleIconRequest(S, ptr);
+else if (strcmp(Token,"EVENT")==0) Pid=RunEventScript(S, ptr);
  
 STREAMFlush(S);
 
 DestroyString(Tempstr);
 DestroyString(Token);
 
-return(result);
+return(Pid);
 }
 
 
@@ -755,6 +775,11 @@ Quoted=QuoteCharsInStr(Quoted,Session->ClientReferrer,"'&");
 Tempstr=MCatStr(Tempstr, " ClientReferrer='",Quoted,"'",NULL);
 
 if (Session->Flags & SESSION_KEEP_ALIVE) Tempstr=CatStr(Tempstr," KeepAlive=Y");
+if (Session->CacheTime > 0)
+{
+	Quoted=FormatStr(Quoted," Cache=%d",Session->CacheTime);
+	Tempstr=CatStr(Tempstr,Quoted);
+}
 if (StrLen(Session->UserName)) Tempstr=MCatStr(Tempstr," User='",Session->UserName,"'",NULL);
 if (StrLen(Session->RemoteAuthenticate)) Tempstr=MCatStr(Tempstr," RemoteAuthenticate='",Session->RemoteAuthenticate,"'",NULL);
 
@@ -881,6 +906,8 @@ char *LocalPath=NULL, *ExternalPath=NULL, *DocName=NULL;
 ListNode *Vars;
 
 
+if (VPath->CacheTime) Session->CacheTime=VPath->CacheTime;
+
 Vars=ListCreate();
 ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
 while (ptr)
@@ -926,6 +953,7 @@ else HTTPServerSendDocument(S, Session, DocName, HEADERS_SENDFILE|HEADERS_USECAC
 void VPathMimeIcons(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendData)
 {
 	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,"",VPath->Path);
+	if (VPath->CacheTime) Session->CacheTime=VPath->CacheTime;
 	ChrootProcessRequest(S, Session, "MIMEICON", "", VPath->Path);
 }
 

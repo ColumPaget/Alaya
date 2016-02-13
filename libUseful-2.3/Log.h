@@ -32,6 +32,7 @@ typedef struct
 } TLogFile;
 
 TLogFile *LogFileGetEntry(const char *FileName);
+int LogFileSetDefaults(int Flags, int MaxSize, int MaxRotate, int FlushInterval);
 void LogFileSetValues(TLogFile *LogFile, int Flags, int MaxSize, int MaxRotate, int FlushInterval);
 int LogFileFindSetValues(const char *FileName, int Flags, int MaxSize, int MaxRotate, int FlushInterval);
 void LogFileFlushAll(int Force);

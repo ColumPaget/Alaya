@@ -19,6 +19,7 @@ struct lnode *Jump;
 struct lnode *Prev;
 struct lnode *Next;
 int Hits;
+time_t Time;
 } ListNode;
 
 

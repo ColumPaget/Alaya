@@ -155,6 +155,7 @@ Curr->Item=Item;
 Curr->Head=ListGetHead(ListStart);
 Curr->Next=NULL;
 if (Name) Curr->Tag=CopyStr(NULL,Name);
+Curr->Time=GetTime(TRUE);
 
 ListIncrNoOfItems(Curr);
 return(Curr);
@@ -212,11 +213,13 @@ NewItem=(ListNode *) calloc(1,sizeof(ListNode));
 NewItem->Item=Item;
 NewItem->Prev=InsertNode;
 NewItem->Next=Next;
-InsertNode->Next=NewItem;
 NewItem->Head=InsertNode->Head;
+InsertNode->Next=NewItem;
 if (Next) Next->Prev=NewItem; /* Next might be NULL! */
 ListIncrNoOfItems(NewItem);
 if (StrLen(Name)) NewItem->Tag=CopyStr(NewItem->Tag,Name);
+NewItem->Time=GetTime(TRUE);
+
 return(NewItem);
 }
 
@@ -260,19 +263,22 @@ ListNode *Prev, *Curr, *Start=NULL;
 int result=0, count=0;
 int hops=0, jumps=0, miss=0;
 
+if (! Head) return(Head);
 if (! StrLen(Name)) return(Head);
 Curr=ListGetNext(Head);
 if (! Curr) return(Head);
 
-Prev=ListGetLast(Head);
-if (Prev && Prev->Tag)
+//Check last item in list
+Prev=Head->Prev;
+if (Prev && (Prev != Head) && Prev->Tag)
 {
 	if (Head->Flags & LIST_FLAG_CASE) result=strcmp(Prev->Tag,Name);
 	else result=strcasecmp(Prev->Tag,Name);
+
+	if ((Head->Flags & LIST_FLAG_ORDERED) && (result < 1)) return(Prev);
 }
 
-if ((Head->Flags & LIST_FLAG_ORDERED) && (result < 1)) return(Prev);
-
+/*
 if ((Head->Flags & LIST_FLAG_CACHE) && (Head->Jump))
 {
 	Prev=Head->Jump;
@@ -283,6 +289,7 @@ if ((Head->Flags & LIST_FLAG_CACHE) && (Head->Jump))
 	if (result < 1) Curr=Prev;
 	}
 }
+*/
 
 
 Prev=Head;
@@ -365,6 +372,7 @@ NewItem->Head=Prev->Head;
 if (NewItem->Next) NewItem->Next->Prev=NewItem; /* Next might be NULL! */
 ListIncrNoOfItems(NewItem);
 if (StrLen(Name)) NewItem->Tag=CopyStr(NewItem->Tag,Name);
+NewItem->Time=GetTime(TRUE);
 
 return(NewItem);
 }
@@ -536,13 +544,16 @@ ListNode *Head, *Prev, *Next;
 
 if (! Item1) return;
 if (! Item2) return;
-Prev=Item1->Prev;
-Next=Item2->Next;
 Head=ListGetHead(Item1);
 if (Head==Item1) return;
 if (Head==Item2) return;
 
+Prev=Item1->Prev;
+Next=Item2->Next;
+
 if (Head->Next==Item1) Head->Next=Item2;
+if (Head->Prev==Item1) Head->Prev=Item2;
+
 if (Prev) Prev->Next=Item2;
 Item1->Prev=Item2;
 Item1->Next=Next;
@@ -634,7 +645,7 @@ return(Curr);
 
 void *ListDeleteNode(ListNode *Node)
 {
-ListNode *Prev, *Next;
+ListNode *Head, *Prev, *Next;
 void *Contents;
 
 if (Node==NULL)
@@ -642,20 +653,13 @@ if (Node==NULL)
  return(NULL);
 }
 
-/*
-Curr=Node->Head;
-while (Curr)
-{
-	if (Curr->Jump==Node) Curr->Jump=NULL;
-	Curr=ListGetNext(Curr);
-}
-*/
-
+Head=ListGetHead(Node);
 Prev=Node->Prev;
 Next=Node->Next;
 if (Prev !=NULL) Prev->Next=Next;
 if (Next !=NULL) Next->Prev=Prev;
-
+if (Head->Next==Node) Head->Next=Next;
+if (Head->Prev==Node) Head->Prev=Prev;
 
 Contents=Node->Item;
 

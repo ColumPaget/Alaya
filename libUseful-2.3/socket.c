@@ -87,6 +87,60 @@ return(FALSE);
 }
 
 
+
+int GetHostARP(const char *IP, char **Device, char **MAC)
+{
+char *Tempstr=NULL, *Token=NULL;
+int result=FALSE;
+const char *ptr;
+FILE *F;
+
+Tempstr=SetStrLen(Tempstr, 255);
+F=fopen("/proc/net/arp","r");
+if (F)
+{
+	*Device=CopyStr(*Device,"remote");
+	*MAC=CopyStr(*MAC,"remote");
+	//Read Title Line
+	fgets(Tempstr,255,F);
+
+	while (fgets(Tempstr,255,F))
+	{
+		StripTrailingWhitespace(Tempstr);
+		ptr=GetToken(Tempstr," ",&Token,0);
+		if (strcmp(Token,IP)==0)
+		{
+			while (isspace(*ptr)) ptr++;
+			ptr=GetToken(ptr," ",&Token,0);
+
+			while (isspace(*ptr)) ptr++;
+			ptr=GetToken(ptr," ",&Token,0);
+
+			while (isspace(*ptr)) ptr++;
+			ptr=GetToken(ptr," ",MAC,0);
+			strlwr(*MAC);
+
+			while (isspace(*ptr)) ptr++;
+			ptr=GetToken(ptr," ",&Token,0);
+
+			while (isspace(*ptr)) ptr++;
+			ptr=GetToken(ptr," ",Device,0);
+
+			result=TRUE;
+		}
+	}
+fclose(F);
+}
+
+DestroyString(Tempstr);
+DestroyString(Token);
+
+return(result);
+}
+
+
+
+
 const char *GetInterfaceIP(const char *Interface)
 {
  int fd, result;
@@ -114,7 +168,8 @@ struct sockaddr_in *sa4;
 struct sockaddr_in6 *sa6;
 socklen_t salen;
 int result;
-char *p_Addr=NULL, *ptr;
+const char *p_Addr=NULL, *ptr;
+char *Token=NULL;
 
 
 if (StrLen(Address))  
@@ -153,13 +208,10 @@ else
 	sa6->sin6_family=AF_INET6;
 	if (StrLen(p_Addr)) 
 	{
-		ptr=strchr(p_Addr,'%');
-		if (ptr)
-		{
-			sa6->sin6_scope_id=if_nametoindex(ptr+1);
-			*ptr='\0';	
-		}
-		inet_pton(AF_INET6, p_Addr, &(sa6->sin6_addr));
+		ptr=GetToken(p_Addr, "%",&Token,0);
+		if (StrLen(ptr)) sa6->sin6_scope_id=if_nametoindex(ptr);
+		inet_pton(AF_INET6, Token, &(sa6->sin6_addr));
+		DestroyString(Token);
 	}
 	else sa6->sin6_addr=in6addr_any;
 	salen=sizeof(struct sockaddr_in6);
@@ -319,7 +371,7 @@ int GetSockDetails(int sock, char **LocalAddress, int *LocalPort, char **RemoteA
 socklen_t salen;
 int result;
 struct sockaddr_storage sa;
-char *Tempstr=NULL;
+char *Tempstr=NULL, *ptr;
 
 *LocalPort=0;
 *RemotePort=0;
@@ -331,10 +383,18 @@ result=getsockname(sock, (struct sockaddr *) &sa, &salen);
 
 if (result==0)
 {
-*LocalAddress=SetStrLen(*LocalAddress,NI_MAXHOST);
-Tempstr=SetStrLen(Tempstr,NI_MAXSERV);
-getnameinfo((struct sockaddr *) &sa, salen, *LocalAddress, NI_MAXHOST, Tempstr, NI_MAXSERV, NI_NUMERICHOST|NI_NUMERICSERV);
+	*LocalAddress=SetStrLen(*LocalAddress,NI_MAXHOST);
+	Tempstr=SetStrLen(Tempstr,NI_MAXSERV);
+	getnameinfo((struct sockaddr *) &sa, salen, *LocalAddress, NI_MAXHOST, Tempstr, NI_MAXSERV, NI_NUMERICHOST|NI_NUMERICSERV);
 	*LocalPort=atoi(Tempstr);
+
+	if ((strncmp(*LocalAddress,"::ffff:",7)==0) && strchr(*LocalAddress,'.')) 
+	{
+		ptr=*LocalAddress;
+		ptr+=7;
+		memmove(*LocalAddress,ptr,StrLen(*LocalAddress)-6);
+	}
+	
 
 	//Set Address to be the same as control sock, as it might not be INADDR_ANY
 	result=getpeername(sock, (struct sockaddr *) &sa, &salen);
@@ -346,6 +406,12 @@ getnameinfo((struct sockaddr *) &sa, salen, *LocalAddress, NI_MAXHOST, Tempstr, 
 		getnameinfo((struct sockaddr *) &sa, salen, *RemoteAddress, NI_MAXHOST, Tempstr, NI_MAXSERV, NI_NUMERICHOST|NI_NUMERICSERV);
 		*RemotePort=atoi(Tempstr);
 
+		if ((strncmp(*RemoteAddress,"::ffff:",7)==0) && strchr(*RemoteAddress,'.')) 
+		{
+		ptr=*RemoteAddress;
+		ptr+=7;
+		memmove(*RemoteAddress,ptr,StrLen(*RemoteAddress)-6);
+		}
 	}
 
 	//We've got the local sock, so lets still call it a success
@@ -431,6 +497,7 @@ sa.sin_addr=*(struct in_addr *) *hostdata->h_addr_list;
 salen=sizeof(sa);
 if (Flags & CONNECT_NONBLOCK) 
 {
+printf("CONNECT NON BLOCK!\n");
 fcntl(sock,F_SETFL,O_NONBLOCK);
 }
 
@@ -717,7 +784,7 @@ if ((HopNo==0) && StrLen(DesiredHost))
 	val=Flags;
 
 	//STREAMDoPostConnect handles this	
-	if (S->Timeout > 0) val |= CONNECT_NONBLOCK;
+	//if (S->Timeout > 0) val |= CONNECT_NONBLOCK;
 
 	S->in_fd=ConnectToHost(DesiredHost,DesiredPort,val);
 

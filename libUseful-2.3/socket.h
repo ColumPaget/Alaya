@@ -21,7 +21,7 @@ int IsIP6Address(const char *Str);
 int IsIPAddress(const char *);
 
 const char *GetInterfaceIP(const char *Interface);
-
+int GetHostARP(const char *IP, char **Device, char **MAC);
 
 /* Server Socket Funcs*/
 int InitServerSock(int Type, const char *Address, int Port);

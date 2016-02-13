@@ -318,6 +318,13 @@ if (S)
 	ptr=LibUsefulGetValue("SSL-Permitted-Ciphers");
 	if (ptr) SSL_set_cipher_list(ssl, ptr);
   result=SSL_connect(ssl);
+	while (result==-1)
+	{
+	result=SSL_get_error(ssl, result);
+	if ( (result!=SSL_ERROR_WANT_READ) && (result != SSL_ERROR_WANT_WRITE) ) break;
+	usleep(300);
+  result=SSL_connect(ssl);
+	}
   S->Flags|=SF_SSL;
 
 	OpenSSLQueryCipher(S);

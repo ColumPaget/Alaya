@@ -10,15 +10,15 @@ extern "C" {
 char *GetBasename(char *Path);
 char *SlashTerminateDirectoryPath(char *DirPath);
 char *StripDirectorySlash(char *DirPath);
-int FileExists(char *);
-int MakeDirPath(char *Path, int DirMask);
-int FindFilesInPath(char *File, char *Path, ListNode *Files);
-char *FindFileInPath(char *InBuff, char *File, char *Path);
-int ChangeFileExtension(char *FilePath, char *NewExt);
-int FindFilesInPath(char *File, char *Path, ListNode *Files);
+int FileExists(const char *);
+int MakeDirPath(const char *Path, int DirMask);
+int FindFilesInPath(const char *File, const char *Path, ListNode *Files);
+char *FindFileInPath(char *InBuff, const char *File, const char *Path);
+int ChangeFileExtension(const char *FilePath, const char *NewExt);
+int FindFilesInPath(const char *File, const char *Path, ListNode *Files);
 
 
-int FileNotifyInit(char *Path, int Flags);
+int FileNotifyInit(const char *Path, int Flags);
 int FileNotifyGetNext(int fd, char **Path);
 
 

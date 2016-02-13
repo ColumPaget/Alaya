@@ -332,7 +332,7 @@ int result=FALSE;
 #ifdef HAVE_LIBSSL
 libCryptoProcessorData *Data;
 EVP_CIPHER_CTX *ctx;
-char *CipherList[]={"blowfish","rc2","rc4","rc5","des","desx","cast","idea","aes","aes-256",NULL};
+const char *CipherList[]={"blowfish","rc2","rc4","rc5","des","desx","cast","idea","aes","aes-256",NULL};
 int val;
 char *Tempstr=NULL;
 

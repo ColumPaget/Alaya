@@ -163,6 +163,37 @@ return(XMLGetTag(Input, NULL, TagType, TagData));
 
 
 
+char *HTMLQuote(char *RetBuff, char *Str)
+{
+char *RetStr=NULL, *Token=NULL, *ptr;
+int len;
+
+RetStr=CopyStr(RetStr,"");
+len=StrLen(Str);
+
+for (ptr=Str; ptr < (Str+len); ptr++)
+{
+
+switch (*ptr)
+{
+case '&': RetStr=CatStr(RetStr,"&amp;"); break;
+case '<': RetStr=CatStr(RetStr,"&lt;"); break;
+case '>': RetStr=CatStr(RetStr,"&gt;"); break;
+
+default:
+		 RetStr=AddCharToStr(RetStr,*ptr); 
+break; 
+}
+
+}
+
+DestroyString(Token);
+return(RetStr);
+}
+
+
+
+
 char *HtmlDeQuote(char *RetStr, char *Data)
 {
 char *Output=NULL, *Token=NULL, *ptr;

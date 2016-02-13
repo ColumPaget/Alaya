@@ -53,11 +53,11 @@ if (posix_memalign(&NewMem, PageSize, MemSize)==0)
 
 	#ifdef HAVE_MADVISE
 
-		#ifdef HAVE_MADVISE_NOFORK
+		#ifdef MADV_NOFORK
 			if (Flags & SMEM_NOFORK) madvise(NewMem,NewSize,MADV_DONTFORK);
 		#endif
 		
-		#ifdef HAVE_MADVISE_DONTDUMP
+		#ifdef MADV_DONTDUMP
 			if (Flags & SMEM_NODUMP) madvise(NewMem,NewSize,MADV_DONTDUMP);
 		#endif
 

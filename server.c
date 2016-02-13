@@ -6,112 +6,50 @@
 #include "FileDetailsPage.h"
 #include "FileProperties.h"
 #include "ChrootHelper.h"
-#include "Settings.h"
 #include "Events.h"
 #include "ID3.h"
 #include "upload.h"
 #include "proxy.h"
 #include "fnmatch.h"
 
-const char *HTTPMethods[]={"HEAD","GET","POST","PUT","DELETE","MKCOL","PROPFIND","PROPPATCH","MOVE","COPY","OPTIONS","CONNECT",NULL};
+const char *HTTPMethods[]={"HEAD","GET","POST","PUT","DELETE","MKCOL","PROPFIND","PROPPATCH","MOVE","COPY","OPTIONS","CONNECT","LOCK","UNLOCK",NULL};
 
 const char *HeaderStrings[]={"Authorization","Proxy-Authorization","Host","Destination","Content-Type","Content-Length","Depth","Overwrite","User-Agent","Cookie","If-Modified-Since","Accept-Encoding","Icy-MetaData","Referer","Connection","Upgrade","Sec-WebSocket-Key","Sec-Websocket-Key1", "Sec-Websocket-Key2","Sec-WebSocket-Protocol","Sec-WebSocket-Version","Origin", NULL};
 
 typedef enum {HEAD_AUTH, HEAD_PROXYAUTH, HEAD_HOST, HEAD_DEST, HEAD_CONTENT_TYPE, HEAD_CONTENT_LENGTH, HEAD_DEPTH, HEAD_OVERWRITE, HEAD_AGENT, HEAD_COOKIE, HEAD_IFMOD_SINCE, HEAD_ACCEPT_ENCODING, HEAD_ICECAST,HEAD_REFERER, HEAD_CONNECTION, HEAD_UPGRADE, HEAD_WEBSOCK_KEY, HEAD_WEBSOCK_KEY1, HEAD_WEBSOCK_KEY2, HEAD_WEBSOCK_PROTOCOL, HEAD_WEBSOCK_VERSION, HEAD_ORIGIN} THeaders;
 
 
-int GetHostARP(const char *IP, char **Device, char **MAC)
+
+int HTTPServerReadBody(HTTPSession *Session, char **Data)
 {
-char *Tempstr=NULL, *Token=NULL;
-int result=FALSE;
-const char *ptr;
-FILE *F;
+char *Tempstr=NULL;
+int bytes_read=0, len;
 
-Tempstr=SetStrLen(Tempstr, 255);
-F=fopen("/proc/net/arp","r");
-if (F)
+if (Session->ContentSize > 0)
 {
-	*Device=CopyStr(*Device,"remote");
-	*MAC=CopyStr(*MAC,"remote");
-	//Read Title Line
-	fgets(Tempstr,255,F);
-
-	while (fgets(Tempstr,255,F))
-	{
-		StripTrailingWhitespace(Tempstr);
-		ptr=GetToken(Tempstr," ",&Token,0);
-		if (strcmp(Token,IP)==0)
-		{
-			while (isspace(*ptr)) ptr++;
-			ptr=GetToken(ptr," ",&Token,0);
-
-			while (isspace(*ptr)) ptr++;
-			ptr=GetToken(ptr," ",&Token,0);
-
-			while (isspace(*ptr)) ptr++;
-			ptr=GetToken(ptr," ",MAC,0);
-			strlwr(*MAC);
-
-			while (isspace(*ptr)) ptr++;
-			ptr=GetToken(ptr," ",&Token,0);
-
-			while (isspace(*ptr)) ptr++;
-			ptr=GetToken(ptr," ",Device,0);
-
-			result=TRUE;
-		}
-	}
-fclose(F);
+	*Data=SetStrLen(*Data,Session->ContentSize+10);
+  while (bytes_read < Session->ContentSize)
+  {
+  len=STREAMReadBytes(Session->S, (*Data) + bytes_read, Session->ContentSize-bytes_read);
+  if (len < 1) break;
+  bytes_read+=len;
+  }
+}
+else
+{
+  Tempstr=STREAMReadLine(Tempstr,Session->S);
+  while (Tempstr)
+  {
+		len=StrLen(Tempstr);
+    *Data=CatStrLen(*Data,Tempstr,len);
+		bytes_read+=len;
+    Tempstr=STREAMReadLine(Tempstr,Session->S);
+  }
 }
 
 DestroyString(Tempstr);
-DestroyString(Token);
-
-return(result);
+return(bytes_read);
 }
-
-
-char *DecodeBase64(char *Return, int *len, char *Text)
-{
-char *RetStr;
-
-RetStr=SetStrLen(Return,StrLen(Text) *2);
-*len=from64tobits(RetStr,Text);
-
-return(RetStr);
-}
-
-char *HTMLQuote(char *RetBuff, char *Str)
-{
-char *RetStr=NULL, *Token=NULL, *ptr;
-int len;
-
-RetStr=CopyStr(RetStr,"");
-len=StrLen(Str);
-
-for (ptr=Str; ptr < (Str+len); ptr++)
-{
-
-switch (*ptr)
-{
-case '&': RetStr=CatStr(RetStr,"&amp;"); break;
-case '<': RetStr=CatStr(RetStr,"&lt;"); break;
-case '>': RetStr=CatStr(RetStr,"&gt;"); break;
-
-default:
-		 RetStr=AddCharToStr(RetStr,*ptr); 
-break; 
-}
-
-}
-
-DestroyString(Token);
-return(RetStr);
-}
-
-
-
-
 
 
 int HTTPServerDecideToCompress(HTTPSession *Session, char *Path)
@@ -587,7 +525,7 @@ else
 {
 	if ((Flags & HEADERS_USECACHE) && (Settings.DocumentCacheTime > 0))
 	{
-	Tempstr=FormatStr(Tempstr,"max-age=%d",Settings.DocumentCacheTime);
+	Tempstr=FormatStr(Tempstr,"max-age=%d",Session->CacheTime);
 	HTTPServerSendHeader(S, "Cache-Control", Tempstr);
 	HTTPServerSendHeader(S,"Expires",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",time(NULL) + Settings.DocumentCacheTime,NULL));
 	}
@@ -905,6 +843,7 @@ int ICYInterval=4096000;
 		}
 
 		Response=FileSendCreateSession(Path, Session->Flags, Vars, ICYInterval);
+		Response->CacheTime=Session->CacheTime;
 		HTTPServerFormatExtraHeaders(Response,Vars);
 		HTTPServerSendHeaders(S, Response, Flags);
 
@@ -975,34 +914,9 @@ int bytes_read=0, result;
 //disallow any 'Get' style arguments previously read. Post sends arguments on stdin
 Session->Arguments=CopyStr(Session->Arguments,"");
 
-if (strcmp(Session->ContentType,"application/x-www-form-urlencoded")==0)
-{
-	if (Session->ContentSize > 0)
-	{
-		Session->Arguments=SetStrLen(Session->Arguments,Session->ContentSize);
-		STREAMReadBytes(S,Session->Arguments,Session->ContentSize);
-	}
-	else
-	{
-		Tempstr=STREAMReadLine(Tempstr,S);
-		while (Tempstr)
-		{
-			Session->Arguments=CatStr(Session->Arguments,Tempstr);
-			Tempstr=STREAMReadLine(Tempstr,S);
-		}
-	}
-}
+if (strcmp(Session->ContentType,"application/x-www-form-urlencoded")==0) HTTPServerReadBody(Session, &Session->Arguments);
 else if ((PathType != PATHTYPE_CGI) && (strncmp(Session->ContentType,"multipart/",10)==0)) HTTPServerHandleMultipartPost(S, Session);
-else if (Session->ContentSize > 0)
-{
-  Session->Arguments=SetStrLen(Session->Arguments,Session->ContentSize);
-  while (bytes_read < Session->ContentSize)
-  {
-  result=STREAMReadBytes(S, Session->Arguments+bytes_read, Session->ContentSize-bytes_read);
-  if (result < 1) break;
-  bytes_read+=result;
-  }
-}
+else if (Session->ContentSize > 0) HTTPServerReadBody(Session, &Session->Arguments);
 
 
 DestroyString(Tempstr);
@@ -1317,6 +1231,25 @@ DestroyString(Tempstr);
 DestroyString(Destination);
 }
 
+void HTTPServerHandleLock(STREAM *S, HTTPSession *ClientHeads)
+{
+
+if (ClientHeads->MethodID==METHOD_LOCK)
+{
+	if (access(ClientHeads->Path, F_OK) !=0)
+	{
+			//File does not exist. We must create it
+	}
+
+}
+else
+{
+	
+}
+
+}
+
+
 
 void HTTPServerOptions(STREAM *S,HTTPSession *ClientHeads)
 {
@@ -1524,9 +1457,9 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 
 int HTTPServerProcessActions(STREAM *S, HTTPSession *Session)
 {
-typedef enum {ACT_NONE, ACT_GET, ACT_DEL, ACT_RENAME, ACT_EDIT, ACT_MKDIR, ACT_SAVE_PROPS, ACT_EDIT_WITH_ACCESSTOKEN} TServerActs;
+typedef enum {ACT_NONE, ACT_GET, ACT_DEL, ACT_RENAME, ACT_EDIT, ACT_MKDIR, ACT_PACK, ACT_SAVE_PROPS, ACT_EDIT_WITH_ACCESSTOKEN} TServerActs;
 char *QName=NULL, *QValue=NULL, *Name=NULL, *Value=NULL, *ptr;
-char *Arg1=NULL, *Arg2=NULL, *FileProperties=NULL;
+char *Arg1=NULL, *Arg2=NULL, *FileProperties=NULL, *SelectedFiles=NULL;
 TServerActs Action=ACT_NONE;
 int result=FALSE;
 
@@ -1574,15 +1507,27 @@ int result=FALSE;
 			Arg1=CopyStr(Arg1,Name+4);
 		}
 
+		if (strncasecmp(Name,"pack:",5)==0) 
+		{
+			Action=ACT_PACK;
+			Arg1=CopyStr(Arg1,Name+5);
+		}
+
 		if (strncasecmp(Name,"sprops:",7)==0) 
 		{
 			Action=ACT_SAVE_PROPS;
 			Arg1=CopyStr(Arg1,Name+7);
 		}
 
-
-		if (strcasecmp(Name,"renameto")==0) Arg2=HTTPUnQuote(Arg2,Value);
-		if (strcasecmp(Name,"mkdir")==0) Arg2=HTTPUnQuote(Arg2,Value);
+		//these are secondary arguments in the query string, whereas all the above are the primary 
+		//request that defines what action we're taking
+		QValue=CopyStr(QValue,"");
+		if (strcasecmp(Name,"renameto")==0) QValue=HTTPUnQuote(QValue,Value);
+		else if (strcasecmp(Name,"mkdir")==0) QValue=HTTPUnQuote(QValue,Value);
+		else if (strcasecmp(Name,"packtype")==0) QValue=HTTPUnQuote(QValue,Value);
+		else if (strcasecmp(Name,"packtarget")==0) QValue=HTTPUnQuote(QValue,Value);
+		else if (strcasecmp(Name,"selected")==0) QValue=HTTPUnQuote(QValue,Value);
+		if (StrLen(QValue)) Arg2=MCatStr(Arg2, Name, "=", QValue, "&",NULL);
 
 		if (strncasecmp(Name,"fileproperty:",13)==0) FileProperties=MCatStr(FileProperties,"&",Name,"=",Value,NULL);
 		ptr=GetNameValuePair(ptr,"&","=",&QName,&QValue);
@@ -1622,7 +1567,7 @@ int result=FALSE;
 	  case ACT_RENAME: 
 		if (StrLen(Arg2))
 		{
-			Value=MCopyStr(Value,Arg1,"?format=rename&renameto=",Arg2,NULL);
+			Value=MCopyStr(Value,Arg1,"?format=rename&",Arg2,NULL);
 			Session->LastModified=0;
 			HTTPServerSendResponse(S, Session, "302", "", Value);
 			result=TRUE;
@@ -1632,7 +1577,7 @@ int result=FALSE;
 	  case ACT_MKDIR: 
 		if (StrLen(Arg2))
 		{
-			Value=MCopyStr(Value,Arg1,"?format=mkdir&mkdir=",Arg2,NULL);
+			Value=MCopyStr(Value,Arg1,"?format=mkdir&",Arg2,NULL);
 			Session->LastModified=0;
 			HTTPServerSendResponse(S, Session, "302", "", Value);
 			result=TRUE;
@@ -1649,8 +1594,16 @@ int result=FALSE;
 		Session->LastModified=0;
 		HTTPServerSendResponse(S, Session, "302", "", Value);
 		break;
+
+		case ACT_PACK:
+		Value=MCopyStr(Value,Arg1,"?format=pack&",Arg2,NULL);
+		Session->LastModified=0;
+		HTTPServerSendResponse(S, Session, "302", "", Value);
+		break;
 	}
 
+DestroyString(FileProperties);
+DestroyString(SelectedFiles);
 DestroyString(QName);
 DestroyString(QValue);
 DestroyString(Name);
@@ -1757,6 +1710,9 @@ else if (! HTTPServerValidateURL(Session, &Tempstr))
 }
 else if (AuthOkay)
 {
+
+//if this is NOT a session being reused with 'Connection: keepalive' then it must be a new connection
+//and so we should setup a new user context 
 if (! (Session->Flags & SESSION_REUSE)) HTTPServerSetUserContext(Session);
 
 
@@ -1817,9 +1773,21 @@ switch (Session->MethodID)
 		HTTPProxyConnect(Session->S,Session);
 		break;
 
+	case METHOD_LOCK:
+		HTTPServerHandleLock(Session->S, Session);
+		break;
+
+	case METHOD_UNLOCK:
+		HTTPServerHandleLock(Session->S, Session);
+		break;
+
+
 	case METHOD_WEBSOCKET:
 	case METHOD_WEBSOCKET75:
 		WebsocketConnect(Session->S,Session);
+		//we can't reuse websocket connections. They are persistent, but they are opaque to 
+		//the HTTP server
+		Session->Flags &= ~SESSION_REUSE;
 		break;
 
 

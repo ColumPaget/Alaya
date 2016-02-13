@@ -46,7 +46,7 @@
 #define SF_CREATE 64
 #define SF_APPEND 128
 #define SF_TRUNC 256
-#define SF_SYMLINK_OK 512
+#define SF_MMAP  512
 #define SF_WRLOCK 1024
 #define SF_RDLOCK 2048
 #define SF_FOLLOW 4096
@@ -55,6 +55,8 @@
 #define SF_SSL 32768
 #define SF_AUTH 65536
 #define SF_EXEC_INHERIT 131072
+#define SF_SYMLINK_OK 262144
+#define SF_NOCACHE 524288
 
 
 

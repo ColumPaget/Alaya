@@ -87,19 +87,20 @@ char *HTTPQuote(char *, char*);
 char *HTTPQuoteChars(char *RetBuff, char *Str, char *CharList);
 char *HTTPUnQuote(char *, char*);
 
-void HTTPSetVar(char *Name, char *Var);
+void HTTPSetVar(const char *Name, const char *Var);
 
 
 void HTTPInfoDestroy(void *p_Info);
-void HTTPInfoSetValues(HTTPInfoStruct *Info, char *Host, int Port, char *Logon, char *Password, char *Method, char *Doc, char *ContentType, int ContentLength);
-void HTTPInfoSetAuth(HTTPInfoStruct *Auth, char *Logon, char *Password, int Type);
-HTTPInfoStruct *HTTPInfoCreate(char *Host, int Port, char *Logon, char *Password, char *Method, char *Doc, char *ContentType, int ContentLength);
+void HTTPInfoSetValues(HTTPInfoStruct *Info, const char *Host, int Port, const char *Logon, const char *Password, const char *Method, const char *Doc, const char *ContentType, int ContentLength);
+void HTTPInfoSetAuth(HTTPInfoStruct *Auth, const char *Logon, const char *Password, int Type);
+HTTPInfoStruct *HTTPInfoCreate(const char *Host, int Port, const char *Logon, const char *Password, const char *Method, const char *Doc, const char *ContentType, int ContentLength);
 STREAM *HTTPConnect(HTTPInfoStruct *Info);
 STREAM *HTTPTransact(HTTPInfoStruct *Info);
-HTTPInfoStruct *HTTPInfoFromURL(char *Method, char *URL);
-STREAM *HTTPMethod(char *Method, char *URL, char *Logon, char *Password, char *ContentType, char *ContentData, int ContentLength);
-STREAM *HTTPGet(char *URL, char *Logon, char *Password);
-STREAM *HTTPPost(char *URL, char *Logon, char *Password, char *ContentType, char *Content);
+void HTTPInfoSetURL(HTTPInfoStruct *Info, const char *Method, const char *URL);
+HTTPInfoStruct *HTTPInfoFromURL(const char *Method, const char *URL);
+STREAM *HTTPMethod(const char *Method, const char *URL, const char *Logon, const char *Password, const char *ContentType, const char *ContentData, int ContentLength);
+STREAM *HTTPGet(const char *URL, const char *Logon, const char *Password);
+STREAM *HTTPPost(const char *URL, const char *Logon, const char *Password, const char *ContentType, const char *Content);
 int HTTPReadBytes(STREAM *Con, char **Buffer);
 void HTTPCopyToSTREAM(STREAM *Con, STREAM *S);
 int HTTPDownload(char *URL, char *Login, char *Password, STREAM *S);

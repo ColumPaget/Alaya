@@ -15,11 +15,16 @@ ListNode *LogFiles=NULL;
 TLogFile *LogFileDefaults=NULL;
 
 
-void LogFileSetupDefaults()
+STREAM *LogFileInternalDoRotate(TLogFile *LogFile);
+
+
+int LogFileSetDefaults(int Flags, int MaxSize, int MaxRotate, int FlushInterval)
 {
 	LogFileDefaults=(TLogFile *) calloc(1,sizeof(TLogFile));
-	LogFileDefaults->MaxSize=100000000;
-	LogFileDefaults->Flags |= LOGFILE_TIMESTAMP | LOGFILE_FLUSH | LOGFILE_LOGPID | LOGFILE_LOGUSER;
+	LogFileDefaults->Flags=Flags;
+	LogFileDefaults->MaxSize=MaxSize;
+	LogFileDefaults->MaxRotate=MaxRotate;
+	LogFileDefaults->FlushInterval=FlushInterval;
 	LogFileDefaults->LogFacility=LOG_USER;
 	if (ParentPID==0) ParentPID=getpid();
 }
@@ -32,7 +37,7 @@ TLogFile *LogFileGetEntry(const char *FileName)
 
 	if (! StrLen(FileName)) return(NULL);
 	if (! LogFiles) LogFiles=ListCreate();
-	if (! LogFileDefaults) LogFileSetupDefaults();
+	if (! LogFileDefaults) LogFileSetDefaults(LOGFILE_TIMESTAMP | LOGFILE_FLUSH | LOGFILE_LOGPID | LOGFILE_LOGUSER, 100000000, 0, 1);
 
 	Node=ListFindNamedItem(LogFiles,FileName);
 	if (Node) LogFile=(TLogFile *) Node->Item;
@@ -43,7 +48,7 @@ TLogFile *LogFileGetEntry(const char *FileName)
 		else if (strcmp(FileName,"SYSLOG")==0) S=STREAMCreate();
 		else
 		{
-			S=STREAMOpenFile(FileName,SF_CREAT | SF_APPEND | SF_WRONLY);
+			S=STREAMOpenFile(FileName,SF_CREAT | SF_APPEND | SF_WRONLY | SF_NOCACHE);
 		}
 
 		if (S)
@@ -53,10 +58,17 @@ TLogFile *LogFileGetEntry(const char *FileName)
 			LogFile->LogFacility=LogFileDefaults->LogFacility;
 			LogFile->Flags=LogFileDefaults->Flags;
 			LogFile->MaxSize=LogFileDefaults->MaxSize;
+			LogFile->MaxRotate=LogFileDefaults->MaxRotate;
+			LogFile->FlushInterval=LogFileDefaults->FlushInterval;
 			LogFile->S=S;
+
 			if (strcmp(FileName,"SYSLOG")==0) LogFile->Flags |= LOGFILE_SYSLOG;
 			ListAddNamedItem(LogFiles,FileName,LogFile);
 			STREAMSetItem(S,"TLogFile",LogFile);
+			STREAMSetFlushType(S, FLUSH_FULL, 0, 0);
+
+			//it might already be too big!
+			LogFile->S=LogFileInternalDoRotate(LogFile);
 		}
 	}
 
@@ -108,6 +120,7 @@ STREAM *LogFileInternalDoRotate(TLogFile *LogFile)
 	int i;
 
 	if (! LogFile) return(NULL);
+	if (! LogFile->S) return(NULL);
 	if (strcmp(LogFile->Path,"SYSLOG")==0) return(LogFile->S);
 	if (strcmp(LogFile->Path,"STDOUT")==0) return(LogFile->S);
 	if (strcmp(LogFile->Path,"STDERR")==0) return(LogFile->S);
@@ -115,7 +128,8 @@ STREAM *LogFileInternalDoRotate(TLogFile *LogFile)
 
   if (LogFile->MaxSize > 0)
   {
-  fstat(LogFile->S->out_fd,&FStat);
+  if (LogFile->S) fstat(LogFile->S->out_fd,&FStat);
+  else stat(LogFile->Path,&FStat);
   if (FStat.st_size > LogFile->MaxSize)
   {
 		Tempstr=LogFileInternalGetRotateDestinationPath(Tempstr, LogFile);
@@ -127,9 +141,10 @@ STREAM *LogFileInternalDoRotate(TLogFile *LogFile)
 			PrevPath=CopyStr(PrevPath,Path);
 		}
 			
-    STREAMClose(LogFile->S);
+    if (LogFile->S) STREAMClose(LogFile->S);
 		if (PrevPath) rename(LogFile->Path,PrevPath);
-    LogFile->S=STREAMOpenFile(LogFile->Path,SF_CREAT | SF_APPEND | SF_WRONLY);
+    LogFile->S=STREAMOpenFile(LogFile->Path,SF_CREAT | SF_APPEND | SF_WRONLY | SF_NOCACHE);
+		if (LogFile->S) STREAMSetFlushType(LogFile->S, FLUSH_FULL, 0, 0);
   }
   }
 
@@ -143,7 +158,7 @@ STREAM *LogFileInternalDoRotate(TLogFile *LogFile)
 
 void LogFileSetValues(TLogFile *LogFile, int Flags, int MaxSize, int MaxRotate, int FlushInterval)
 {
-	if (! LogFileDefaults) LogFileSetupDefaults();
+	if (! LogFileDefaults) LogFileSetDefaults(LOGFILE_TIMESTAMP | LOGFILE_FLUSH | LOGFILE_LOGPID | LOGFILE_LOGUSER, 100000000, 0, 1);
 	if (ParentPID==0) ParentPID=getpid();
 
 	if (LogFile)
@@ -222,7 +237,10 @@ int LogFileInternalWrite(TLogFile *LF, STREAM *S, int Flags, const char *Str)
 			if (LF && ((Now.tv_sec-LF->LastFlushTime) > LF->FlushInterval)) Flags |= LOGFILE_FLUSH;
 			STREAMWriteLine(LogStr,S);
 
-			if (Flags & LOGFILE_FLUSH) STREAMFlush(S);
+			if (Flags & LOGFILE_FLUSH) 
+			{
+				STREAMFlush(S);
+			}
 		
 			result=TRUE;
 		}
@@ -265,19 +283,18 @@ void LogFileFlushAll(int Force)
 	ListNode *Curr;
 	TLogFile *Log;
 
-	time(&Now);
-
+	Now=GetTime(FALSE);
 	Curr=ListGetNext(LogFiles);
 	while (Curr)
 	{
 	        Log=(TLogFile *) Curr->Item;
 
-	        if (Force)
+	        if (Force && Log->S)
 	        {
                 STREAMFlush(Log->S);
                 Log->LastFlushTime=Now;
 	        }
-	        else if ((Now - Log->LastFlushTime) > Log->FlushInterval)
+	        else if (Log->S && ((Now - Log->LastFlushTime) > Log->FlushInterval) )
 	        {
                 STREAMFlush(Log->S);
                 Log->LastFlushTime=Now;

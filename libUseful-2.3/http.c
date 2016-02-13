@@ -42,7 +42,7 @@ free(Info);
 
 
 
-void HTTPSetVar(char *Name, char *Var)
+void HTTPSetVar(const char *Name, const char *Var)
 {
 	if (! HTTPVars) HTTPVars=ListCreate();
 	SetVar(HTTPVars,Name,Var);
@@ -60,6 +60,8 @@ int ChunkSize;
 int BuffLen;
 } THTTPChunk;
 
+
+
 int HTTPChunkedInit(TProcessingModule *Mod, const char *Args)
 {
 
@@ -67,6 +69,8 @@ Mod->Data=(THTTPChunk *) calloc(1, sizeof(THTTPChunk));
 
 return(TRUE);
 }
+
+
 
 int HTTPChunkedRead(TProcessingModule *Mod, const char *InBuff, int InLen, char **OutBuff, int *OutLen, int Flush)
 {
@@ -297,19 +301,21 @@ return(RetStr);
 }
 
 
-void HTTPInfoSetAuth(HTTPInfoStruct *Info, char *Logon, char *Password, int Type)
+void HTTPInfoSetAuth(HTTPInfoStruct *Info, const char *Logon, const char *Password, int Type)
 {
 char **p_Auth;
 
 if (Type & HTTP_AUTH_PROXY) p_Auth=&Info->ProxyAuthorization;
 else p_Auth=&Info->Authorization;
 
-*p_Auth=MCopyStr(*p_Auth,":",Logon,":",Password, NULL);
+Info->AuthFlags |= Type;
 
+if (Type==HTTP_AUTH_TOKEN) *p_Auth=CopyStr(*p_Auth, Password);
+else *p_Auth=MCopyStr(*p_Auth,":",Logon,":",Password, NULL);
 }
 
 
-void HTTPInfoSetValues(HTTPInfoStruct *Info, char *Host, int Port, char *Logon, char *Password, char *Method, char *Doc, char *ContentType, int ContentLength)
+void HTTPInfoSetValues(HTTPInfoStruct *Info, const char *Host, int Port, const char *Logon, const char *Password, const char *Method, const char *Doc, const char *ContentType, int ContentLength)
 {
 Info->State=0;
 Info->PostData=CopyStr(Info->PostData,"");
@@ -327,7 +333,7 @@ if (StrLen(Logon) || StrLen(Password)) HTTPInfoSetAuth(Info, Logon, Password, HT
 
 
 
-HTTPInfoStruct *HTTPInfoCreate(char *Host, int Port, char *Logon, char *Password, char *Method, char *Doc, char *ContentType, int ContentLength)
+HTTPInfoStruct *HTTPInfoCreate(const char *Host, int Port, const char *Logon, const char *Password, const char *Method, const char *Doc, const char *ContentType, int ContentLength)
 {
 HTTPInfoStruct *Info;
 char *ptr;
@@ -370,13 +376,10 @@ return(RetStr);
 }
 
 
-HTTPInfoStruct *HTTPInfoFromURL(char *Method, char *URL)
+void HTTPInfoSetURL(HTTPInfoStruct *Info, const char *Method, const char *URL)
 {
-HTTPInfoStruct *Info;
 char *Proto=NULL, *User=NULL, *Pass=NULL, *Token=NULL;
 
-
-Info=HTTPInfoCreate("", 80, "", "", Method, "", "",0);
 if (strcasecmp(Method,"POST")==0) ParseURL(URL, &Proto, &Info->Host, &Token, &User, &Pass,&Info->Doc,&Info->PostData);
 else ParseURL(URL, &Proto, &Info->Host, &Token, &User, &Pass,&Info->Doc, NULL);
 if (StrLen(Token)) Info->Port=atoi(Token);
@@ -395,16 +398,23 @@ DestroyString(User);
 DestroyString(Pass);
 DestroyString(Token);
 DestroyString(Proto);
+}
+
+
+HTTPInfoStruct *HTTPInfoFromURL(const char *Method, const char *URL)
+{
+HTTPInfoStruct *Info;
+
+Info=HTTPInfoCreate("", 80, "", "", Method, "", "",0);
+HTTPInfoSetURL(Info, Method, URL);
 
 return(Info);
 }
 
 
-
-
-void HTTPParseCookie(HTTPInfoStruct *Info, char *Str)
+void HTTPParseCookie(HTTPInfoStruct *Info, const char *Str)
 {
-	char *startptr, *endptr;
+	const char *startptr, *endptr;
 	char *Tempstr=NULL;
 	ListNode *Curr;
 	int len;
@@ -778,8 +788,9 @@ if (
 		}
 	}
 
-	if (StrLen(Tempstr)) SendStr=MCatStr(SendStr,"Accept-Encoding: ",Tempstr,"\r\n",NULL);
-	else SendStr=CatStr(SendStr,"Accept-Encoding: *.*\r\n");
+  if (StrLen(Tempstr)) SendStr=MCatStr(SendStr,"Accept-Encoding: ",Tempstr,"\r\n",NULL);
+  else if (Info->Flags & HTTP_NOCOMPRESS) SendStr=MCatStr(SendStr,"Accept-Encoding:\r\n",NULL);
+  else SendStr=CatStr(SendStr,"Accept-Encoding: *.*\r\n");
 }
 
 if (Info->Flags & HTTP_KEEPALIVE) 
@@ -1143,7 +1154,7 @@ return(Info->S);
 
 
 
-STREAM *HTTPMethod(char *Method, char *URL, char *Logon, char *Password, char *ContentType, char *ContentData, int ContentLength)
+STREAM *HTTPMethod(const char *Method, const char *URL, const char *Logon, const char *Password, const char *ContentType, const char *ContentData, int ContentLength)
 {
 HTTPInfoStruct *Info;
 STREAM *S;
@@ -1170,13 +1181,13 @@ return(S);
 }
 
 
-STREAM *HTTPGet(char *URL, char *Logon, char *Password)
+STREAM *HTTPGet(const char *URL, const char *Logon, const char *Password)
 {
 return(HTTPMethod("GET", URL, Logon, Password,"","",0));
 }
 
 
-STREAM *HTTPPost(char *URL, char *Logon, char *Password, char *ContentType, char *Content)
+STREAM *HTTPPost(const char *URL, const char *Logon, const char *Password, const char *ContentType, const char *Content)
 {
 return(HTTPMethod("POST", URL, Logon, Password, ContentType, Content, StrLen(Content)));
 }

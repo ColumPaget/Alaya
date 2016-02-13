@@ -4,6 +4,7 @@
 #include "expect.h"
 #include <sys/file.h>
 #include "securemem.h"
+#include <sys/mman.h>
 
 #ifdef HAVE_LIBSSL
 #include <openssl/crypto.h>
@@ -84,8 +85,8 @@ void STREAMSetFlags(STREAM *S, int Set, int UnSet)
 {
 int val;
 
-        S->Flags &= ~UnSet;
-        S->Flags |= Set;
+  S->Flags &= ~UnSet;
+	S->Flags |= Set;
 
 	//Handling nonblock flag involves setting nonblock on or off
   fcntl(S->in_fd,F_GETFL,&val);
@@ -292,6 +293,12 @@ else
   result=write(S->out_fd, Data + count, result);
 	if (S->Flags & SF_WRLOCK) flock(S->out_fd,LOCK_UN);
 
+	//yes, we neglect to do a sync. The idea here is to work opportunisitically, flushing out those pages
+	//that have been written. We do a sync and another fadvise in STREAMClose
+	#ifdef POSIX_FADV_DONTNEED
+	if (S->Flags & SF_NOCACHE) posix_fadvise(S->out_fd, 0,0,POSIX_FADV_DONTNEED);
+	#endif
+
 }
 
   if (result < 1 && ((errno !=EINTR) && (errno !=EAGAIN)) ) break;
@@ -458,6 +465,23 @@ return(Stream);
 }
 
 
+
+int STREAMOpenMMap(STREAM *S, int offset, int len, int Flags)
+{
+char *ptr;
+
+if (S->InputBuff) free(S->InputBuff);
+ptr=(char *) mmap(0, len, PROT_READ, Flags, S->in_fd, offset);
+if (ptr==MAP_FAILED) return(FALSE);
+S->InEnd=len;
+S->InStart=0;
+S->Flags |= SF_MMAP;
+S->InputBuff=ptr;
+
+return(TRUE);
+}
+
+
 STREAM *STREAMOpenFile(const char *FilePath, int Flags)
 {
 int fd, Mode=0;
@@ -520,12 +544,22 @@ else
 	 		return(NULL);
 		}
 	}
+	else 
+	{
+		stat(FilePath, &myStat);
+	}
 
-	if (Flags & SF_TRUNC) ftruncate(fd,0);
-	if (Flags & SF_APPEND) lseek(fd,0,SEEK_END);
-
+	//CREATE THE STREAM OBJECT !!
 	Stream=STREAMFromFD(fd);
 	STREAMSetTimeout(Stream,0);
+
+	if (Flags & (SF_RDONLY | SF_MMAP) == (SF_RDONLY | SF_MMAP)) STREAMOpenMMap(Stream, 0, myStat.st_size, MAP_SHARED);
+	else
+	{
+	if (Flags & SF_TRUNC) ftruncate(fd,0);
+	if (Flags & SF_APPEND) lseek(fd,0,SEEK_END);
+	}
+
 }
 Stream->Flags |= Flags;
 if (Stream->Flags & SF_SECURE) STREAMResizeBuffer(Stream, Stream->BuffSize);
@@ -550,15 +584,34 @@ if (
 	 (strcmp(S->Path,"-") !=0)
 	)
 {
-if ((S->out_fd != -1) && (S->out_fd != S->in_fd)) close(S->out_fd);
-if (S->in_fd != -1) close(S->in_fd);
+	if ((S->out_fd != -1) && (S->out_fd != S->in_fd)) 
+	{
+		#ifdef POSIX_FADV_DONTNEED
+		if (S->Flags & SF_NOCACHE)
+		{
+	  		fdatasync(S->out_fd);
+ 	 		posix_fadvise(S->out_fd, 0,0,POSIX_FADV_DONTNEED);
+		}
+		#endif
+	
+		close(S->out_fd);
+	}
+
+	if (S->in_fd != -1)
+	{
+		#ifdef POSIX_FADV_DONTNEED
+		if (S->Flags & SF_NOCACHE) posix_fadvise(S->in_fd, 0,0,POSIX_FADV_DONTNEED);
+		#endif
+
+		close(S->in_fd);
+	}
 }
 
 Curr=ListGetNext(S->Values);
 while (Curr)
 {
-if (strncmp(Curr->Tag,"HelperPID",9)==0) kill(atoi(Curr->Item),SIGKILL);
-Curr=ListGetNext(Curr);
+	if (strncmp(Curr->Tag,"HelperPID",9)==0) kill(atoi(Curr->Item),SIGKILL);
+	Curr=ListGetNext(Curr);
 }
 
 if (S->Flags & SF_SECURE) 
@@ -568,7 +621,7 @@ if (S->Flags & SF_SECURE)
 }
 else
 {
-	DestroyString(S->InputBuff);
+	if (! (S->Flags & SF_MMAP)) DestroyString(S->InputBuff);
 	DestroyString(S->OutputBuff);
 }
 
@@ -581,17 +634,17 @@ return(NULL);
 }
 
 
-int STREAMDisassociateFromFD(STREAM *Stream)
+int STREAMDisassociateFromFD(STREAM *S)
 {
 int fd;
 
-if (! Stream) return(-1);
-fd=Stream->in_fd;
-STREAMFlush(Stream);
-DestroyString(Stream->InputBuff);
-DestroyString(Stream->OutputBuff);
-DestroyString(Stream->Path);
-free(Stream);
+if (! S) return(-1);
+fd=S->in_fd;
+STREAMFlush(S);
+if (! (S->Flags & SF_MMAP)) DestroyString(S->InputBuff);
+DestroyString(S->OutputBuff);
+DestroyString(S->Path);
+free(S);
 return(fd);
 }
 
@@ -610,7 +663,17 @@ void *SSL_CTX=NULL;
 
 if (! S) return(0);
 
+//we don't read from and embargoed stream. Embargoed is a state that we
+//use to indicate a stream must be ignored for a while
 if (S->State & SS_EMBARGOED) return(0);
+
+//we don't read to mmaped streams. We just update pointers to the mmap
+if (S->Flags & SF_MMAP)
+{
+	result=S->InEnd-S->InStart;
+	if (result < 1) return(STREAM_CLOSED);
+	return(result);
+}
 
 
 if (S->InStart >= S->InEnd)
@@ -735,6 +798,7 @@ inline int STREAMTransferBytesOut(STREAM *S, char *Dest, int DestSize)
 int bytes;
 
 	bytes=S->InEnd - S->InStart;
+	if (bytes < 1) return(0);
 	
 	if (bytes > DestSize) bytes=DestSize;
 	
@@ -775,7 +839,8 @@ while (total < Buffsize)
 		//we didn't have enough to satisfy another read like the one we just had
 	
 		//We must check for '< 1' rather than '-1' because 
-		result=FDCheckForBytes(S->in_fd);
+		if (S->Flags & SF_MMAP) result=-1;
+		else result=FDCheckForBytes(S->in_fd);
 
 		if (result ==-1) 
 		{
@@ -803,6 +868,7 @@ double STREAMTell(STREAM *S)
 {
 double pos;
 
+if (S->Flags & SF_MMAP) return((double) S->InStart);
 if (S->OutEnd > 0) STREAMFlush(S);
 
 #ifdef _LARGEFILE64_SOURCE
@@ -820,6 +886,17 @@ double STREAMSeek(STREAM *S, double offset, int whence)
 {
 double pos;
 int wherefrom;
+
+if (S->Flags & SF_MMAP)
+{
+  switch (whence)
+  {
+  case SEEK_SET: S->InStart=offset; break;
+  case SEEK_CUR: S->InStart += offset; break;
+  case SEEK_END: S->InStart=S->InEnd-offset; break;
+  }
+  return((double) S->InStart);
+}
 
 if (S->OutEnd > 0) STREAMFlush(S);
 
@@ -892,7 +969,7 @@ return(AllDataWritten);
 
 int STREAMInternalQueueBytes(STREAM *S, const char *Bytes, int Len)
 {
-int o_len, written=0, avail, val, result=0;
+int o_len, written=0, avail, val=0, result=0;
 const char *ptr;
 
 	o_len=Len;
@@ -912,7 +989,7 @@ const char *ptr;
 		}
 	
 		if (
-					(S->OutEnd > S->StartPoint) ||
+					(S->StartPoint && (S->Flags & (FLUSH_BLOCK | FLUSH_ALWAYS)) && (S->OutEnd > S->StartPoint)) ||
 					(S->OutEnd >= S->BuffSize) 
 			)
 		{
@@ -1142,6 +1219,7 @@ while (1)
 	if (S->InStart >= S->InEnd)
 	{
 		if (result==STREAM_TIMEOUT) return(RetStr);
+		if (result==STREAM_NODATA) return(RetStr);
 
 		if (bytes_read==0)
 		{

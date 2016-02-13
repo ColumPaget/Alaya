@@ -23,7 +23,6 @@
 
 #include "common.h"
 #include "Authenticate.h"
-#include "Settings.h"
 #include "MimeType.h"
 #include "ChrootHelper.h"
 #include "server.h"
@@ -37,6 +36,10 @@ void SigHandler(int sig)
 {
 if (sig==SIGHUP) Settings.Flags |= FLAG_SIGHUP_RECV;
 signal(SIGHUP, SigHandler);
+
+//This is to stop select restarting if we get a SIGCHLD, if we get a signal
+//we need to clean it up!
+signal(SIGCHLD, SigHandler);
 }
 
 
@@ -58,7 +61,7 @@ HTTPSession *Session;
 		HTTPSessionDestroy(Session);
 
 		STREAMClose(ParentProcessPipe);
-		LogFileFlushAll(TRUE);
+		//LogFileFlushAll(TRUE);
 		_exit(0);
 }
 
@@ -68,7 +71,7 @@ int fd, infd, outfd;
 char *Tempstr=NULL;
 HTTPSession *Session;
 STREAM *S;
-int pid;
+pid_t pid;
 
 		//Check if log file has gotten big and rotate if needs be
 		LogFileCheckRotate(Settings.LogPath);
@@ -83,33 +86,70 @@ int pid;
 		S=STREAMFromDualFD(outfd, infd);
 		ListAddNamedItem(Connections,Tempstr,S);
 
-	//Closes 'fd' too
+	//Close the *socket* connection, as this parent app no longer needsto speak to it.
+	//however, the pipe connection to the child process stays open in Connectoins list
 	STREAMClose(Session->S);
 	HTTPSessionDestroy(Session);
 	DestroyString(Tempstr);
 }
 
 
+
+//There's two processes involved in a connection, the main service process and 
+//possibly a 'helper' process that performs out-of-chroot tasks for the service
+//process. Either of these can signal closing the socket, the service task just
+//by exiting, and the helper by exiting with status '0' (which we also get if
+//it crashed rather than exiting)
 void CollectChildProcesses()
 {
-int i, pid;
-char *Tempstr=NULL;
-ListNode *Curr;
+int i, status;
+#define NO_OF_PROCESSES 20
+pid_t *PidsList, owner, helper;
+int *StatusList;
+ListNode *Curr, *Next;
+STREAM *S;
 
-	for (i=0; i < 20; i++) 
+PidsList=(int *) calloc(NO_OF_PROCESSES,sizeof(pid_t));
+StatusList=(int *) calloc(NO_OF_PROCESSES,sizeof(int));
+for (i=0; i < 20; i++) 
+{
+	owner=waitpid(-1,&status,WNOHANG);
+	if (owner < 1) break;
+	PidsList[i]=owner;
+	if (WIFEXITED(status)) StatusList[i]=WEXITSTATUS(status);
+}
+
+Curr=ListGetNext(Connections);
+while (Curr)
+{
+	Next=ListGetNext(Curr);
+
+	S=(STREAM *) Curr->Item;
+	if (StrLen(Curr->Tag))
 	{
-		pid=waitpid(-1,NULL,WNOHANG);
-		if (pid==-1) break;
+	owner=strtol(Curr->Tag, NULL, 10);
+	helper=(int) STREAMGetItem(S,"HelperPid");
 
-		Tempstr=FormatStr(Tempstr,"%d",pid);
-		Curr=ListFindNamedItem(Connections,Tempstr);
-		if (Curr)
+	for (i=0; i < NO_OF_PROCESSES; i++)
+	{
+		if (PidsList[i] < 1) break;
+		if (
+					(owner==PidsList[i]) ||
+					((helper==PidsList[i]) && (StatusList[i]==0))
+			)
 		{
-			STREAMClose((STREAM *) Curr->Item);
+			STREAMClose(S);
 			ListDeleteNode(Curr);
+			break;
 		}
 	}
-DestroyString(Tempstr);
+	}
+
+	Curr=Next;
+}
+
+DestroyString(PidsList);
+DestroyString(StatusList);
 }
 
 
@@ -153,6 +193,7 @@ STREAM *ServiceSock, *S;
 int fd;
 char *Tempstr=NULL;
 int result, i;
+pid_t pid;
 
 
 SetTimezoneEnv();
@@ -188,7 +229,9 @@ SetResourceLimits();
 Tempstr=MCopyStr(Tempstr, "Alaya Starting up. Version: ",Version,NULL);
 ReopenLogFile(Tempstr);
 
-signal(SIGHUP, SigHandler);
+//Not only handles signals, but registers itself too, so we
+//run it to set up signal handling
+SigHandler(0);
 
 LoadFileMagics("/etc/mime.types","/etc/magic");
 
@@ -226,12 +269,21 @@ if (S)
 	if (S==ServiceSock) AcceptConnection(S->in_fd);
 	else 
 	{
-		result=HandleChildProcessRequest(S);
-		if (! result) 
+		//This handles a request from a child process that is servicing a connection
+		//Often they are chrooted and need to call back to the parent process to 
+		//perform tasks for them. HandleChildProcessRequest can either return '0',
+		//which means the request was dealt with or failed, and the connection can
+		//be closed, or a pid. We book the pid against the appropriate connection
+		//so when the process exits we can use its exit status to decide whether the
+		//connection has been closed, or is 'keep alive'
+		
+		pid=HandleChildProcessRequest(S);
+		if (pid==STREAM_CLOSED) 
 		{
 			ListDeleteItem(Connections,S);
 			STREAMClose(S);
 		}
+		else if (pid > 0) STREAMSetItem(S,"HelperPid",pid);
 	}
 }
 

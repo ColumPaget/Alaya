@@ -44,25 +44,54 @@ return(strcmp(S1,S2));
 }
 
 
-
-char *CopyStrLen(char *Dest, const char *Src,size_t len)
+char *CopyStrLen(char *Dest, const char *Src, size_t len)
 {
-char *ptr;
-ptr=CopyStr(Dest,Src);
-if (StrLen(ptr) >len) ptr[len]=0;
-return(ptr);
+const char *src, *end;
+char *dst;
+
+Dest=(char *)realloc(Dest,len+1);
+dst=Dest;
+src=Src;
+end=src+len;
+while ((src < end) && (*src != '\0'))
+{
+*dst=*src;
+dst++;
+src++;
+}
+*dst='\0';
+
+return(Dest);
 }
 
-char *CatStrLen(char *Dest, const char *Src,size_t len)
-{
-char *ptr;
-size_t catlen=0;
 
-catlen=StrLen(Dest);
-ptr=CatStr(Dest,Src);
-catlen+=len;
-if (StrLen(ptr) > catlen) ptr[catlen]=0;
-return(ptr);
+char *CatStrLen(char *Dest, const char *Src, size_t len)
+{
+const char *src, *end;
+char *dst;
+int dstlen;
+
+dstlen=StrLen(Dest);
+Dest=(char *)realloc(Dest,dstlen+len+1);
+dst=Dest+dstlen;
+src=Src;
+end=src+len;
+while ((src < end) && (*src != '\0'))
+{
+*dst=*src;
+dst++;
+src++;
+}
+*dst='\0';
+
+return(Dest);
+}
+
+
+
+char *CatStr(char *Dest, const char *Src)
+{
+return(CatStrLen(Dest, Src, StrLen(Src)));
 }
 
 
@@ -134,29 +163,39 @@ va_end(args);
 return(ptr);
 }
 
-char *CatStr(char *Dest, const char *Src)
-{
-size_t len;
-char *ptr;
 
-if (Dest !=NULL) 
+
+
+
+char *PadStr(char*Dest, char Pad, int PadLen)
 {
+char *NewStr=NULL;
+int i, len;
+
+if (PadLen==0) return(Dest);
+
 len=StrLen(Dest);
-ptr=Dest;
-}
-else
+if (PadLen > 0)
 {
- len=10;
- ptr=(char *) calloc(10,1);
+  NewStr=Dest;
+  while (len < PadLen) NewStr=AddCharToBuffer(NewStr,len++,Pad);
+}
+else if (PadLen < 0)
+{
+  for (i=0; i < (0-PadLen)-len; i++) NewStr=AddCharToBuffer(NewStr,i,Pad);
+  NewStr=CatStr(NewStr,Dest);
+  //NewStr really is new, so we destroy Dest
+  DestroyString(Dest);
 }
 
-if (StrLen(Src)==0) return(ptr);
-len+=StrLen(Src);
-len++;
+return(NewStr);
+}
 
-ptr=(char *)realloc(ptr,len);
-if (ptr && Src) strcat(ptr,Src);
-return(ptr);
+char *CopyPadStr(char*Dest, char *Src, char Pad, int PadLen)
+{
+Dest=CopyStr(Dest,Src);
+Dest=PadStr(Dest,Pad,PadLen);
+return(Dest);
 }
 
 

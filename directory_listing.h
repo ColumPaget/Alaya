@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-void HTTPServerSendDirectory(STREAM *S, HTTPSession *Heads, char *Path, ListNode *Vars);
+int HTTPServerSendDirectory(STREAM *S, HTTPSession *Heads, char *Path, ListNode *Vars);
 
 #endif
 

@@ -94,7 +94,7 @@ return(len / 2);
 
 char *Ascii85(char *RetStr, const char *Bytes, int ilen, const char *CharMap)
 {
-char *ptr, *block, *end;
+const char *ptr, *block, *end;
 uint32_t val, mod;
 int olen=0, i;
 char Buff[6];
@@ -471,7 +471,6 @@ int GenerateRandomBytes(char **RetBuff, int ReqLen, int Encoding)
 struct utsname uts;
 int i, len;
 clock_t ClocksStart, ClocksEnd;
-struct timeval tv1, tv2;
 char *Tempstr=NULL, *RandomBytes=NULL;
 int fd;
 
@@ -486,16 +485,14 @@ if (fd > -1)
 else
 {
 	ClocksStart=clock();
-	gettimeofday(&tv1,NULL);
 	//how many clock cycles used here will depend on overall
 	//machine activity/performance/number of running processes
 	for (i=0; i < 100; i++) sleep(0);
 	uname(&uts);
 	ClocksEnd=clock();
-	gettimeofday(&tv2,NULL);
 
 
-	Tempstr=FormatStr(Tempstr,"%lu:%lu:%lu:%lu:%lu:%lu\n",getpid(),getuid(),ClocksStart,ClocksEnd,tv1.tv_usec,tv2.tv_usec);
+	Tempstr=FormatStr(Tempstr,"%lu:%lu:%lu:%lu:%llu\n",getpid(),getuid(),ClocksStart,ClocksEnd,GetTime(TIME_MILLISECS));
 	//This stuff should be unique to a machine
 	Tempstr=CatStr(Tempstr, uts.sysname);
 	Tempstr=CatStr(Tempstr, uts.nodename);
@@ -518,4 +515,13 @@ return(len);
 }
 
 
+char *DecodeBase64(char *Return, int *len, char *Text)
+{
+char *RetStr;
+
+RetStr=SetStrLen(Return,StrLen(Text) *2);
+*len=from64tobits(RetStr,Text);
+
+return(RetStr);
+}
 

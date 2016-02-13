@@ -20,8 +20,8 @@
 #define SORT_RTIME 7
 #define SORT_RSIZE 8
 
-const char *DirActionTypes[]={"html","csv","m3u","rss","tar","tgz","tbz","txz","upload","edit","delete","rename","mkdir-query","mkdir","saveprops","editaccesstoken",NULL};
-typedef enum {ACTION_HTML,ACTION_CSV,ACTION_M3U,ACTION_RSS,ACTION_TAR,ACTION_TGZ,ACTION_TBZ,ACTION_TXZ,ACTION_UPLOAD,ACTION_EDIT,ACTION_DELETE,ACTION_RENAME, ACTION_MKDIRQUERY, ACTION_MKDIR, ACTION_SAVEPROPS, ACTION_EDIT_ACCESSTOKEN} TDIRFORMAT;
+const char *DirActionTypes[]={"html","csv","m3u","rss","pack","upload","edit","delete","rename","mkdir-query","mkdir","saveprops","editaccesstoken",NULL};
+typedef enum {ACTION_HTML,ACTION_CSV,ACTION_M3U,ACTION_RSS,ACTION_PACK,ACTION_UPLOAD,ACTION_EDIT,ACTION_DELETE,ACTION_RENAME, ACTION_MKDIRQUERY, ACTION_MKDIR, ACTION_SAVEPROPS, ACTION_EDIT_ACCESSTOKEN} TDIRFORMAT;
 
 
 time_t Now;
@@ -226,22 +226,19 @@ ListNode *Curr;
 TPathItem *PathItem;
 
 RetStr=CopyStr(RetStr, "???");
-if (File->Type==PATHTYPE_DIR)
-{
-	RetStr=CopyStr(RetStr,"DIR");
-}
+
+//Book a content type against file so that things outside this function can use it
+if (File->Type==PATHTYPE_DIR) File->ContentType=CopyStr(File->ContentType, "DIR");
 else
 {
 	FM=GetFileTypeInfo(File->Name);
-	if (! FM)
-	{
-		RetStr=CopyStr(RetStr,"FILE");
-	}
-	else RetStr=CopyStr(RetStr,FM->ContentType);
+	if (! FM) File->ContentType=CopyStr(File->ContentType, "FILE");
+	else File->ContentType=CopyStr(File->ContentType, FM->ContentType);
 }
 
+RetStr=CopyStr(RetStr,File->ContentType);
+
 ptr=GetVar(Vars,"Thumbnail");
-fprintf(stderr,"TN: %s\n",ptr);
 if (StrLen(ptr))
 {
 	RetStr=CopyStr(RetStr, ptr);
@@ -274,21 +271,50 @@ return(RetStr);
 }
 
 
-
-
-char *FormatFancyDirItem(char *Buffer, int count, TPathItem *File)
+char *FormatFancyDirComment(char *RetStr, ListNode *Vars)
 {
-char *Tempstr=NULL, *FileType=NULL, *DateStr=NULL, *DisplayName=NULL, *RetStr=NULL, *Interact=NULL;
+ListNode *Curr;
+const char *NonDisplayingValues[]={"executable","FileSize","CTime-Secs","MTime-Secs","IsExecutable","getcontentlength","getcontenttype","getlastmodified","creationdate",NULL};
+const char *ptr;
+
+RetStr=CopyStr(RetStr, "");
+Curr=ListGetNext(Vars);
+while (Curr)
+{
+	if (MatchTokenFromList(Curr->Tag, NonDisplayingValues,0)==-1) 
+	{
+		ptr=Curr->Tag;
+		if (strncmp(ptr,"Media-",6)==0) ptr+=6;
+		RetStr=MCatStr(RetStr,ptr, ":", Curr->Item, " ", NULL);
+	}
+	Curr=ListGetNext(Curr);
+}
+
+return(RetStr);
+}
+
+
+char *FormatFancyDirItem(char *RetStr, int count, TPathItem *File)
+{
+char *Tempstr=NULL, *FileType=NULL, *DateStr=NULL, *DisplayName=NULL, *Interact=NULL;
 char *Comment=NULL, *ptr;
 char *bgcolor;
 ListNode *Vars;
 
+	
 	Vars=ListCreate();
 	LoadFileProperties(File->Path, Vars);
 
+/*
 	ptr=GetVar(Vars,"comment");
-	if (StrLen(ptr)) Comment=MCopyStr(Comment," title=\"",ptr,"\" ",NULL);
+	if (StrLen(ptr)) 
+	{
+		Comment=MCopyStr(Comment," title=\"",ptr,"\" ",NULL);
+	}
 	else Comment=CopyStr(Comment,"");
+*/
+
+	Comment=FormatFancyDirComment(Comment, Vars);
 
 		if ((count % 2)==0) bgcolor="#FFFFFF";
 		else bgcolor="#CCCCCC";
@@ -309,22 +335,35 @@ ListNode *Vars;
 
 		FileType=FormatFileType(FileType, File, Vars);
 
+
+		//Okay, start building the actual table row
+		RetStr=MCatStr(RetStr, "<tr bgcolor=\"",bgcolor,"\">",NULL);
+
 		if (Settings.DirListFlags & DIR_INTERACTIVE) 
 		{
-			Interact=MCopyStr(Interact,"<td><input type='submit' name='edit:",File->URL,"' value='Edit' /></td>",NULL);
+			//Append checkbox to start of things
+			RetStr=MCatStr(RetStr,"<td><input type=\"checkbox\" name=\"selected\" value=\"",File->Name,"\" /></td>",NULL);
+
+			//Interaction string will be added to end of line
+			Interact=CopyStr(Interact,"<td align=\"center\">");
+			Interact=MCatStr(Interact,"<input type='submit' name='edit:",File->URL,"' value='Edit' /> ",NULL);
+			Interact=MCatStr(Interact,"<input type='submit' name='del:",File->URL,"' value='Del' /> ",NULL);
+			if (strncasecmp(File->ContentType,"audio/",6)==0) Interact=MCatStr(Interact,"<input type=\"button\" onclick=\"javascript: addaudio('",File->URL,"');\" value=\"Play\" /> ",NULL);
+			Interact=CatStr(Interact,"</td>");
 		}
 		else Interact=CopyStr(Interact,"");
 
-		Tempstr=FormatStr(Tempstr,"<tr bgcolor=\"%s\"><td>%s</td><td><a href=\"%s\" %s >%s</a></td><td align=right> &nbsp; %s</td><td align=right> &nbsp; %s</td>%s</tr>\r\n",bgcolor,FileType,File->URL,Comment, DisplayName,DateStr,GetHumanReadableDataQty((double) File->Size,0),Interact);
+		Tempstr=FormatStr(Tempstr,"<td title=\"%s\">%s</td><td><a href=\"%s\">%s</a></td><td align=right> &nbsp; %s</td><td align=right> &nbsp; %s</td>%s</td>",Comment,FileType,File->URL, DisplayName,DateStr,GetHumanReadableDataQty((double) File->Size,0),Interact);
 
-		RetStr=CatStr(Buffer,Tempstr);
+		//Append it all to our output
+		RetStr=MCatStr(RetStr,Tempstr,"</tr>\r\n",NULL);
 
-		DestroyString(Tempstr);
-		DestroyString(FileType);
-		DestroyString(DateStr);
 		DestroyString(DisplayName);
+		DestroyString(FileType);
 		DestroyString(Interact);
 		DestroyString(Comment);
+		DestroyString(Tempstr);
+		DestroyString(DateStr);
 
 	ListDestroy(Vars,DestroyString);
 
@@ -350,6 +389,30 @@ return("");
 }
 
 
+char *DisplayPackAction(char *HTML, HTTPSession *Session)
+{
+char *Name=NULL, *Value=NULL, *ptr;
+
+//if (Flags & DIR_TARBALLS) 
+if (StrLen(Settings.PackFormats))
+{
+ptr=GetNameValuePair(Settings.PackFormats,",",":",&Name,&Value);
+
+HTML=CatStr(HTML,"<td bgcolor='skyblue'>Download <select name='packtarget'><option value='all'>all\n<option value='selected'>selected</select> as <select name=\"PackType\">");
+while (ptr)
+{
+	HTML=MCatStr(HTML,"<option value=\"",Name,"\">",Name,NULL);
+	ptr=GetNameValuePair(ptr,",",":",&Name,&Value);
+}
+
+HTML=MCatStr(HTML,"</select><input type=submit name='pack:",Session->URL,"' value='Pack'></td>",NULL);
+}
+
+return(HTML);
+}
+
+
+
 char *DisplayDirActions(char *Buffer, HTTPSession *Session, int Flags)
 {
 char *HTML=NULL;
@@ -357,7 +420,8 @@ char *HTML=NULL;
 if (Flags & (DIR_TARBALLS | DIR_INTERACTIVE))
 {
 HTML=CatStr(Buffer,"<table align=center><tr>\r\n");
-if (Flags & DIR_TARBALLS) HTML=MCatStr(HTML,"<td bgcolor='skyblue'><a href=\"",Session->URL,"?format=tar\">Download Directory in TAR format</a></td>\r\n",NULL);
+
+HTML=DisplayPackAction(HTML, Session);
 if (Flags & DIR_INTERACTIVE) 
 {
 	HTML=MCatStr(HTML,"<td bgcolor='pink'><a href=\"",Session->URL,"?format=upload\">Upload Files</a></td>\r\n",NULL);
@@ -386,7 +450,12 @@ char *HTML=NULL;
 		HTML=DisplayDirActions(HTML,Session,Flags);
 
 
- 		if ((Flags & DIR_HASMEDIA) && (Flags & DIR_MEDIA_EXT)) HTML=MCatStr(HTML,"<a href=\"",Session->URL,"?format=m3u\">","<br />Playlist of Media in this Directory","</a></p>\r\n",NULL);
+ 		if ((Flags & DIR_HASMEDIA) && (Flags & DIR_MEDIA_EXT))
+		{
+			 HTML=MCatStr(HTML,"<a href=\"",Session->URL,"?format=m3u\">","<br />Playlist of Media in this Directory","</a><br/>\r\n",NULL);
+			 HTML=MCatStr(HTML,"<audio id=\"audioplayer\" controls autoplay></audio>",NULL);
+			 HTML=MCatStr(HTML,"<script>function addaudio(url){document.getElementById('audioplayer').src=url;}</script>",NULL);
+		}
 	}
 	HTML=MCatStr(HTML,DirItemsHtml,"<br />&nbsp;<br />",NULL);
 	if (Flags & DIR_INTERACTIVE) HTML=CatStr(HTML,"</form>\r\n");
@@ -447,11 +516,14 @@ HTML=CatStr(HTML,"<table align=center width=90%% border=0>\r\n");
 Tempstr=CopyStr(Tempstr,Session->URL);
 HTML=CatStr(HTML,"<tr bgcolor=\"#AAAAFF\">");
 
+//This one is for checkbox
+if (Settings.DirListFlags & DIR_INTERACTIVE) HTML=CatStr(HTML,"<td> &nbsp; </td>");
 HTML=FancyHeading(HTML,"Type",SORT_TYPE,Tempstr,Flags);
 HTML=FancyHeading(HTML,"Name",SORT_NAME,Tempstr,Flags);
 HTML=FancyHeading(HTML,"Last Modified",SORT_TIME,Tempstr,Flags);
 HTML=FancyHeading(HTML,"Size",SORT_SIZE,Tempstr,Flags);
 
+//this one is for action buttons
 if (Settings.DirListFlags & DIR_INTERACTIVE) HTML=CatStr(HTML,"<td> &nbsp; </td>");
 HTML=CatStr(HTML,"</tr>\r\n");
 }
@@ -478,7 +550,7 @@ for (i=0; i < NoOfFiles; i++)
 
 if (Settings.DirListFlags & DIR_FANCY) 
 {
-	if (Settings.DirListFlags & DIR_INTERACTIVE) i=5;
+	if (Settings.DirListFlags & DIR_INTERACTIVE) i=6;
 	else i=4;
 
 	//DirCount-1 here because we will have counted '..'
@@ -559,17 +631,49 @@ DestroyString(CSV);
 }
 
 
-void HTTPServerSendPackedDir(STREAM *S, HTTPSession *Session,char *Dir)
+int HTTPServerSendPackedDir(STREAM *S, HTTPSession *Session, const char *Dir)
 {
 char *Tempstr=NULL, *DirName=NULL, *FileName=NULL, *ptr;
+char *Extn=NULL, *PackType=NULL, *Name=NULL, *Value=NULL;
+char *PackList=NULL;
+TFileMagic *FM;
 HTTPSession *Response;
+STREAM *Pipe;
 
-	LogToFile(Settings.LogPath,"Sending Tar Pack of [%s]",Dir);
 	chdir(Dir);
+	//unset session reuse, because we will close session to indicate end of package
+	Session->Flags &= ~SESSION_REUSE;
+
+	//do this so we can strcmp it
+	PackList=CopyStr(PackList,"");
 
 	Response=HTTPSessionCreate();
 	Response->ResponseCode=CopyStr(Response->ResponseCode,"200 OK");
-	Response->ContentType=CopyStr(Response->ContentType,"application/x-tar");
+
+	ptr=GetNameValuePair(Session->Arguments, "&","=",&Name,&Value);
+	while (ptr)
+	{
+		if ( StrLen(Name) )
+		{
+		if	(strcasecmp(Name,"packtype")==0)
+		{
+			PackType=CopyStr(PackType,Value);
+			Extn=MCopyStr(Extn, ".", Value, NULL);
+			FM=GetFileMagicForFile(Extn, NULL);
+			Response->ContentType=CopyStr(Response->ContentType, FM->ContentType);
+		}
+		else if (strcasecmp(Name,"packtarget")==0) 
+		{
+			if (strcmp(Value,"all")==0) PackList=CopyStr(PackList, " *");
+		}
+		else if (strcasecmp(Name,"selected")==0) 
+		{
+			if (strcmp(PackList," *") !=0) PackList=MCatStr(PackList, " ", Value, NULL);
+		}
+		}
+		
+	ptr=GetNameValuePair(ptr, "&","=",&Name,&Value);
+	}
 
 	DirName=CopyStr(DirName,Dir);
 	StripDirectorySlash(DirName);
@@ -577,19 +681,52 @@ HTTPSession *Response;
 
 	if (! StrLen(ptr)) ptr="rootdir";
 
-	FileName=MCopyStr(FileName,Session->Host,"-",Session->UserName,"-",ptr,".tar",NULL);
+	FileName=MCopyStr(FileName,Session->Host,"-",Session->UserName,"-",ptr,Extn,NULL);
 	strrep(FileName,' ','_');
 
 	Tempstr=MCopyStr(Tempstr,"attachment; filename=",FileName,NULL);
 	SetVar(Response->Headers,"Content-disposition",Tempstr);
-	HTTPServerSendHeaders(S, Response, HEADERS_KEEPALIVE); 
 
-	TarFiles(S," *");
+	ptr=GetNameValuePair(Settings.PackFormats, ",",":", &Name, &Value);
+	while (ptr)
+	{
+	if (strcasecmp(Name, PackType)==0)
+	{
+		if (strcasecmp(Value,"internal")==0)
+		{
+			if (strcasecmp(Name,"tar")==0) 
+			{
+				HTTPServerSendHeaders(S, Response, 0); 
+				TarFiles(S, PackList);
+			}
+		}
+		else
+		{
+		HTTPServerSendHeaders(S, Response, 0); 
+		Tempstr=MCopyStr(Tempstr,Value,PackList,NULL);
+		Pipe=STREAMSpawnCommand(Tempstr, COMMS_BY_PIPE);
+		STREAMSendFile(Pipe, S, 0, SENDFILE_KERNEL| SENDFILE_LOOP);
+		STREAMClose(Pipe);
+		}
+	}
+	ptr=GetNameValuePair(ptr, ",",":", &Name, &Value);
+	}
+
 	STREAMFlush(S);
 
 DestroyString(FileName);
 DestroyString(Tempstr);
 DestroyString(DirName);
+DestroyString(PackList);
+DestroyString(PackType);
+DestroyString(Name);
+DestroyString(Value);
+DestroyString(Extn);
+
+
+//This true means 'please close the connection' as our tarballs/zips are transferred using
+//connection: close to indicate end of transfer
+return(STREAM_CLOSED);
 }
 
 
@@ -703,12 +840,13 @@ void HTTPServerSendToParentDir(STREAM *S, HTTPSession *Session)
 
 
 
-void HTTPServerSendDirectory(STREAM *S, HTTPSession *Session, char *Path, ListNode *Vars)
+int HTTPServerSendDirectory(STREAM *S, HTTPSession *Session, char *Path, ListNode *Vars)
 {
 int DirSent=FALSE;
 char *Tempstr=NULL, *Token=NULL, *ptr;
 int Flags=0, Format, max=0;
 TPathItem **Files;
+int result=FALSE;
 
 
 //Maybe we can get out of sending the directory. Check 'IfModifiedSince'
@@ -748,7 +886,7 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 
 			//TAR doesn't send a list of files, it sends the actual files, so it doesn't need to use
 			//LoadDir in order to handle VPaths etc.
-			case ACTION_TAR: HTTPServerSendPackedDir(S,Session,Path); break;
+			case ACTION_PACK: result=HTTPServerSendPackedDir(S,Session,Path); break;
 			case ACTION_UPLOAD: HtmlUploadPage(S,Session,Path); break;
 			case ACTION_EDIT: DirectoryItemEdit(S,Session,Path,0); break;
 			case ACTION_EDIT_ACCESSTOKEN: DirectoryItemEdit(S,Session,Path, FDETAILS_ACCESSTOKEN); break;
@@ -799,10 +937,13 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 			break;
 
 
-			default: HTTPServerSendHTML(S, Session, "403 Index Listing Forbidden","This server is not configured to list directories."); break;
+			//default: HTTPServerSendHTML(S, Session, "403 Index Listing Forbidden","This server is not configured to list directories."); break;
+			default: HTTPServerSendHTML(S, Session, "403 Index Listing Forbidden", Session->Arguments); break;
 		}
 	}
 
 DestroyString(Tempstr);
 DestroyString(Token);
+
+return(result);
 }

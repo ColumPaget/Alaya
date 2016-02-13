@@ -26,6 +26,8 @@ char *MCatStr(char *, const char *, ...);
 char *MCopyStr(char *, const char *, ...);
 char *CatStr(char *, const char *);
 char *CatStrLen(char *,const char *,size_t);
+char *PadStr(char*Dest, char Pad, int PadLen);
+char *CopyPadStr(char*Dest, char *Src, char Pad, int PadLen);
 char *VFormatStr(char *,const char *,va_list);
 char *FormatStr(char *,const char *,...);
 char *AddCharToStr(char *,char);

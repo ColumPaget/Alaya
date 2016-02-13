@@ -10,6 +10,7 @@ extern "C" {
 
 char *XMLGetTag(char *Input, char **Namespace, char **TagType, char **TagData);
 char *HtmlGetTag(char *Input, char **TagType, char **TagData);
+char *HTMLQuote(char *RetBuff, char *Str);
 char *HtmlDeQuote(char *RetStr, char *Data);
 
 
