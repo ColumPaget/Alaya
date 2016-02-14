@@ -41,7 +41,6 @@ char *DefaultGroup;
 gid_t DefaultGroupID;
 char *DefaultDir;
 int DirListFlags;
-char *CgiUser;
 char *AllowUsers;
 char *DenyUsers;
 int AuthFlags;

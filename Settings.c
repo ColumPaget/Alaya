@@ -19,9 +19,6 @@ void PostProcessSettings(TSettings *Settings)
 char *Tempstr=NULL, *Token=NULL, *ptr;
 
 if (StrLen(Settings->DefaultUser)==0) Settings->DefaultUser=CopyStr(Settings->DefaultUser,GetDefaultUser());
-if (StrLen(Settings->CgiUser)==0) Settings->CgiUser=CopyStr(Settings->CgiUser,Settings->DefaultUser);
-
-LogToFile(Settings->LogPath, "Default User: %s %s\n",Settings->DefaultUser,Settings->CgiUser);
 
 Tempstr=CopyStr(Tempstr,"");
 ptr=GetToken(Settings->HttpMethods,",",&Token,0);
@@ -85,6 +82,7 @@ char *URL=NULL, *Path=NULL, *Tempstr=NULL, *ptr;
 TPathItem *PI;
 int Type;
 unsigned int CacheTime=0;
+char *User=NULL, *Group=NULL;
 
 ptr=GetToken(Data,",",&Tempstr,0);
 Type=MatchTokenFromList(Tempstr,PathTypes,0);
@@ -102,6 +100,8 @@ if (Type > -1)
 	{
 	StripLeadingWhitespace(Tempstr);
 	if (strncasecmp(Tempstr,"cache=",6)==0) CacheTime=atoi(Tempstr+6);
+	else if (strncasecmp(Tempstr,"user=",5)==0) User=CopyStr(User, Tempstr+5);
+	else if (strncasecmp(Tempstr,"group=",6)==0) Group=CopyStr(Group, Tempstr+6);
 	else Path=MCatStr(Path, Tempstr,":",NULL);
 	ptr=GetToken(ptr,",",&Tempstr,0);
 	}
@@ -109,6 +109,8 @@ if (Type > -1)
 	
 	PI=PathItemCreate(Type, URL, Path);
 	PI->CacheTime=CacheTime;
+	PI->User=CopyStr(PI->User, User);
+	PI->Group=CopyStr(PI->Group, Group);
 	if (PI->Type==PATHTYPE_LOGOUT) Settings.Flags |= FLAG_LOGOUT_AVAILABLE;
 	ListAddNamedItem(Settings.VPaths,PI->URL,PI);
 }
@@ -116,6 +118,8 @@ else LogToFile(Settings.LogPath,"ERROR: Unknown Path type '%s' in Config File",T
 
 
 DestroyString(Tempstr);
+DestroyString(Group);
+DestroyString(User);
 DestroyString(Path);
 DestroyString(URL);
 }
@@ -283,7 +287,6 @@ switch(TokType)
 
 	case CT_DEFAULTUSER:
 		Settings.DefaultUser=CopyStr(Settings.DefaultUser,ptr);
-		Settings.CgiUser=CopyStr(Settings.CgiUser,ptr);
 	break;
 
 	case CT_DEFAULTGROUP:
@@ -801,8 +804,8 @@ Settings.HostConnections=ListCreate();
 Settings.ScriptHandlers=ListCreate();
 Settings.LoginEntries=ListCreate();
 Settings.DocumentCacheTime=10;
-Settings.AddressSpace=CopyStr(Settings.AddressSpace, "50M");
-Settings.StackSize=CopyStr(Settings.StackSize, "500k");
+Settings.AddressSpace=CopyStr(Settings.AddressSpace, "250M");
+Settings.StackSize=CopyStr(Settings.StackSize, "1M");
 Settings.ActivityTimeout=10000;
 Settings.PackFormats=CopyStr(Settings.PackFormats,"tar:internal,zip:zip -");
 

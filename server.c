@@ -924,96 +924,6 @@ DestroyString(Tempstr);
 
 
 
-//This function checks the Paths configured in the server for virtual 
-//documents like cgi scripts or streams, or for directories to which we
-//are allowed access from outside chroot
-void HTTPServerFindAndSendDocument(STREAM *S, HTTPSession *Session, int Flags)
-{
-ListNode *Curr=NULL, *Default=NULL;
-TPathItem *PI=NULL;
-char *Path=NULL, *Tempstr=NULL, *ptr;
-
-
-	
-	Curr=ListGetNext(Settings.VPaths);
-	while (Curr)
-	{
-		if (StrLen(Curr->Tag) < 2) Default=Curr;
-		else if (strncmp(Session->Path,Curr->Tag,StrLen(Curr->Tag))==0) break;
-		Curr=ListGetNext(Curr);
-	}
-
-	//If Curr is set then we found a VPath
-	if (! Curr) Curr=Default;
-
-
-	if (Curr)
-	{
-		PI=(TPathItem *) Curr->Item;
-		
-		if (Flags & HEADERS_POST) HTTPServerHandlePost(Session->S,Session,PI->Type);
-		LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s]",PI->Type,Curr->Tag,PI->Path);
-		switch (PI->Type)
-		{
-			case PATHTYPE_CGI:
-			LogToFile(Settings.LogPath,"CGI EXEC REQUEST: Script='%s' Path='%s'",GetBasename(Session->Path), PI->Path);
-			ChrootProcessRequest(S, Session, "EXEC", GetBasename(Session->Path), PI->Path);
-			break;
-
-			case PATHTYPE_EXTFILE:
-			HTTPServerHandleVPath(S,Session,PI,Flags);
-			break;
-
-			case PATHTYPE_STREAM:
-			HTTPServerHandleStream(S,Session,PI->Path,Flags);
-			break;
-
-			case PATHTYPE_LOGOUT:
-			Session->Path=FormatStr(Session->Path,"%d-%d-%d",getpid(),time(NULL),rand());
-			HTTPServerHandleRegister(Session, LOGIN_CHANGE);
-			Path=FormatURL(Path, Session, "/");
-			Path=MCatStr(Path,"?Logout=",Session->Path,NULL);
-			Session->Flags &= ~SESSION_KEEP_ALIVE; 
-			HTTPServerSendResponse(S, Session, "302", "", Path);
-			break;
-
-			case PATHTYPE_URL:
-			ChrootProcessRequest(S, Session, "PROXY", PI->Path, "");
-			break;
-
-			case PATHTYPE_PROXY:
-			if (StrLen(Session->UserName)) 
-			{
-				Path=MCopyStr(Path,Session->UserName,":",Session->Password,NULL);
-				Tempstr=EncodeBytes(Tempstr, Path, StrLen(Path), ENCODE_BASE64);
-				Session->RemoteAuthenticate=MCopyStr(Session->RemoteAuthenticate,"Basic ",Tempstr,NULL);	
-			}
-			Path=MCopyStr(Path,PI->Path,Session->Path+StrLen(PI->URL),NULL);
-			ChrootProcessRequest(S, Session, "PROXY", Path, "");
-			break;
-
-			case PATHTYPE_MIMEICONS:
-			VPathMimeIcons(S,Session, PI, Flags);
-			break;
-		}
-	}
-	else 
-	{
-		if (Flags & HEADERS_POST) HTTPServerHandlePost(Session->S,Session,0);
-		ptr=Session->StartDir;
-		if (*ptr=='.') ptr++;
-		if (strcmp(ptr,"/")==0) Path=CopyStr(Path,Session->Path);
-		else Path=MCopyStr(Path,ptr,Session->Path,NULL);
-
-		HTTPServerSendDocument(S, Session, Path, Flags);
-	}
-
-
-DestroyString(Tempstr);
-DestroyString(Path);
-}
-
-
 void HTTPServerRecieveURL(STREAM *S,HTTPSession *Heads)
 {
 STREAM *Doc;
@@ -1665,6 +1575,26 @@ return(FALSE);
 
 
 
+void HTTPServerFindAndSendDocument(STREAM *S, HTTPSession *Session, int Flags)
+{
+char *Path=NULL, *ptr;
+
+	if (! VPathProcess(S, Session, Flags))
+  {
+    if (Flags & HEADERS_POST) HTTPServerHandlePost(S,Session,0);
+    ptr=Session->StartDir;
+    if (*ptr=='.') ptr++;
+    if (strcmp(ptr,"/")==0) Path=CopyStr(Path,Session->Path);
+    else Path=MCopyStr(Path,ptr,Session->Path,NULL);
+
+    HTTPServerSendDocument(S, Session, Path, Flags);
+  }
+DestroyString(Path);
+}
+
+
+
+
 void HTTPServerHandleConnection(HTTPSession *Session)
 {
 char *Tempstr=NULL, *Method=NULL, *URL=NULL;
@@ -1699,6 +1629,7 @@ if (Settings.AuthFlags & FLAG_AUTH_REQUIRED)
 		if (Session->AuthFlags & FLAG_AUTH_PRESENT) LogToFile(Settings.LogPath,"AUTHENTICATE FAIL: %s@%s for '%s %s' against %s %s\n",Session->UserName,Session->ClientIP,Session->Method,Session->Path,Settings.AuthPath,Settings.AuthMethods);
 	}
 }
+
 
 
 

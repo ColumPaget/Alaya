@@ -146,6 +146,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 	Response->ContentSize=0;
 	Response->LastModified=0;
 	Response->CacheTime=Settings.DocumentCacheTime;
+	Response->RealUser=CopyStr(Response->RealUser, Settings.DefaultUser);
 
 	ptr=GetNameValuePair(Data," ","=",&Name,&Tempstr);
 	while (ptr)
@@ -154,6 +155,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 
 
 		if (strcmp(Name,"User")==0) Response->UserName=CopyStr(Response->UserName,Value);
+		else if (strcmp(Name,"RealUser")==0) Response->RealUser=CopyStr(Response->RealUser,Value);
 		else if (strcmp(Name,"Host")==0) Response->Host=CopyStr(Response->Host,Value);
 		else if (strcmp(Name,"UserAgent")==0) Response->UserAgent=CopyStr(Response->UserAgent,Value);
 		else if (strcmp(Name,"Method")==0) Response->Method=CopyStr(Response->Method,Value);
@@ -188,7 +190,7 @@ return(Response);
 }
 
 
-void SetupEnvironment(HTTPSession *Session)
+void SetupEnvironment(HTTPSession *Session, const char *ScriptPath)
 {
 char *Tempstr=NULL, *ptr;
 
@@ -209,6 +211,7 @@ char *Tempstr=NULL, *ptr;
 	if (ptr) ptr++;
 	else ptr=Session->Path;
 	SetEnvironmentVariable("SCRIPT_NAME",ptr);
+	SetEnvironmentVariable("SCRIPT_FILENAME",ScriptPath);
 	SetEnvironmentVariable("QUERY_STRING",Session->Arguments);
 	SetEnvironmentVariable("HTTP_USER_AGENT",Session->UserAgent);
 	SetEnvironmentVariable("HTTP_REFERER",Session->ClientReferrer);
@@ -216,7 +219,8 @@ char *Tempstr=NULL, *ptr;
 	SetEnvironmentVariable("REQUEST_METHOD",Session->Method);
 	SetEnvironmentVariable("REQUEST_URI",Session->URL);
 	SetEnvironmentVariable("SERVER_PROTOCOL","HTTP/1.1");
-	if (StrLen(Session->Cipher)) SetEnvironmentVariable("SLL",Session->Cipher);
+	SetEnvironmentVariable("REDIRECT_STATUS","200");
+	if (StrLen(Session->Cipher)) SetEnvironmentVariable("SSL",Session->Cipher);
 
 DestroyString(Tempstr);
 }
@@ -360,20 +364,20 @@ HTTPSession *Response;
 			dup(ClientCon->out_fd);
 
 
-      //Switch to Cgi/Default user. ALAYA WILL NOT RUN SCRIPTS AS ROOT!
-      if (! SwitchUser(Settings.CgiUser))
+      //Switch user. ALAYA WILL NOT RUN SCRIPTS AS ROOT!
+      if (! SwitchUser(Response->RealUser))
       {
-        LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s using handler '%s'",Settings.CgiUser,ScriptPath,Tempstr);
+        LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s using handler '%s'", Response->RealUser, ScriptPath, Tempstr);
         _exit(0);
       }
 
 			if (geteuid()==0)
 			{
-				LogToFile(Settings.LogPath, "Failed to switch user to '%s' for running a .cgi program. Will not run programs as 'root'. Set 'DefaultUser' in config file or command line.",Settings.CgiUser);
+				LogToFile(Settings.LogPath, "Failed to switch user to '%s' for running a .cgi program. Will not run programs as 'root'. Set 'DefaultUser' in config file or command line.", Response->RealUser);
 			}
 			else
 			{
-				SetupEnvironment(Response);
+				SetupEnvironment(Response, ScriptPath);
 				Tempstr=FindScriptHandlerForScript(Tempstr,ScriptPath);
 				if (Tempstr) LogToFile(Settings.LogPath,"Execute script: %s using handler '%s'",ScriptPath,Tempstr);
 				else LogToFile(Settings.LogPath,"Execute script: %s QUERY_STRING= '%s'",ScriptPath,getenv("QUERY_STRING"));
@@ -453,26 +457,27 @@ HTTPSession *Response;
 			dup(ClientCon->out_fd);
 
 
-      //Switch to Cgi/Default user. ALAYA WILL NOT RUN SCRIPTS AS ROOT!
-      if (! SwitchUser(Settings.CgiUser))
+
+		//Switch user. ALAYA WILL NOT RUN SCRIPTS AS ROOT!
+      if (! SwitchUser(Response->RealUser))
       {
-        LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s using handler '%s'",Settings.CgiUser,ScriptPath,Tempstr);
+        LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s using handler '%s'",Response->RealUser, ScriptPath, Tempstr);
         _exit(0);
       }
 
 			if (geteuid()==0)
 			{
 				HTTPServerSendHTML(ClientCon, NULL, "403 Forbidden","Alaya will not run .cgi programs as 'root'.<br>\r\nTry setting 'Default User' in config file or command line.");
-				LogToFile(Settings.LogPath, "Failed to switch user to '%s' for running a .cgi program. Will not run programs as 'root'. Set 'DefaultUser' in config file or command line.",Settings.CgiUser);
+				LogToFile(Settings.LogPath, "Failed to switch user to '%s' for running a .cgi program. Will not run programs as 'root'. Set 'DefaultUser' in config file or command line.",Response->RealUser);
 			}
 			else
 			{
-				SetupEnvironment(Response);
 	
 				Response->ResponseCode=CopyStr(Response->ResponseCode,"200 OK");
 				HTTPServerSendHeaders(ClientCon, Response, HEADERS_CGI);
 				STREAMFlush(ClientCon);
 
+				SetupEnvironment(Response, ScriptPath);
 				Tempstr=FindScriptHandlerForScript(Tempstr,ScriptPath);
 				if (Tempstr) LogToFile(Settings.LogPath,"Execute script: %s using handler '%s'",ScriptPath,Tempstr);
 				else LogToFile(Settings.LogPath,"Execute script: %s QUERY_STRING= '%s'",ScriptPath,getenv("QUERY_STRING"));
@@ -687,7 +692,7 @@ return(0);
 
 pid_t RunEventScript(STREAM *S, const char *Script)
 {
-	if (Spawn(Script,Settings.CgiUser,"",NULL) ==-1)
+	if (Spawn(Script,Settings.DefaultUser,"",NULL) ==-1)
 	{
         LogToFile(Settings.LogPath, "ERROR: Failed to run event script '%s'. Error was: %s",Script, strerror(errno));
 	}
@@ -781,6 +786,7 @@ if (Session->CacheTime > 0)
 	Tempstr=CatStr(Tempstr,Quoted);
 }
 if (StrLen(Session->UserName)) Tempstr=MCatStr(Tempstr," User='",Session->UserName,"'",NULL);
+if (StrLen(Session->RealUser)) Tempstr=MCatStr(Tempstr," RealUser='",Session->RealUser,"'",NULL);
 if (StrLen(Session->RemoteAuthenticate)) Tempstr=MCatStr(Tempstr," RemoteAuthenticate='",Session->RemoteAuthenticate,"'",NULL);
 
 if (! PostArguments)
@@ -815,6 +821,8 @@ int PostArguments=FALSE, KeepAlive=FALSE, RetVal=FALSE;
 
 
 if (! ChrootSendRequest(Session, Type, Path, SearchPath)) return(FALSE);
+
+
 if ((strcmp(Type, "PROXY") != 0) && (strcmp(Session->Method,"POST") ==0)) PostArguments=TRUE;
 
 if (PostArguments && StrLen(Session->Arguments))
@@ -896,66 +904,6 @@ DestroyString(ResponseLine);
 return(RetVal);
 }
 
-
-
-void HTTPServerHandleVPath(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendData)
-{
-char *Tempstr=NULL, *ptr;
-char *Name=NULL, *Value=NULL;
-char *LocalPath=NULL, *ExternalPath=NULL, *DocName=NULL;
-ListNode *Vars;
-
-
-if (VPath->CacheTime) Session->CacheTime=VPath->CacheTime;
-
-Vars=ListCreate();
-ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
-while (ptr)
-{
-SetVar(Vars,Name,Value);
-ptr=GetNameValuePair(ptr,"&","=",&Name,&Value);
-}
-
-DocName=SubstituteVarsInString(DocName,Session->Path+StrLen(VPath->URL),Vars,0);
-
-ptr=GetToken(VPath->Path,":",&Tempstr,0);
-while (ptr)
-{
-	if (*Tempstr=='/') ExternalPath=MCatStr(ExternalPath,Tempstr,":",NULL);
-	else 
-	{
-		if (StrLen(Tempstr)==0) LocalPath=CatStr(LocalPath,"/:");
-		else LocalPath=MCatStr(LocalPath,Tempstr,":",NULL);
-	}
-	ptr=GetToken(ptr,":",&Tempstr,0);
-}
-
-Tempstr=CopyStr(Tempstr,"");
-if (StrLen(LocalPath)) Tempstr=FindFileInPath(Tempstr,DocName,LocalPath);
-
-if (StrLen(Tempstr)) HTTPServerSendDocument(S, Session, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
-else if (StrLen(ExternalPath))
-{
-	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
-	ChrootProcessRequest(S, Session, "GETF", DocName, ExternalPath);
-}
-//This will send '404'
-else HTTPServerSendDocument(S, Session, DocName, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
-
-	DestroyString(Name);
-	DestroyString(Value);
-	DestroyString(DocName);
-	DestroyString(Tempstr);
-	DestroyString(LocalPath);
-	DestroyString(ExternalPath);
-}
-
-void VPathMimeIcons(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendData)
-{
-	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,"",VPath->Path);
-	if (VPath->CacheTime) Session->CacheTime=VPath->CacheTime;
-	ChrootProcessRequest(S, Session, "MIMEICON", "", VPath->Path);
-}
 
 
 int HTTPServerHandleRegister(HTTPSession *Session, int Flags)

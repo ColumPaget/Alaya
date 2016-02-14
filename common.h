@@ -69,6 +69,8 @@ char *Name;
 char *ContentType;
 off_t Size;
 unsigned int CacheTime;
+char *User;
+char *Group;
 time_t Mtime;
 } TPathItem;
 
@@ -130,6 +132,7 @@ extern char *Version;
 HTTPSession *HTTPSessionCreate();
 void HTTPSessionClear(void *);
 void HTTPSessionDestroy(void *);
+HTTPSession *HTTPSessionClone(HTTPSession *Src);
 
 void SetTimezoneEnv();
 
@@ -139,17 +142,10 @@ void PathItemDestroy(void *pi_ptr);
 
 char *FormatURL(char *Buff, HTTPSession *Session, char *ItemPath);
 char *MakeAccessToken(char *Buffer, char *User, char *Salt, char *RequestingHost, char *RequestURL);
-
 char *ParentDirectory(char *RetBuff, char *Path);
-
 char *SessionGetArgument(char *RetBuff, HTTPSession *Session, char *ReqName);
-
 int CopyURL(HTTPSession *Session, char *From, char *To);
-
-
 int ProcessEventTriggers(HTTPSession *Session);
-
-
 void DropCapabilities(int Level);
 
 #endif

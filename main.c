@@ -176,14 +176,23 @@ LogToFile(Settings.LogPath, "%s",Msg);
 void SetResourceLimits()
 {
 struct rlimit limit;
+rlim_t val;
 
+val= (rlim_t) ParseHumanReadableDataQty(Settings.AddressSpace, 0);
+if (val > 0)
+{
 getrlimit(RLIMIT_AS, &limit);
-limit.rlim_cur=(rlim_t) ParseHumanReadableDataQty(Settings.AddressSpace, 0);
+limit.rlim_cur=val;
 setrlimit(RLIMIT_AS, &limit);
+}
 
+val= (rlim_t) ParseHumanReadableDataQty(Settings.AddressSpace, 0);
+if (val > 0)
+{
 getrlimit(RLIMIT_STACK, &limit);
-limit.rlim_cur=(rlim_t) ParseHumanReadableDataQty(Settings.StackSize, 0);
+limit.rlim_cur=val;
 setrlimit(RLIMIT_STACK, &limit);
+}
 }
 
 
@@ -283,7 +292,7 @@ if (S)
 			ListDeleteItem(Connections,S);
 			STREAMClose(S);
 		}
-		else if (pid > 0) STREAMSetItem(S,"HelperPid",pid);
+		else if (pid > 0) STREAMSetItem(S,"HelperPid",(void *) pid);
 	}
 }
 

@@ -7,7 +7,7 @@ exec_prefix=@exec_prefix@
 bindir=@sbindir@
 sysconfdir=@sysconfdir@
 FLAGS=$(CFLAGS) @DEFS@ 
-OBJ=Authenticate.o MimeType.o DavProps.o Settings.o common.o server.o FileProperties.o directory_listing.o FileDetailsPage.o ChrootHelper.o Events.o ID3.o upload.o proxy.o websocket.o libUseful-2.3/libUseful-2.3.a 
+OBJ=Authenticate.o MimeType.o DavProps.o Settings.o common.o server.o FileProperties.o directory_listing.o FileDetailsPage.o VPath.o ChrootHelper.o Events.o ID3.o upload.o proxy.o websocket.o libUseful-2.3/libUseful-2.3.a 
 EXE=alaya
 
 all: $(OBJ)
@@ -39,6 +39,9 @@ server.o: server.c server.h
 
 Events.o: Events.c Events.h
 	gcc $(FLAGS) -c Events.c 
+
+VPath.o: VPath.c VPath.h
+	gcc $(FLAGS) -c VPath.c
 
 directory_listing.o: directory_listing.c directory_listing.h
 	gcc $(FLAGS) -c directory_listing.c 
