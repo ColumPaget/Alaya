@@ -18,8 +18,8 @@ void HTTPServerHandleConnection(HTTPSession *Session);
 void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags);
 void HTTPServerSendHTML(STREAM *S, HTTPSession *Session, char *Title, char *Body);
 void HTTPServerSendResponse(STREAM *S, HTTPSession *Heads, char *ResponseLine, char *ContentType, char *Body);
-
 void HTTPServerSendFile(STREAM *S, HTTPSession *Session, char *Path, ListNode *Vars, int SendData);
+int HTTPServerExecCGI(STREAM *ClientCon, HTTPSession *Session, const char *ScriptPath);
 void HTTPServerSendDocument(STREAM *S, HTTPSession *Session, char *Path, int Flags);
 int HTTPServerDecideToCompress(HTTPSession *Session, char *Path);
 int HTTPServerReadBody(HTTPSession *Session, char **Data);

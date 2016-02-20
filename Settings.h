@@ -27,9 +27,11 @@
 #define FLAG_AUTH_PRESENT  2
 #define FLAG_AUTH_DIGEST   4
 #define FLAG_AUTH_ACCESS_TOKEN  8
-#define FLAG_AUTH_CERT_REQUIRED 16
-#define FLAG_AUTH_CERT_SUFFICIENT 32
+#define FLAG_AUTH_COOKIE 16
+#define FLAG_AUTH_HASCOOKIE 32
 #define FLAG_AUTH_CERT_ASK 64
+#define FLAG_AUTH_CERT_SUFFICIENT 128
+#define FLAG_AUTH_CERT_REQUIRED 256
 
 
 typedef struct
@@ -62,6 +64,7 @@ int DisplayNameLen;
 unsigned long DocumentCacheTime;
 ListNode *SSLKeys;
 ListNode *VPaths;
+ListNode *FileTypes;
 ListNode *ScriptHandlers;
 ListNode *LoginEntries;
 ListNode *SanitizeArgumentsAllowedTags;

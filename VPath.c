@@ -1,5 +1,21 @@
+
+/**********************************************************************
+This module relates to 'Virtual Paths' or 'VPaths. These are URLs that
+trigger special processing, and are often used to allow access to some
+directories outside of a chroot jail.  For instance, a VPath of type 
+'Path' creates a virtual directory that maps to a real directory, and 
+that real directory can be outside of chroot. A VPath of type 'cgi' 
+creates a search path of directories whose contents are treated as 
+programs or scripts to be run. Again, these directories can be outside 
+of chroot. Finally some values, like cache time, can be set on a VPath.
+**********************************************************************/
+
+
+
 #include "VPath.h"
 #include "server.h"
+
+
 
 char *HTTPServerSubstituteArgs(char *RetStr, const char *Template, HTTPSession *Session)
 {
@@ -32,6 +48,7 @@ char *Tempstr=NULL, *ptr;
 char *LocalPath=NULL, *ExternalPath=NULL, *DocName=NULL;
 
 //Document name here is whatever part of the Path is *beyond* the VPath component
+LogToFile(Settings.LogPath,"SA: [%s] [%s]", Session->URL, VPath->URL);
 DocName=HTTPServerSubstituteArgs(DocName, Session->Path+StrLen(VPath->URL), Session);
 
 
@@ -53,7 +70,7 @@ if (StrLen(LocalPath)) Tempstr=FindFileInPath(Tempstr,DocName,LocalPath);
 if (StrLen(Tempstr)) HTTPServerSendDocument(S, Session, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 else if (StrLen(ExternalPath))
 {
-	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
+	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s  %d", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath,Session->Flags & SESSION_KEEP_ALIVE);
 	ChrootProcessRequest(S, Session, "GETF", DocName, ExternalPath);
 }
 //This will send '404'
@@ -89,6 +106,7 @@ HTTPSession *VPathSession=NULL;
 int result=FALSE;
 
 	
+LogToFile(Settings.LogPath,"VP: %d ",Session->Flags & SESSION_KEEP_ALIVE);
 	Curr=ListGetNext(Settings.VPaths);
 	while (Curr)
 	{

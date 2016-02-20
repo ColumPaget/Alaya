@@ -56,13 +56,17 @@
 #define CAPS_LEVEL_CHROOTED 3
 #define CAPS_LEVEL_SESSION  4
 
-typedef enum {PATHTYPE_EXTFILE, PATHTYPE_CGI, PATHTYPE_WEBSOCKET, PATHTYPE_STREAM, PATHTYPE_LOGOUT, PATHTYPE_PROXY, PATHTYPE_MIMEICONS, PATHTYPE_URL, PATHTYPE_FILE, PATHTYPE_DIR} TPathTypes;
+typedef enum {PATHTYPE_EXTFILE, PATHTYPE_CGI, PATHTYPE_WEBSOCKET, PATHTYPE_STREAM, PATHTYPE_LOGOUT, PATHTYPE_PROXY, PATHTYPE_MIMEICONS, PATHTYPE_FILETYPE, PATHTYPE_URL, PATHTYPE_FILE, PATHTYPE_DIR} TPathTypes;
 
 
+#define PATHITEM_EXEC 1
+#define PATHITEM_NO_COMPRESS 2
+#define PATHITEM_COMPRESS 4
 
 typedef struct
 {
 int Type;
+int Flags;
 char *URL;
 char *Path;
 char *Name;
@@ -72,6 +76,7 @@ unsigned int CacheTime;
 char *User;
 char *Group;
 time_t Mtime;
+char *OnUpload;
 } TPathItem;
 
 
@@ -137,15 +142,16 @@ HTTPSession *HTTPSessionClone(HTTPSession *Src);
 void SetTimezoneEnv();
 
 void HandleError(int Flags, const char *FmtStr, ...);
-TPathItem *PathItemCreate(int Type, char *URL, char *Path);
+TPathItem *PathItemCreate(int Type, const char *URL, const char *Path);
 void PathItemDestroy(void *pi_ptr);
 
-char *FormatURL(char *Buff, HTTPSession *Session, char *ItemPath);
-char *MakeAccessToken(char *Buffer, char *User, char *Salt, char *RequestingHost, char *RequestURL);
-char *ParentDirectory(char *RetBuff, char *Path);
-char *SessionGetArgument(char *RetBuff, HTTPSession *Session, char *ReqName);
+char *FormatURL(char *Buff, HTTPSession *Session, const char *ItemPath);
+char *ParentDirectory(char *RetBuff, const char *Path);
+char *SessionGetArgument(char *RetBuff, HTTPSession *Session, const char *ReqName);
 int CopyURL(HTTPSession *Session, char *From, char *To);
 int ProcessEventTriggers(HTTPSession *Session);
+char *FindScriptHandlerForScript(char *RetStr, const char *ScriptPath);
+
 void DropCapabilities(int Level);
 
 #endif

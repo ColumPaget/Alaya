@@ -11,13 +11,13 @@
 #include "upload.h"
 #include "proxy.h"
 #include "fnmatch.h"
+#include "AccessTokens.h"
 
 const char *HTTPMethods[]={"HEAD","GET","POST","PUT","DELETE","MKCOL","PROPFIND","PROPPATCH","MOVE","COPY","OPTIONS","CONNECT","LOCK","UNLOCK",NULL};
 
 const char *HeaderStrings[]={"Authorization","Proxy-Authorization","Host","Destination","Content-Type","Content-Length","Depth","Overwrite","User-Agent","Cookie","If-Modified-Since","Accept-Encoding","Icy-MetaData","Referer","Connection","Upgrade","Sec-WebSocket-Key","Sec-Websocket-Key1", "Sec-Websocket-Key2","Sec-WebSocket-Protocol","Sec-WebSocket-Version","Origin", NULL};
 
 typedef enum {HEAD_AUTH, HEAD_PROXYAUTH, HEAD_HOST, HEAD_DEST, HEAD_CONTENT_TYPE, HEAD_CONTENT_LENGTH, HEAD_DEPTH, HEAD_OVERWRITE, HEAD_AGENT, HEAD_COOKIE, HEAD_IFMOD_SINCE, HEAD_ACCEPT_ENCODING, HEAD_ICECAST,HEAD_REFERER, HEAD_CONNECTION, HEAD_UPGRADE, HEAD_WEBSOCK_KEY, HEAD_WEBSOCK_KEY1, HEAD_WEBSOCK_KEY2, HEAD_WEBSOCK_PROTOCOL, HEAD_WEBSOCK_VERSION, HEAD_ORIGIN} THeaders;
-
 
 
 int HTTPServerReadBody(HTTPSession *Session, char **Data)
@@ -412,7 +412,7 @@ while (StrLen(Tempstr) )
 	break;
 
 	case HEAD_WEBSOCK_KEY2:
-		Session->Cookies=CopyStr(Session->Cookies, ptr);
+		Session->ContentType=CopyStr(Session->ContentType, ptr);
 		if (Session->MethodID==METHOD_WEBSOCKET) Session->MethodID = METHOD_WEBSOCKET75;
 	break;
 
@@ -552,6 +552,11 @@ else
 		Session->Flags &= ~SESSION_REUSE;
 	}
 
+	if ((Settings.AuthFlags & FLAG_AUTH_COOKIE) && (Session->Flags & SESSION_AUTHENTICATED) && (! (Session->AuthFlags & FLAG_AUTH_HASCOOKIE)))
+	{
+		Tempstr=MakeAccessCookie(Tempstr, Session);
+		HTTPServerSendHeader(S, "Set-Cookie", Tempstr);
+	}
 
 //If we are running a CGI script, then the script will handle all headers relating to content
 if (! (Flags & HEADERS_CGI)) 
@@ -601,6 +606,7 @@ if (Session)
 	Response->MethodID=Session->MethodID;
 	Response->LastModified=Session->LastModified;
 	Response->Flags |= Session->Flags & SESSION_KEEP_ALIVE;
+	Response->Flags |= SESSION_KEEP_ALIVE;
 	Response->ClientIP=CopyStr(Response->ClientIP,Session->ClientIP);
 	Response->Path=CopyStr(Response->Path,Session->Path);
 	Response->Method=CopyStr(Response->Method,Session->Method);
@@ -670,61 +676,35 @@ DestroyString(Tempstr);
 }
 
 
-HTTPSession *NormalFileSendSessionCreate(char *Path, int Flags, ListNode *Vars)
+
+
+
+HTTPSession *FileSendCreateSession(char *Path, HTTPSession *Request, ListNode *Vars, int ICYInterval)
 {
-HTTPSession *Headers;
+	HTTPSession *Session;
+	char *Tempstr=NULL;
 
-Headers=HTTPSessionCreate();
-Headers->ResponseCode=CopyStr(Headers->ResponseCode,"200 OK");
-Headers->ContentType=CopyStr(Headers->ContentType,GetVar(Vars,"ContentType"));
-Headers->LastModified=atoi(GetVar(Vars,"MTime-secs"));
-Headers->ContentSize=atoi(GetVar(Vars,"FileSize"));
+	Session=HTTPSessionClone(Request);
+	Session->ResponseCode=CopyStr(Session->ResponseCode,"200 OK");
+	Session->ContentType=CopyStr(Session->ContentType,GetVar(Vars,"ContentType"));
+	Session->LastModified=atoi(GetVar(Vars,"MTime-secs"));
+	Session->ContentSize=atoi(GetVar(Vars,"FileSize"));
 
-//if the client supports keep alives then use that
-Headers->Flags |= (Flags & SESSION_KEEP_ALIVE);
+	if (Session->Flags & SESSION_ICECAST) 
+	{
+		Session->Flags |= SESSION_ICECAST;
+		Session->Protocol=CopyStr(Session->Protocol,"ICY");
+		Tempstr=FormatStr(Tempstr,"%d",ICYInterval);
+		SetVar(Session->Headers,"icy-metaint",Tempstr);
+	}
+	else if (HTTPServerDecideToCompress(Request,Path))
+	{
+		Session->ContentSize=0;
+		Session->Flags |= SESSION_ENCODE_GZIP;
+	}
 
-
-return(Headers);
-}
-
-
-HTTPSession *MediaItemCreateSendSession(char *Path, int ClientFlags, int IcyInterval, ListNode *Vars)
-{
-HTTPSession *Response;
-char *Tempstr=NULL;
-
-Response=NormalFileSendSessionCreate(Path, ClientFlags, Vars);
-/*
-if (ClientFlags & SESSION_ICECAST) 
-{
-	Response->Flags |= SESSION_ICECAST;
-	Response->Protocol=CopyStr(Response->Protocol,"ICY");
-	Tempstr=FormatStr(Tempstr,"%d",IcyInterval);
-	SetVar(Response->Headers,"icy-metaint",Tempstr);
-}
-*/
-
-DestroyString(Tempstr);
-
-return(Response);
-}
-
-
-
-
-HTTPSession *FileSendCreateSession(char *Path, int ClientFlags, ListNode *Vars, int ICYInterval)
-{
-		HTTPSession *Session;
-
-		if (ClientFlags & SESSION_ICECAST) Session=MediaItemCreateSendSession(Path, ClientFlags, ICYInterval, Vars);
-		else Session=NormalFileSendSessionCreate(Path, ClientFlags, Vars);
-		if (HTTPServerDecideToCompress(Session,Path))
-		{
-			Session->ContentSize=0;
-			Session->Flags|=SESSION_ENCODE_GZIP;
-		}
-
-		return(Session);
+	DestroyString(Tempstr);
+	return(Session);
 }
 
 
@@ -768,7 +748,7 @@ DestroyString(Tempstr);
 }
 
 
-void HTTPServerHandleStream(STREAM *Output,HTTPSession *Session, char *SearchPath, int SendData)
+void HTTPServerHandleStream(STREAM *Output, HTTPSession *Session, char *SearchPath, int SendData)
 {
 char *Tempstr=NULL;
 HTTPSession *Response;
@@ -780,7 +760,7 @@ int i;
 
 Vars=ListCreate();
 SetVar(Vars,"ContentType","audio/mpeg");
-Response=MediaItemCreateSendSession("", Session->Flags, 0, Vars);
+Response=FileSendCreateSession("", Session, Vars, 0);
 HTTPServerSendHeaders(Output, Response, FALSE);
 STREAMFlush(Output);
 
@@ -842,8 +822,7 @@ int ICYInterval=4096000;
 			LogToFile(Settings.LogPath,"%s@%s (%s) downloading %s (%s bytes)",Session->UserName,Session->ClientHost,Session->ClientIP,Path,GetVar(Vars,"FileSize"));
 		}
 
-		Response=FileSendCreateSession(Path, Session->Flags, Vars, ICYInterval);
-		Response->CacheTime=Session->CacheTime;
+		Response=FileSendCreateSession(Path, Session, Vars, ICYInterval);
 		HTTPServerFormatExtraHeaders(Response,Vars);
 		HTTPServerSendHeaders(S, Response, Flags);
 
@@ -901,6 +880,55 @@ ListNode *Vars;
 	}
 
 ListDestroy(Vars,DestroyString);
+}
+
+
+
+int HTTPServerExecCGI(STREAM *ClientCon, HTTPSession *Session, const char *ScriptPath)
+{
+char *Tempstr=NULL;
+int i;
+
+
+    //Switch user. ALAYA WILL NOT RUN SCRIPTS AS ROOT!
+      if ((geteuid()==0) && (! SwitchUser(Session->RealUser)))
+      {
+        LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s",Session->RealUser, ScriptPath);
+				return(FALSE);
+      }
+
+      if (geteuid()==0)
+      {
+        HTTPServerSendHTML(ClientCon, NULL, "403 Forbidden","Alaya will not run .cgi programs as 'root'.<br>\r\nTry setting 'Default User' in config file or command line.");
+        LogToFile(Settings.LogPath, "Failed to switch user to '%s' for running a .cgi program. Will not run programs as 'root'. Set 'DefaultUser' in config file or command line.",Session->RealUser);
+      }
+      else
+      {
+        Session->ResponseCode=CopyStr(Session->ResponseCode,"200 OK");
+        HTTPServerSendHeaders(ClientCon, Session, HEADERS_CGI);
+        STREAMFlush(ClientCon);
+
+        SetupEnvironment(Session, ScriptPath);
+        Tempstr=FindScriptHandlerForScript(Tempstr,ScriptPath);
+        if (Tempstr) LogToFile(Settings.LogPath,"Execute script: %s using handler '%s'",ScriptPath,Tempstr);
+        else LogToFile(Settings.LogPath,"Execute script: %s QUERY_STRING= '%s'",ScriptPath,getenv("QUERY_STRING"));
+
+        //Only do this late! Otherwise logging won't work.
+        for (i=3; i < 1000; i++) close(i);
+
+        if (StrLen(Tempstr)) execl(Tempstr, Tempstr, ScriptPath,NULL);
+        else execl(ScriptPath,ScriptPath,NULL);
+
+        /*If this code gets executed, then 'execl' failed*/
+        HTTPServerSendHTML(ClientCon, Session, "403 Forbidden","You don't have permission for that.");
+  
+        //Logging won't work after we've closed all the file descriptors!
+        LogToFile(Settings.LogPath,"Cannot execute script: %s",ScriptPath);
+    }
+
+	//if we get there then, for whatever reason, our script didn't run
+	DestroyString(Tempstr);
+	return(FALSE);
 }
 
 
@@ -1203,6 +1231,7 @@ else
 	{
 		LogToFile(Settings.LogPath,"ERROR: CHDIR FAILED: %d %s %s",getuid(),ChrootDir,strerror(errno));
 		HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to home-directory");
+		LogFileFlushAll(TRUE);
  		_exit(1);
 	}
 	chroot(".");
@@ -1226,7 +1255,7 @@ else if (Settings.Flags & FLAG_CHSHARE)
 
 Session->StartDir=SlashTerminateDirectoryPath(Session->StartDir);
 
-LogToFile(Settings.LogPath,"User Context: Chroot: %s, StartDir: %s, UserID: %d, GroupID: %d,",ChrootDir, Session->StartDir,Session->RealUserUID,Session->GroupID);
+LogToFile(Settings.LogPath,"User Context: Chroot: %s, StartDir: %s, HomeDir: %s, UserID: %d, GroupID: %d,",ChrootDir, Session->StartDir, Session->HomeDir, Session->RealUserUID,Session->GroupID);
 
 if (Session->GroupID > 0)
 {
@@ -1324,6 +1353,7 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 		return(FALSE);
 	}
 
+
 	if (Session->Flags & SESSION_AUTHENTICATED) 
 	{
 		if (strcmp(Session->UserName,Session->AuthenticatedUser)==0) 
@@ -1337,7 +1367,8 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 
 
 	//Consider AccessToken Authentication for this URL!
-	if (Session->AuthFlags & FLAG_AUTH_ACCESS_TOKEN) ParseAccessToken(Session);
+	if ((! (Session->Flags & SESSION_AUTHENTICATED)) && (Session->AuthFlags & FLAG_AUTH_ACCESS_TOKEN)) ParseAccessToken(Session);
+
 
 	if (Session->AuthFlags & FLAG_AUTH_PRESENT)
 	{
@@ -1575,9 +1606,14 @@ return(FALSE);
 
 
 
+
+
+
 void HTTPServerFindAndSendDocument(STREAM *S, HTTPSession *Session, int Flags)
 {
 char *Path=NULL, *ptr;
+TPathItem *PI=NULL;
+ListNode *Curr;
 
 	if (! VPathProcess(S, Session, Flags))
   {
@@ -1587,7 +1623,25 @@ char *Path=NULL, *ptr;
     if (strcmp(ptr,"/")==0) Path=CopyStr(Path,Session->Path);
     else Path=MCopyStr(Path,ptr,Session->Path,NULL);
 
-    HTTPServerSendDocument(S, Session, Path, Flags);
+		
+		Curr=ListGetNext(Settings.FileTypes);
+		while (Curr)
+		{
+			PI=(TPathItem *) Curr->Item;
+			if (fnmatch(PI->Path, GetBasename(Session->Path), 0) ==0)
+			{
+				if (PI->Flags & PATHITEM_COMPRESS) Session->Flags |= FLAG_COMPRESS;
+				if (PI->Flags & PATHITEM_NO_COMPRESS) Session->Flags &= ~FLAG_COMPRESS;
+				if (PI->CacheTime > 0) Session->CacheTime=PI->CacheTime;
+			}
+			Curr=ListGetNext(Curr);
+		}
+
+		//One day we will be able to handle scripts inside of chroot using embedded
+		//scripting. But not today.
+		// if (PI && (PI->Flags & PATHITEM_EXEC)) HTTPServerExecCGI(S, Session, Path);
+    //else 
+		HTTPServerSendDocument(S, Session, Path, Flags);
   }
 DestroyString(Path);
 }

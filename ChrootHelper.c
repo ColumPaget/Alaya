@@ -147,6 +147,9 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 	Response->LastModified=0;
 	Response->CacheTime=Settings.DocumentCacheTime;
 	Response->RealUser=CopyStr(Response->RealUser, Settings.DefaultUser);
+	//if we got as far as calling this function, then the original session must be
+	//authenticated.
+	Response->Flags |= SESSION_AUTHENTICATED;
 
 	ptr=GetNameValuePair(Data," ","=",&Name,&Tempstr);
 	while (ptr)
@@ -175,6 +178,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		else if (strcmp(Name,"Cipher")==0) Response->Cipher=CopyStr(Response->Cipher,Value);
 		else if (strcmp(Name,"Cookies")==0) Response->Cookies=CopyStr(Response->Cookies,Value);
 		else if (strcmp(Name,"KeepAlive")==0) Response->Flags |= SESSION_KEEP_ALIVE;
+		else if (strcmp(Name,"AuthCookie")==0) Response->AuthFlags |= FLAG_AUTH_HASCOOKIE;
 		else if (strcmp(Name,"Cache")==0) Response->CacheTime=atoi(Value);
 
 		ptr=GetNameValuePair(ptr," ","=",&Name,&Tempstr);
@@ -223,35 +227,6 @@ char *Tempstr=NULL, *ptr;
 	if (StrLen(Session->Cipher)) SetEnvironmentVariable("SSL",Session->Cipher);
 
 DestroyString(Tempstr);
-}
-
-
-char *FindScriptHandlerForScript(char *RetStr, char *ScriptPath)
-{
-char *Handler=NULL, *ptr;
-ListNode *Curr;
-
-ptr=strrchr(ScriptPath,'.');
-
-Handler=CopyStr(RetStr,"");
-if (ptr)
-{
-	Curr=ListGetNext(Settings.ScriptHandlers);
-	while (Curr)
-	{
-		if (
-				(strcmp(Curr->Tag,ptr)==0) ||
-				(strcmp(Curr->Tag,ptr+1)==0)
-			) 
-		{
-			Handler=CopyStr(Handler,(char *) Curr->Item);
-			break;
-		}
-		Curr=ListGetNext(Curr);
-	}
-}
-
-return(Handler);
 }
 
 
@@ -337,19 +312,19 @@ HTTPSession *Response;
 	CleanStr(Response->Path);
 	CleanStr(Response->SearchPath);
 	CleanStr(Response->StartDir);
-	ScriptPath=FindFileInPath(ScriptPath,Response->Path,Response->SearchPath);
-	LogToFile(Settings.LogPath,"Script: Found=[%s] SearchPath=[%s] ScriptName=[%s] Arguments=[%s]",ScriptPath,Response->SearchPath,Response->Path,Response->Arguments);
+	ScriptPath=FindFileInPath(ScriptPath, Response->Path, Response->SearchPath);
+	LogToFile(Settings.LogPath,"Script: Found=[%s] SearchPath=[%s] ScriptName=[%s] Arguments=[%s]", ScriptPath, Response->SearchPath, Response->Path, Response->Arguments);
 
 	if (access(ScriptPath,F_OK) !=0)
 	{
-			LogToFile(Settings.LogPath,"No such script: %s in path %s = %s",Response->Path,Response->SearchPath,ScriptPath);
+			LogToFile(Settings.LogPath,"No such script: %s in path %s = %s",Response->Path, Response->SearchPath, ScriptPath);
 	}
 	else if (
 					(access(ScriptPath,X_OK) !=0) || 
 					(! CheckScriptIntegrity(ScriptPath))
 			)
 	{
-			LogToFile(Settings.LogPath,"Cannot execute script: %s",ScriptPath);
+			LogToFile(Settings.LogPath,"Cannot execute script: %s", ScriptPath);
 	}
 	else
 	{
@@ -368,6 +343,7 @@ HTTPSession *Response;
       if (! SwitchUser(Response->RealUser))
       {
         LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s using handler '%s'", Response->RealUser, ScriptPath, Tempstr);
+				LogFileFlushAll(TRUE);
         _exit(0);
       }
 
@@ -391,6 +367,7 @@ HTTPSession *Response;
 				//Logging won't work after we've closed all the file descriptors!
 				LogToFile(Settings.LogPath,"Cannot execute script: %s",ScriptPath);
 		}
+		LogFileFlushAll(TRUE);
 		_exit(0);
 	}
 	else
@@ -456,51 +433,12 @@ HTTPSession *Response;
 			close(1);
 			dup(ClientCon->out_fd);
 
+			HTTPServerExecCGI(ClientCon, Response, ScriptPath);
 
-
-		//Switch user. ALAYA WILL NOT RUN SCRIPTS AS ROOT!
-      if (! SwitchUser(Response->RealUser))
-      {
-        LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s using handler '%s'",Response->RealUser, ScriptPath, Tempstr);
-        _exit(0);
-      }
-
-			if (geteuid()==0)
-			{
-				HTTPServerSendHTML(ClientCon, NULL, "403 Forbidden","Alaya will not run .cgi programs as 'root'.<br>\r\nTry setting 'Default User' in config file or command line.");
-				LogToFile(Settings.LogPath, "Failed to switch user to '%s' for running a .cgi program. Will not run programs as 'root'. Set 'DefaultUser' in config file or command line.",Response->RealUser);
-			}
-			else
-			{
-	
-				Response->ResponseCode=CopyStr(Response->ResponseCode,"200 OK");
-				HTTPServerSendHeaders(ClientCon, Response, HEADERS_CGI);
-				STREAMFlush(ClientCon);
-
-				SetupEnvironment(Response, ScriptPath);
-				Tempstr=FindScriptHandlerForScript(Tempstr,ScriptPath);
-				if (Tempstr) LogToFile(Settings.LogPath,"Execute script: %s using handler '%s'",ScriptPath,Tempstr);
-				else LogToFile(Settings.LogPath,"Execute script: %s QUERY_STRING= '%s'",ScriptPath,getenv("QUERY_STRING"));
-
-				//Only do this late! Otherwise logging won't work.
-				for (i=3; i < 1000; i++) close(i);
-
-				if (StrLen(Tempstr)) execl(Tempstr, Tempstr, ScriptPath,NULL);
-				else execl(ScriptPath,ScriptPath,NULL);
-
-				/*If this code gets executed, then 'execl' failed*/
-				HTTPServerSendHTML(ClientCon, Response, "403 Forbidden","You don't have permission for that.");
-
-				//Logging won't work after we've closed all the file descriptors!
-				LogToFile(Settings.LogPath,"Cannot execute script: %s",ScriptPath);
+			//exit whether script ran or not!
+			_exit(0);
 		}
-		_exit(0);
 	}
-	else
-	{
-
-	}
-}
 
 
 HTTPSessionDestroy(Response);
@@ -533,7 +471,8 @@ if (pid==0)
 	HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 		
 	//exit 1 means that we can keep connection alive for re-use
-	if (Response->Flags & SESSION_REUSE) _exit(1);
+	LogFileFlushAll(TRUE);
+	if (Response->Flags & SESSION_KEEP_ALIVE) _exit(1);
 	_exit(0);
 }
 
@@ -583,6 +522,7 @@ if (pid==0)
 		
 	HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 	//exit 1 means we can keep connection alive for reuse
+	LogFileFlushAll(TRUE);
 	_exit(1);
 }
 
@@ -780,6 +720,7 @@ Quoted=QuoteCharsInStr(Quoted,Session->ClientReferrer,"'&");
 Tempstr=MCatStr(Tempstr, " ClientReferrer='",Quoted,"'",NULL);
 
 if (Session->Flags & SESSION_KEEP_ALIVE) Tempstr=CatStr(Tempstr," KeepAlive=Y");
+if (Session->AuthFlags & FLAG_AUTH_HASCOOKIE) Tempstr=CatStr(Tempstr," AuthCookie=Y");
 if (Session->CacheTime > 0)
 {
 	Quoted=FormatStr(Quoted," Cache=%d",Session->CacheTime);
@@ -893,7 +834,7 @@ STREAMFlush(S);
 
 //if we're running a cgi program, then it will close the session when done, so
 //turn off the 'reuse session' flag
-if (KeepAlive) Session->Flags |= SESSION_REUSE;
+if (KeepAlive) Session->Flags |= SESSION_KEEP_ALIVE | SESSION_REUSE;
 else Session->Flags &= ~(SESSION_KEEP_ALIVE | SESSION_REUSE);
 
 

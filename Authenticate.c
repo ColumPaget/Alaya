@@ -1,4 +1,5 @@
 #include "Authenticate.h"
+#include "AccessTokens.h"
 #include <pwd.h>
 
 #define USER_UNKNOWN -1
@@ -21,8 +22,8 @@ static pam_handle_t *pamh=NULL;
 
 char *AuthenticationsTried=NULL;
 
-const char *AuthMethods[]={"none","open","deny","native","pam","pam-account","passwd","shadow","digest","accesstoken",NULL};
-typedef enum {AUTHTOK_NONE, AUTHTOK_OPEN, AUTHTOK_DENY, AUTHTOK_NATIVE, AUTHTOK_PAM, AUTHTOK_PAM_ACCT, AUTHTOK_PASSWD, AUTHTOK_SHADOW, AUTHTOK_DIGEST, AUTHTOK_ACCESSTOKEN, AUTHTOK_ACCESSTOKEN_HTTP} TAuthTokens;
+const char *AuthMethods[]={"none","open","deny","native","pam","pam-account","passwd","shadow","digest","certificate","accesstoken","cookie",NULL};
+typedef enum {AUTHTOK_NONE, AUTHTOK_OPEN, AUTHTOK_DENY, AUTHTOK_NATIVE, AUTHTOK_PAM, AUTHTOK_PAM_ACCT, AUTHTOK_PASSWD, AUTHTOK_SHADOW, AUTHTOK_DIGEST, AUTHTOK_CERTIFICATE, AUTHTOK_ACCESSTOKEN, AUTHTOK_ACCESSTOKEN_HTTP, AUTHTOK_COOKIE} TAuthTokens;
 
 
 
@@ -180,61 +181,6 @@ return(result);
 }
 
 
-int CheckAccessToken(HTTPSession *Session, char *Salt, char *URL, char *ClientIP, char *CorrectToken)
-{
-char *Token=NULL;
-int result=FALSE;
-
-if (strcmp(Session->Method, "PUT")==0) return(FALSE);
-if (strcmp(Session->Method, "POST")==0) return(FALSE);
-Token=MakeAccessToken(Token, Salt, Session->UserName, ClientIP, URL);
-
-if (StrLen(Token) && (strcmp(Token, CorrectToken)==0)) result=TRUE; 
-
-DestroyString(Token);
-return(result);
-}
-
-
-int AuthAccessToken(HTTPSession *Session)
-{
-char *URL=NULL, *Salt=NULL;
-char *ptr;
-int result=FALSE;
-
-//if (! (Session->Flags & FLAG_AUTH_ACCESS_TOKEN)) return(FALSE);
-if (StrLen(Settings.AccessTokenKey)==0) return(FALSE);
-
-URL=FormatURL(URL,Session,Session->Path);
-
-//Password will be in format <salt>:<access token>
-ptr=GetToken(Session->Password,":",&Salt,0);
-
-
-if (StrLen(Salt) && (StrLen(ptr)))
-{
-	if ((strncmp(Session->ClientIP,"::ffff:",7)==0) && (CheckAccessToken(Session, Salt, URL, Session->ClientIP+7, ptr))) result=TRUE;
-	else if (CheckAccessToken(Session, Salt, URL, Session->ClientIP, ptr)) result=TRUE;
-	else if (CheckAccessToken(Session, Salt, URL, "*", ptr)) result=TRUE;
-
-	if (result)
-	{ 
-		LogToFile(Settings.LogPath,"AUTH: Client Authenticated with AccessToken for %s", Session->UserName);
-	}
-	else LogToFile(Settings.LogPath,"AUTH: AccessToken Failed for %s@%s", Session->UserName,Session->ClientIP);
-}
-
-AuthenticationsTried=CatStr(AuthenticationsTried,"accesstoken ");
-
-DestroyString(Salt);
-DestroyString(URL);
-
-return(result);
-}
-
-
-
-
 
 int AuthPasswdFile(HTTPSession *Session, char **RealUser, char **HomeDir)
 {
@@ -289,9 +235,8 @@ sptr=pass_struct->sp_pwdp;
 
 #ifdef HAVE_LIBCRYPT
 
-if (CheckSSLAuthentication(Session, Session->UserName)) result=TRUE;
 // this is an md5 password
-else if (
+if (
 	(StrLen(sptr) > 4) && 
 	(strncmp(sptr,"$1$",3)==0)
    )
@@ -608,8 +553,7 @@ while (Tempstr)
 	
 		RetVal=FALSE;
 
-		if (CheckSSLAuthentication(Session, Name)) RetVal=TRUE;
-		else if (HTTPDigest) RetVal=NativeFileCheckHTTPDigestAuth(Session, PasswordType, Pass, Session->Password);
+		if (HTTPDigest) RetVal=NativeFileCheckHTTPDigestAuth(Session, PasswordType, Pass, Session->Password);
 		else RetVal=NativeFileCheckPassword(Name,PasswordType,Pass,Session->Password);
 
 		break;
@@ -751,11 +695,47 @@ void AuthPAMClose()
 
 
 
+int AuthenticateLookupUserDetails(HTTPSession *Session)
+{
+struct passwd *pwent;
+
+//if we haven't got a real user, first try looking in the 'native' authentication
+//file to find a mapping from UserName to RealUser
+if (! StrLen(Session->RealUser))
+{
+	AuthNativeFile(Session, FALSE, &Session->RealUser, &Session->HomeDir, &Session->UserSettings);
+}
+
+//if we didn't find a 'real user' in the native file, try looking the username up in the system
+//password file to confirm it is a real username
+if (! StrLen(Session->RealUser)) 
+{
+	Session->RealUser=CopyStr(Session->RealUser,Session->UserName);
+	pwent=getpwnam(Session->RealUser);
+
+	//if we didn't find it, then set our real user to be the server default user
+  //though really, at this point, it's a mystery where this user is configured
+	if (! pwent) Session->RealUser=CopyStr(Session->RealUser,Settings.DefaultUser);
+}
+
+//Have to do this again in case first try failed
+pwent=getpwnam(Session->RealUser);
+if (pwent)
+{
+	Session->RealUserUID=pwent->pw_uid;
+
+	if (! StrLen(Session->HomeDir)) Session->HomeDir=CopyStr(Session->HomeDir,pwent->pw_dir);
+	//grent=getgrnam(Session->Group);
+}
+
+}
+
+
+
 int Authenticate(HTTPSession *Session)
 {
 int result=0;
-char *Token=NULL, *RealUser=NULL, *HomeDir=NULL, *UserSettings=NULL, *ptr;
-struct passwd *pwent;
+char *Token=NULL, *ptr;
 int PAMAccount=FALSE;
 //struct group *grent;
 
@@ -781,12 +761,17 @@ ptr=GetToken(Settings.AuthMethods,",",&Token,0);
 while (ptr)
 {
 	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"AUTH: Try to authenticate '%s' via '%s'. Remaining authentication types: %s",Session->UserName, Token, ptr);
+
 	if (strcasecmp(Token,"open")==0) result=TRUE;
-	else if (strcasecmp(Token,"native")==0) result=AuthNativeFile(Session,FALSE, &RealUser, &HomeDir, &UserSettings);
-	else if (strcasecmp(Token,"digest")==0) result=AuthNativeFile(Session,TRUE, &RealUser, &HomeDir, &UserSettings);
-	else if (strcasecmp(Token,"passwd")==0) result=AuthPasswdFile(Session, &RealUser, &HomeDir);
+	else if (strcasecmp(Token,"native")==0) result=AuthNativeFile(Session,FALSE, &Session->RealUser, &Session->HomeDir, &Session->UserSettings);
+	else if (strcasecmp(Token,"digest")==0) result=AuthNativeFile(Session,TRUE, &Session->RealUser, &Session->HomeDir, &Session->UserSettings);
+	else if (strcasecmp(Token,"passwd")==0) result=AuthPasswdFile(Session, &Session->RealUser, &Session->HomeDir);
 	else if (strcasecmp(Token,"shadow")==0) result=AuthShadowFile(Session);
-	else if (strcasecmp(Token,"accesstoken")==0) result=AuthAccessToken(Session);
+	else if (strcasecmp(Token,"cert")==0) result=CheckSSLAuthentication(Session, Session->UserName);
+	else if (strcasecmp(Token,"certificate")==0) result=CheckSSLAuthentication(Session, Session->UserName);
+	else if (strcasecmp(Token,"accesstoken")==0) result=AuthAccessToken(Session, Session->Password);
+	else if (strcasecmp(Token,"cookie")==0) result=AccessTokenAuthCookie(Session);
+
 	#ifdef HAVE_LIBPAM
 	else if (strcasecmp(Token,"pam")==0) 
 	{
@@ -805,7 +790,14 @@ while (ptr)
 		break;
 	}
 
-	if (result==TRUE) break;
+	if (result==TRUE)
+  {
+    LogToFile(Settings.LogPath,"AUTH: Client Authenticated with %s for %s@%s", Token, Session->UserName,Session->ClientIP);
+		break;
+  }
+
+	AuthenticationsTried=MCatStr(AuthenticationsTried,Token," ",NULL);
+
 	ptr=GetToken(ptr,",",&Token,0);
 }
 
@@ -813,44 +805,20 @@ while (ptr)
 switch (result)
 {
 case TRUE:
+AuthenticateLookupUserDetails(Session);
 
-//Don't let them authenticate if HomeDir and user mapping not set
-
-if (! StrLen(RealUser)) 
-{
-	RealUser=CopyStr(RealUser,Session->UserName);
-	pwent=getpwnam(RealUser);
-
-	if (! pwent) RealUser=CopyStr(RealUser,Settings.DefaultUser);
-}
-
-//Have to do this again in case first try failed
-pwent=getpwnam(RealUser);
-
-if (pwent)
-{
-	Session->RealUser=CopyStr(Session->RealUser, RealUser);
-	Session->RealUserUID=pwent->pw_uid;
-
-	if (StrLen(HomeDir)) Session->HomeDir=CopyStr(Session->HomeDir,HomeDir);
-	else Session->HomeDir=CopyStr(Session->HomeDir,pwent->pw_dir);
-	Session->UserSettings=CopyStr(Session->UserSettings,UserSettings);	
-	//grent=getgrnam(Session->Group);
-}
-else
+if (Session->RealUserUID==0)
 {
 	LogToFile(Settings.LogPath,"AUTH: No 'RealUser' for '%s'. Login Denied",Session->UserName);
 	result=FALSE;
 }
-
-
 if (! StrLen(Session->HomeDir)) 
 {
 	LogToFile(Settings.LogPath,"AUTH: No 'HomeDir' set for '%s'. Login Denied",Session->UserName);
 	result=FALSE;
 }
 
-//check again, because may have changed in above block
+//Use PAMCheckAccount to check if account is allowed to login even if authenticated
 if (result && PAMAccount)
 {
 #ifdef HAVE_LIBPAM
@@ -861,8 +829,6 @@ if (result && PAMAccount)
   }
 #endif
 }
-
-
 break;
 
 
@@ -876,9 +842,6 @@ break;
 }
 
 
-DestroyString(UserSettings);
-DestroyString(RealUser);
-DestroyString(HomeDir);
 DestroyString(Token);
 return(result);
 }

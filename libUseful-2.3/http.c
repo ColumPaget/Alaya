@@ -179,9 +179,10 @@ TProcessingModule *Mod=NULL;
 
 
 
-char *HTTPUnQuote(char *RetBuff, char *Str)
+char *HTTPUnQuote(char *RetBuff,const char *Str)
 {
-char *RetStr=NULL, *Token=NULL, *ptr;
+char *RetStr=NULL, *Token=NULL;
+const char *ptr;
 int olen=0, ilen;
 
 RetStr=CopyStr(RetStr,"");
@@ -217,9 +218,10 @@ return(RetStr);
 }
 
 
-char *HTTPQuoteChars(char *RetBuff, char *Str, char *CharList)
+char *HTTPQuoteChars(char *RetBuff, const char *Str, const char *CharList)
 {
-char *RetStr=NULL, *Token=NULL, *ptr;
+char *RetStr=NULL, *Token=NULL;
+const char *ptr;
 int olen=0, ilen;
 
 RetStr=CopyStr(RetStr,"");
@@ -248,9 +250,10 @@ return(RetStr);
 
 
 
-char *HTTPQuote(char *RetBuff, char *Str)
+char *HTTPQuote(char *RetBuff, const char *Str)
 {
-char *RetStr=NULL, *Token=NULL, *ptr;
+char *RetStr=NULL, *Token=NULL;
+const char *ptr;
 int olen=0, ilen;
 
 RetStr=CopyStr(RetStr,"");

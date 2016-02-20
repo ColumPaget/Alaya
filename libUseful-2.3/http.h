@@ -83,9 +83,9 @@ STREAM *S;
 extern "C" {
 #endif
 
-char *HTTPQuote(char *, char*);
-char *HTTPQuoteChars(char *RetBuff, char *Str, char *CharList);
-char *HTTPUnQuote(char *, char*);
+char *HTTPQuote(char *, const char*);
+char *HTTPQuoteChars(char *RetBuff, const char *Str, const char *CharList);
+char *HTTPUnQuote(char *, const char*);
 
 void HTTPSetVar(const char *Name, const char *Var);
 

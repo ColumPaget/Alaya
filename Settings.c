@@ -75,20 +75,20 @@ DestroyString(Token);
 
 
 
-void ParsePathItem(const char *Data)
+void ParsePathItem(ListNode *List, const char *PathType, const char *Data)
 {
-const char *PathTypes[]={"Files","Cgi","Websocket","Stream","Logout","Proxy","MimeIcons",NULL};
-char *URL=NULL, *Path=NULL, *Tempstr=NULL, *ptr;
-TPathItem *PI;
-int Type;
+const char *PathTypes[]={"Files","Cgi","Websocket","Stream","Logout","Proxy","MimeIcons","FileType",NULL};
+char *URL=NULL, *Path=NULL, *Tempstr=NULL;
+const char *ptr;
+TPathItem *PI=NULL;
+int Type, Flags=0;
 unsigned int CacheTime=0;
 char *User=NULL, *Group=NULL;
 
-ptr=GetToken(Data,",",&Tempstr,0);
-Type=MatchTokenFromList(Tempstr,PathTypes,0);
+Type=MatchTokenFromList(PathType,PathTypes,0);
 if (Type > -1)
 {
-	ptr=GetToken(ptr,",",&Tempstr,0);
+	ptr=GetToken(Data,",",&Tempstr,0);
 
 	StripLeadingWhitespace(Tempstr);
 	if (*Tempstr !='/') URL=MCopyStr(URL,"/",Tempstr,NULL);
@@ -102,17 +102,32 @@ if (Type > -1)
 	if (strncasecmp(Tempstr,"cache=",6)==0) CacheTime=atoi(Tempstr+6);
 	else if (strncasecmp(Tempstr,"user=",5)==0) User=CopyStr(User, Tempstr+5);
 	else if (strncasecmp(Tempstr,"group=",6)==0) Group=CopyStr(Group, Tempstr+6);
+	else if ( (strncasecmp(Tempstr,"exec=",5)==0) && YesNoTrueFalse(Tempstr+5)) Flags |= PATHITEM_EXEC;
+	else if (strncasecmp(Tempstr,"compress=",9)==0) 
+	{
+		if (YesNoTrueFalse(Tempstr+9)) Flags |= PATHITEM_COMPRESS;
+		else Flags |= PATHITEM_NO_COMPRESS;
+	}
 	else Path=MCatStr(Path, Tempstr,":",NULL);
 	ptr=GetToken(ptr,",",&Tempstr,0);
 	}
 
 	
 	PI=PathItemCreate(Type, URL, Path);
+	PI->Flags=Flags;
 	PI->CacheTime=CacheTime;
 	PI->User=CopyStr(PI->User, User);
 	PI->Group=CopyStr(PI->Group, Group);
-	if (PI->Type==PATHTYPE_LOGOUT) Settings.Flags |= FLAG_LOGOUT_AVAILABLE;
-	ListAddNamedItem(Settings.VPaths,PI->URL,PI);
+	switch (PI->Type)
+	{
+		case PATHTYPE_LOGOUT: Settings.Flags |= FLAG_LOGOUT_AVAILABLE; break;
+		case PATHTYPE_FILETYPE: 
+			ptr=PI->URL;
+			if (*ptr=='/') ptr++;
+			PI->Path=CopyStr(PI->Path, ptr); 
+		break;
+	}
+	ListAddNamedItem(List,PI->URL,PI);
 }
 else LogToFile(Settings.LogPath,"ERROR: Unknown Path type '%s' in Config File",Tempstr);
 
@@ -221,8 +236,8 @@ return(RetStr);
 
 void ParseConfigItem(char *ConfigLine)
 {
-const char *ConfTokens[]={"Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","WebsocketHandler","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats",NULL};
-typedef enum {CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEP_ALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS} TConfigTokens;
+const char *ConfTokens[]={"Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","SSLKey","SSLCert","SSLCiphers","SSLDHParams","Path","FileType","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","WebsocketHandler","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings","SSLClientCertificate","SSLVerifyPath","Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats",NULL};
+typedef enum {CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_PATH, CT_FILETYPE, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEP_ALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS} TConfigTokens;
 
 char *Token=NULL, *ptr;
 struct group *grent;
@@ -336,7 +351,12 @@ switch(TokType)
 	break;
 
 	case CT_PATH:
-		ParsePathItem(ptr);
+		ptr=GetToken(ptr,",",&Token,0);
+		ParsePathItem(Settings.VPaths, Token, ptr);
+	break;
+
+	case CT_FILETYPE:
+		ParsePathItem(Settings.FileTypes, Token, ptr);
 	break;
 
 	case CT_DIRTYPE:
@@ -458,6 +478,7 @@ DestroyString(Token);
 }
 
 
+
 void ParseConfigItemList(const char *ConfigItemList)
 {
 char *Tempstr=NULL, *ptr;
@@ -476,6 +497,7 @@ PostProcessSettings(&Settings);
 
 DestroyString(Tempstr);
 }
+
 
 
 
@@ -791,15 +813,17 @@ Settings.LogPath=CopyStr(Settings.LogPath,"SYSLOG");
 Settings.ConfigPath=CopyStr(Settings.ConfigPath,"/etc/alaya.conf");
 Settings.DefaultDir=CopyStr(Settings.DefaultDir,"./");
 Settings.BindAddress=CopyStr(Settings.BindAddress,"");
-Settings.AuthFlags=FLAG_AUTH_REQUIRED;
-Settings.AuthPath=CopyStr(Settings.AuthPath,"/etc/alaya.auth");
-Settings.AuthMethods=CopyStr(Settings.AuthMethods,"native,accesstoken");
-Settings.AuthRealm=CopyStr(Settings.AuthRealm,UnameData.nodename);
+Settings.Flags |= FLAG_KEEP_ALIVES;
 Settings.DirListFlags=DIR_SHOWFILES | DIR_FANCY;
+Settings.AuthFlags=FLAG_AUTH_REQUIRED | FLAG_AUTH_COOKIE;
+Settings.AuthPath=CopyStr(Settings.AuthPath,"/etc/alaya.auth");
+Settings.AuthMethods=CopyStr(Settings.AuthMethods,"native,accesstoken,cookie");
+Settings.AuthRealm=CopyStr(Settings.AuthRealm,UnameData.nodename);
 Settings.IndexFiles=CopyStr(Settings.IndexFiles,"index.html,dir.html");
 Settings.M3UFileTypes=CopyStr(Settings.M3UFileTypes,".mp3,.ogg,.mp4,.flv,.webm,.m4v,.m4a,.aac");
 Settings.ForbiddenURLStrings=CopyStr(Settings.ForbiddenURLStrings,"..,%00,%2e%2e");
 Settings.VPaths=ListCreate();
+Settings.FileTypes=ListCreate();
 Settings.HostConnections=ListCreate();
 Settings.ScriptHandlers=ListCreate();
 Settings.LoginEntries=ListCreate();

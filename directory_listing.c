@@ -6,6 +6,7 @@
 #include "upload.h"
 #include "FileDetailsPage.h"
 #include "FileProperties.h"
+#include "AccessTokens.h"
 
 //These are defined like flags, but used like an enumberated type
 //This is because I might want to use them in combintation with other
@@ -852,8 +853,8 @@ int result=FALSE;
 //Maybe we can get out of sending the directory. Check 'IfModifiedSince'
 if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->LastModified <= Session->IfModifiedSince))
 {
-		HTTPServerSendHTML(S, Session, "304 Not Modified","");
-		return;
+//		HTTPServerSendHTML(S, Session, "304 Not Modified","");
+//		return;
 }
 
 	//Get Time for uses like showing 'recent files'

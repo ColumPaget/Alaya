@@ -55,6 +55,8 @@ Session->Headers=ListCreate();
 return(Session);
 }
 
+
+
 HTTPSession *HTTPSessionClone(HTTPSession *Src)
 {
 HTTPSession *Session;
@@ -64,6 +66,7 @@ Session=(HTTPSession *) calloc(1,sizeof(HTTPSession));
 //Must set all these to "" otherwise nulls can cause trouble later
 Session->Protocol=CopyStr(Session->Protocol, Src->Protocol);
 Session->Method=CopyStr(Session->Method, Src->Method);
+Session->URL=CopyStr(Session->URL, Src->URL);
 Session->ServerName=CopyStr(Session->ServerName, Src->ServerName);
 Session->UserAgent=CopyStr(Session->UserAgent, Src->UserAgent);
 Session->UserName=CopyStr(Session->UserName, Src->UserName);
@@ -79,6 +82,8 @@ Session->ClientReferrer=CopyStr(Session->ClientReferrer, Src->ClientReferrer);
 Session->StartDir=CopyStr(Session->StartDir, Src->StartDir);
 Session->Depth=Src->Depth;
 Session->CacheTime=Src->CacheTime;
+Session->Flags=Src->Flags;
+Session->AuthFlags=Src->AuthFlags;
 Session->Headers=ListCreate();
 CopyVars(Session->Headers, Src->Headers);
 
@@ -187,14 +192,14 @@ if (Flags & ERR_EXIT) exit(1);
 }
 
 
-TPathItem *PathItemCreate(int Type, char *URL, char *Path)
+TPathItem *PathItemCreate(int Type, const char *URL, const char *Path)
 {
 TPathItem *PI=NULL;
 
 PI=(TPathItem *) calloc(1,sizeof(TPathItem));
 PI->Type=Type;
 PI->Path=CopyStr(PI->Path,Path);
-PI->Name=CopyStr(PI->Name,GetBasename(Path));
+PI->Name=CopyStr(PI->Name,GetBasename((char *) Path));
 PI->URL=CopyStr(PI->URL,URL);
 PI->ContentType=CopyStr(PI->ContentType, "");
 return(PI);
@@ -215,9 +220,10 @@ free(PI);
 
 
 
-char *FormatURL(char *Buff, HTTPSession *Session, char *ItemPath)
+char *FormatURL(char *Buff, HTTPSession *Session, const char *ItemPath)
 {
-char *Tempstr=NULL, *Quoted=NULL, *ptr=NULL, *sd_ptr;
+char *Tempstr=NULL, *Quoted=NULL;
+const char *ptr=NULL, *sd_ptr;
 int len;
 
 if (StrLen(Session->Host))
@@ -248,28 +254,8 @@ return(Tempstr);
 
 
 
-char *MakeAccessToken(char *Buffer, char *Salt, char *User, char *RequestingHost, char *RequestURL)
-{
-char *Tempstr=NULL, *RetStr=NULL;
 
-
-RetStr=CopyStr(Buffer,"");
-
-if (StrLen(Settings.AccessTokenKey))
-{
-	Tempstr=MCopyStr(Tempstr,Salt,":",User,":",Settings.AccessTokenKey,":",RequestingHost,":",RequestURL,NULL);
-	HashBytes(&RetStr,"sha1",Tempstr,StrLen(Tempstr),ENCODE_HEX);
-}
-
-DestroyString(Tempstr);
-
-return(RetStr);
-}
-
-
-
-
-char *ParentDirectory(char *RetBuff, char *Path)
+char *ParentDirectory(char *RetBuff, const char *Path)
 {
 char *RetStr=NULL, *ptr;
 int len;
@@ -293,7 +279,7 @@ return(RetStr);
 }
 
 
-char *SessionGetArgument(char *RetBuff, HTTPSession *Session, char *ReqName)
+char *SessionGetArgument(char *RetBuff, HTTPSession *Session, const char *ReqName)
 {
 char *Name=NULL, *Value=NULL, *RetStr=NULL, *ptr;
 
@@ -421,7 +407,33 @@ return(RetVal);
 }
 
 
+char *FindScriptHandlerForScript(char *RetStr, const char *ScriptPath)
+{
+char *Handler=NULL, *ptr;
+ListNode *Curr;
 
+ptr=strrchr(ScriptPath,'.');
+
+Handler=CopyStr(RetStr,"");
+if (ptr)
+{
+  Curr=ListGetNext(Settings.ScriptHandlers);
+  while (Curr)
+  {
+    if (
+        (strcmp(Curr->Tag,ptr)==0) ||
+        (strcmp(Curr->Tag,ptr+1)==0)
+      )
+    {
+      Handler=CopyStr(Handler,(char *) Curr->Item);
+      break;
+    }
+    Curr=ListGetNext(Curr);
+  }
+}
+
+return(Handler);
+}
 
 
 

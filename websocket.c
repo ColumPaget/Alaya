@@ -1,5 +1,7 @@
 #include "websocket.h"
 #include "server.h"
+#include "ChrootHelper.h"
+
 
 //WebsocketKey is stored in 'ContentBoundary' field
 //WebsocketProtocol goes in 'ContentType' field
@@ -89,12 +91,12 @@ if (Head.Masked)  OpCode |= WEBSOCKET_MASK;
 
 if (Head.Len==126) 
 {
-STREAMReadBytes(S,&val,2);
+STREAMReadBytes(S,(char *) &val,2);
 *len=ntohs(val);
 }
 else *len=Head.Len;
 
-if (OpCode & WEBSOCKET_MASK) STREAMReadBytes(S,mask,4);
+if (OpCode & WEBSOCKET_MASK) STREAMReadBytes(S,(char *) mask,4);
 
 
 return(OpCode);
@@ -108,12 +110,12 @@ int result, data;
 
 while (len > 0)
 {
-	if (len > 4) result=STREAMReadBytes(S, &data, 4);
-	else result=STREAMReadBytes(S, &data, len);
+	if (len > 4) result=STREAMReadBytes(S, (char *) &data, 4);
+	else result=STREAMReadBytes(S, (char *) &data, len);
 
 	data = data ^ mask;
 
-	STREAMWriteBytes(Out, & data, result);
+	STREAMWriteBytes(Out,(const char *) &data, result);
 	len-=result;
 }
 
@@ -148,11 +150,11 @@ else Head.Len=len;
 Head.OpCode=WEBSOCKET_TEXT;
 //if (flags & WEBSOCKET_MASK) Tempstr[1] |= 0x1;
 
-STREAMWriteBytes(S, &Head, 2);
+STREAMWriteBytes(S, (const char *) &Head, 2);
 if (len > 125) 
 {
 	val=htons(len);
-	STREAMWriteBytes(S, &val, 2);
+	STREAMWriteBytes(S,(const char *)  &val, 2);
 }
 
 STREAMWriteBytes(S, Data, len);
@@ -166,8 +168,8 @@ void WebsocketTransact(STREAM *Client, HTTPSession *Session, const char *Helper)
 {
 int OpCode, len, mask;
 char *Tempstr=NULL;
-STREAM *Prog;
-ListNode *Streams, *S;
+STREAM *Prog, *S;
+ListNode *Streams;
 
 	Streams=ListCreate();
 	Prog=ChrootSendRequest(Session, "WEBSOCKET", Helper, "/bin:/usr/bin");
@@ -262,12 +264,12 @@ char *String=NULL;
 
 String=SetStrLen(String,16);
 v1=htonl(WebsocketProcessKeyPart(Session->ContentBoundary));
-v2=htonl(WebsocketProcessKeyPart(Session->Cookies));
+v2=htonl(WebsocketProcessKeyPart(Session->ContentType));
 
 
 memcpy(String,&v1,4);
 memcpy(String+4,&v2,4);
-STREAMReadBytes(S, String+8,8);
+STREAMReadBytes(S, (char *) String+8,8);
 HashBytes(Key, "md5", String, 16, ENCODE_BASE64);
 
 DestroyString(String);

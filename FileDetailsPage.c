@@ -4,6 +4,7 @@
 #include "common.h"
 #include "MimeType.h"
 #include "FileProperties.h"
+#include "AccessTokens.h"
 
 
 char *FormatFileProperties(char *HTML, HTTPSession *Session, int FType, char *URL, char *Path, ListNode *Vars, int Flags)
