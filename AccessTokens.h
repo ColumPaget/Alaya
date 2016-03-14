@@ -4,6 +4,7 @@
 #include "common.h"
 
 
+void ParseAccessToken(HTTPSession *Session);
 int AuthAccessToken(HTTPSession *Session, const char *AccessToken);
 int AccessTokenAuthCookie(HTTPSession *Session);
 char *MakeAccessToken(char *Buffer, const char *Salt, const char *User, const char *RequestingHost, const char *RequestURL);

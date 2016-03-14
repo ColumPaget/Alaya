@@ -62,6 +62,7 @@ typedef enum {PATHTYPE_EXTFILE, PATHTYPE_CGI, PATHTYPE_WEBSOCKET, PATHTYPE_STREA
 #define PATHITEM_EXEC 1
 #define PATHITEM_NO_COMPRESS 2
 #define PATHITEM_COMPRESS 4
+#define PATHITEM_UPLOAD 8
 
 typedef struct
 {
@@ -138,6 +139,7 @@ HTTPSession *HTTPSessionCreate();
 void HTTPSessionClear(void *);
 void HTTPSessionDestroy(void *);
 HTTPSession *HTTPSessionClone(HTTPSession *Src);
+HTTPSession *HTTPSessionResponse(HTTPSession *Src);
 
 void SetTimezoneEnv();
 

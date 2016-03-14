@@ -12,6 +12,7 @@
 #include "proxy.h"
 #include "fnmatch.h"
 #include "AccessTokens.h"
+#include "VPath.h"
 
 const char *HTTPMethods[]={"HEAD","GET","POST","PUT","DELETE","MKCOL","PROPFIND","PROPPATCH","MOVE","COPY","OPTIONS","CONNECT","LOCK","UNLOCK",NULL};
 
@@ -128,6 +129,8 @@ void HTTPServerParsePostContentType(HTTPSession *Session, char *Data)
 char *ptr, *Name=NULL, *Value=NULL;
 
 ptr=GetToken(Data,";",&Session->ContentType,0);
+if (ptr)
+{
 while (isspace(*ptr)) ptr++;
 
 ptr=GetNameValuePair(ptr,";","=",&Name,&Value);
@@ -135,6 +138,7 @@ while (ptr)
 {
 	if (strcmp(Name,"boundary")==0) Session->ContentBoundary=MCopyStr(Session->ContentBoundary,"--",Value,NULL);
 	ptr=GetNameValuePair(ptr,";","=",&Name,&Value);
+}
 }
 
 DestroyString(Name);
@@ -234,7 +238,6 @@ if (tmp_ptr)
 //URL with arguments removed is the 'true' URL
 Session->OriginalURL=CopyStr(Session->OriginalURL,Token);
 if (StrLen(Session->OriginalURL)==0) Session->OriginalURL=CopyStr(Session->OriginalURL,"/");
-StripTrailingWhitespace(Session->OriginalURL);
 
 if 
 (
@@ -370,6 +373,7 @@ while (StrLen(Tempstr) )
 	case HEAD_COOKIE:
 			if (StrLen(Session->Cookies)) Session->Cookies=MCopyStr(Session->Cookies,"; ",ptr,NULL);
 			else Session->Cookies=CopyStr(Session->Cookies,ptr);
+			Session->AuthFlags |= FLAG_AUTH_PRESENT;
 	break;
 
 	case HEAD_REFERER:
@@ -397,7 +401,7 @@ while (StrLen(Tempstr) )
 	case HEAD_UPGRADE:
 		if ((strcasecmp(ptr,"Upgrade")==0) && SSLAvailable())
 		{
-			if (! ActivateSSL(Session,Settings.SSLKeys)) return;
+			if (! HTTPServerActivateSSL(Session,Settings.SSLKeys)) return;
 		} 
 		else if (strcasecmp(ptr,"websocket")==0) Session->MethodID = METHOD_WEBSOCKET;
 	break;
@@ -440,7 +444,6 @@ Session->URL=HTTPUnQuote(Session->URL,Session->OriginalURL);
 
 if (*Session->URL=='/') Session->Path=CopyStr(Session->Path,Session->URL);
 else Session->Path=MCopyStr(Session->Path,"/",Session->URL,NULL);
-StripTrailingWhitespace(Session->Path);
 
 DestroyString(Tempstr);
 DestroyString(Token);
@@ -527,7 +530,7 @@ else
 	{
 	Tempstr=FormatStr(Tempstr,"max-age=%d",Session->CacheTime);
 	HTTPServerSendHeader(S, "Cache-Control", Tempstr);
-	HTTPServerSendHeader(S,"Expires",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",time(NULL) + Settings.DocumentCacheTime,NULL));
+	HTTPServerSendHeader(S,"Expires",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",time(NULL) + Session->CacheTime,NULL));
 	}
 	else 
 	{
@@ -554,7 +557,7 @@ else
 
 	if ((Settings.AuthFlags & FLAG_AUTH_COOKIE) && (Session->Flags & SESSION_AUTHENTICATED) && (! (Session->AuthFlags & FLAG_AUTH_HASCOOKIE)))
 	{
-		Tempstr=MakeAccessCookie(Tempstr, Session);
+		if (strstr(Settings.AuthMethods, "cookie")) Tempstr=MakeAccessCookie(Tempstr, Session);
 		HTTPServerSendHeader(S, "Set-Cookie", Tempstr);
 	}
 
@@ -582,6 +585,7 @@ if (! (Flags & HEADERS_CGI))
 }
 }
 
+LogFileFlushAll(TRUE);
 DestroyString(Tempstr);
 }
 
@@ -684,7 +688,7 @@ HTTPSession *FileSendCreateSession(char *Path, HTTPSession *Request, ListNode *V
 	HTTPSession *Session;
 	char *Tempstr=NULL;
 
-	Session=HTTPSessionClone(Request);
+	Session=HTTPSessionResponse(Request);
 	Session->ResponseCode=CopyStr(Session->ResponseCode,"200 OK");
 	Session->ContentType=CopyStr(Session->ContentType,GetVar(Vars,"ContentType"));
 	Session->LastModified=atoi(GetVar(Vars,"MTime-secs"));
@@ -786,7 +790,7 @@ ListDestroy(Vars,DestroyString);
 
 
 
-void HTTPServerFormatExtraHeaders(HTTPSession *Session,ListNode *Vars)
+void HTTPServerFormatExtraHeaders(HTTPSession *Session, ListNode *Vars)
 {
 ListNode *Curr;
 char *Tempstr=NULL;
@@ -823,7 +827,9 @@ int ICYInterval=4096000;
 		}
 
 		Response=FileSendCreateSession(Path, Session, Vars, ICYInterval);
+		MediaReadDetails(Doc,Vars);
 		HTTPServerFormatExtraHeaders(Response,Vars);
+		
 		HTTPServerSendHeaders(S, Response, Flags);
 
 		if (Response->Flags & SESSION_ENCODE_GZIP) 
@@ -933,19 +939,14 @@ int i;
 
 
 
-void HTTPServerHandlePost(STREAM *S, HTTPSession *Session, int PathType)
+void HTTPServerHandlePost(STREAM *S, HTTPSession *Session)
 {
 char *Tempstr=NULL;
 int bytes_read=0, result;
 
-
-//disallow any 'Get' style arguments previously read. Post sends arguments on stdin
-Session->Arguments=CopyStr(Session->Arguments,"");
-
-if (strcmp(Session->ContentType,"application/x-www-form-urlencoded")==0) HTTPServerReadBody(Session, &Session->Arguments);
-else if ((PathType != PATHTYPE_CGI) && (strncmp(Session->ContentType,"multipart/",10)==0)) HTTPServerHandleMultipartPost(S, Session);
-else if (Session->ContentSize > 0) HTTPServerReadBody(Session, &Session->Arguments);
-
+	if (strcmp(Session->ContentType,"application/x-www-form-urlencoded")==0) HTTPServerReadBody(Session, &Session->Arguments);
+	else if (strncmp(Session->ContentType,"multipart/",10)==0) UploadMultipartPost(S, Session);
+	HTTPServerSendResponse(S, Session, "302", "", Session->URL);
 
 DestroyString(Tempstr);
 }
@@ -1320,28 +1321,6 @@ return(FALSE);
 }
 
 
-void ParseAccessToken(HTTPSession *Session)
-{
-char *Salt=NULL, *Token=NULL;
-char *Name=NULL, *Value=NULL, *ptr;
-
-		ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
-		while (ptr)
-		{
-			//Put salt in User settings, it will get overwritten during 'Authenticate'
-			if (strcasecmp(Name,"Salt")==0) Salt=CopyStr(Salt,Value);
-			if (strcasecmp(Name,"User")==0) Session->UserName=CopyStr(Session->UserName,Value);
-			if (strcasecmp(Name,"AccessToken")==0) Token=CopyStr(Token,Value);
-			ptr=GetNameValuePair(ptr,"&","=",&Name,&Value);
-		}
-		Session->Password=MCopyStr(Session->Password,Salt,":",Token,NULL);
-
-	DestroyString(Salt);
-	DestroyString(Name);
-	DestroyString(Value);
-	DestroyString(Token);
-}
-
 int HTTPServerAuthenticate(HTTPSession *Session)
 {
 	int result=FALSE;
@@ -1372,7 +1351,9 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 
 	if (Session->AuthFlags & FLAG_AUTH_PRESENT)
 	{
-		if (StrLen(Session->UserName) && Authenticate(Session)) result=TRUE;
+		//if this looks back-to-front it's because for some methods we only get the username
+		//after we've completed authentication (e.g. it's taken from a cookie)
+		if (Authenticate(Session) && StrLen(Session->UserName)) result=TRUE;
 
 		//If authentication provided any users settings, then apply those
 		if (StrLen(Session->UserSettings)) ParseConfigItemList(Session->UserSettings);
@@ -1396,9 +1377,19 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 
 
 
+/************************************************************
+
+This function reformats button presses from the interactive
+directory listing. It reformats them into GET style URLs that
+are easier to work with. This method also means that we can
+trigger the same actions either with a button, or with an
+anchor (href) tag.
+
+*************************************************************/
+
 int HTTPServerProcessActions(STREAM *S, HTTPSession *Session)
 {
-typedef enum {ACT_NONE, ACT_GET, ACT_DEL, ACT_RENAME, ACT_EDIT, ACT_MKDIR, ACT_PACK, ACT_SAVE_PROPS, ACT_EDIT_WITH_ACCESSTOKEN} TServerActs;
+typedef enum {ACT_NONE, ACT_GET, ACT_DEL, ACT_DEL_SELECTED, ACT_RENAME, ACT_EDIT, ACT_MKDIR, ACT_PACK, ACT_SAVE_PROPS, ACT_EDIT_WITH_ACCESSTOKEN, ACT_M3U, ACT_UPLOAD} TServerActs;
 char *QName=NULL, *QValue=NULL, *Name=NULL, *Value=NULL, *ptr;
 char *Arg1=NULL, *Arg2=NULL, *FileProperties=NULL, *SelectedFiles=NULL;
 TServerActs Action=ACT_NONE;
@@ -1412,65 +1403,103 @@ int result=FALSE;
 	{
 		Name=HTTPUnQuote(Name,QName);
 		Value=HTTPUnQuote(Value,QValue);
-		if (strncasecmp(Name,"edit:",5)==0)
-		{
-			Action=ACT_EDIT;
-			Arg1=CopyStr(Arg1,Name+5);
-		}
+		QValue=CopyStr(QValue,"");
 
-		if (strncasecmp(Name,"genaccess:",10)==0)
+		switch (*Name)
 		{
-			Action=ACT_EDIT_WITH_ACCESSTOKEN;
-			Arg1=CopyStr(Arg1,Name+10);
-		}
-
-		if (strncasecmp(Name,"renm:",5)==0) 
-		{
-			Action=ACT_RENAME;
-			Arg1=CopyStr(Arg1,Name+5);
-		}
-
-		if (strncasecmp(Name,"mkdir:",6)==0) 
-		{
-			Action=ACT_MKDIR;
-			Arg1=CopyStr(Arg1,Name+6);
-		}
-		
-		if (strncasecmp(Name,"get:",4)==0) 
-		{
-			Action=ACT_GET;
-			Arg1=CopyStr(Arg1,Name+4);
-		}
-
+		case 'd':
 		if (strncasecmp(Name,"del:",4)==0) 
 		{
 			Action=ACT_DEL;
 			Arg1=CopyStr(Arg1,Name+4);
 		}
+		else if (strncasecmp(Name,"delete-selected:",16)==0) 
+		{
+			Action=ACT_DEL_SELECTED;
+			Arg1=CopyStr(Arg1,Name+16);
+		}
+		break;
 
+		case 'e':
+		if (strncasecmp(Name,"edit:",5)==0)
+		{
+			Action=ACT_EDIT;
+			Arg1=CopyStr(Arg1,Name+5);
+		}
+		break;
+
+		case 'f':
+		if (strncasecmp(Name,"fileproperty:",13)==0) FileProperties=MCatStr(FileProperties,"&",Name,"=",Value,NULL);
+		break;
+
+		case 'g':
+		if (strncasecmp(Name,"get:",4)==0) 
+		{
+			Action=ACT_GET;
+			Arg1=CopyStr(Arg1,Name+4);
+		}
+		else if (strncasecmp(Name,"genaccess:",10)==0)
+		{
+			Action=ACT_EDIT_WITH_ACCESSTOKEN;
+			Arg1=CopyStr(Arg1,Name+10);
+		}
+		break;
+		
+		case 'm':
+		if (strncasecmp(Name,"mkdir:",6)==0) 
+		{
+			Action=ACT_MKDIR;
+			Arg1=CopyStr(Arg1,Name+6);
+		}
+		else if (strcasecmp(Name,"mkdir")==0) QValue=HTTPUnQuote(QValue,Value);
+		else if (strncasecmp(Name,"m3u:",4)==0) 
+		{
+			Action=ACT_M3U;
+			Arg1=CopyStr(Arg1,Name+4);
+		}
+		break;
+
+		case 'r':	
+		if (strncasecmp(Name,"renm:",5)==0) 
+		{
+			Action=ACT_RENAME;
+			Arg1=CopyStr(Arg1,Name+5);
+		}
+		else if (strcasecmp(Name,"renameto")==0) QValue=HTTPUnQuote(QValue,Value);
+		break;
+
+		case 'p':
 		if (strncasecmp(Name,"pack:",5)==0) 
 		{
 			Action=ACT_PACK;
 			Arg1=CopyStr(Arg1,Name+5);
 		}
+		else if (strcasecmp(Name,"packtype")==0) QValue=HTTPUnQuote(QValue,Value);
+		else if (strcasecmp(Name,"packtarget")==0) QValue=HTTPUnQuote(QValue,Value);
+		break;
 
+		case 's':
 		if (strncasecmp(Name,"sprops:",7)==0) 
 		{
 			Action=ACT_SAVE_PROPS;
 			Arg1=CopyStr(Arg1,Name+7);
 		}
+		else if (strcasecmp(Name,"selected")==0) QValue=HTTPUnQuote(QValue,Value);
+		break;
+
+		case 'u':
+		if (strncasecmp(Name,"upload:",7)==0) 
+		{
+			Action=ACT_UPLOAD;
+			Arg1=CopyStr(Arg1,Name+7);
+		}
+		break;
+		}
 
 		//these are secondary arguments in the query string, whereas all the above are the primary 
 		//request that defines what action we're taking
-		QValue=CopyStr(QValue,"");
-		if (strcasecmp(Name,"renameto")==0) QValue=HTTPUnQuote(QValue,Value);
-		else if (strcasecmp(Name,"mkdir")==0) QValue=HTTPUnQuote(QValue,Value);
-		else if (strcasecmp(Name,"packtype")==0) QValue=HTTPUnQuote(QValue,Value);
-		else if (strcasecmp(Name,"packtarget")==0) QValue=HTTPUnQuote(QValue,Value);
-		else if (strcasecmp(Name,"selected")==0) QValue=HTTPUnQuote(QValue,Value);
 		if (StrLen(QValue)) Arg2=MCatStr(Arg2, Name, "=", QValue, "&",NULL);
 
-		if (strncasecmp(Name,"fileproperty:",13)==0) FileProperties=MCatStr(FileProperties,"&",Name,"=",Value,NULL);
 		ptr=GetNameValuePair(ptr,"&","=",&QName,&QValue);
 	}
 
@@ -1505,6 +1534,13 @@ int result=FALSE;
 		HTTPServerSendResponse(S, Session, "302", "", Value);
 		break;
 
+		case ACT_DEL_SELECTED:
+		result=TRUE;
+		Value=MCopyStr(Value,Arg1,"?format=delete-selected&",Arg2,NULL);
+		Session->LastModified=0;
+		HTTPServerSendResponse(S, Session, "302", "", Value);
+		break;
+
 	  case ACT_RENAME: 
 		if (StrLen(Arg2))
 		{
@@ -1525,6 +1561,12 @@ int result=FALSE;
 		}
 		break;
 
+		case ACT_M3U:
+		Value=MCopyStr(Value,Arg1,"?format=m3u&",Arg2,NULL);
+		HTTPServerSendResponse(S, Session, "302", "", Value);
+		result=TRUE;
+		break;
+
 		case ACT_GET:
 		HTTPServerSendResponse(S, Session, "302", "", Arg1);
 		result=TRUE;
@@ -1540,6 +1582,12 @@ int result=FALSE;
 		Value=MCopyStr(Value,Arg1,"?format=pack&",Arg2,NULL);
 		Session->LastModified=0;
 		HTTPServerSendResponse(S, Session, "302", "", Value);
+		break;
+
+		case ACT_UPLOAD:
+		Value=MCopyStr(Value,Arg1,"?format=upload",NULL);
+		HTTPServerSendResponse(S, Session, "302", "", Value);
+		result=TRUE;
 		break;
 	}
 
@@ -1579,7 +1627,7 @@ return(TRUE);
 }
 
 
-int ActivateSSL(HTTPSession *Session,ListNode *Keys)
+int HTTPServerActivateSSL(HTTPSession *Session,ListNode *Keys)
 {
 ListNode *Curr;
 int Flags=0;
@@ -1617,24 +1665,17 @@ ListNode *Curr;
 
 	if (! VPathProcess(S, Session, Flags))
   {
-    if (Flags & HEADERS_POST) HTTPServerHandlePost(S,Session,0);
     ptr=Session->StartDir;
     if (*ptr=='.') ptr++;
     if (strcmp(ptr,"/")==0) Path=CopyStr(Path,Session->Path);
     else Path=MCopyStr(Path,ptr,Session->Path,NULL);
 
-		
-		Curr=ListGetNext(Settings.FileTypes);
-		while (Curr)
+		PI=VPathFind(PATHTYPE_FILETYPE, Session->Path);
+		if (PI)
 		{
-			PI=(TPathItem *) Curr->Item;
-			if (fnmatch(PI->Path, GetBasename(Session->Path), 0) ==0)
-			{
-				if (PI->Flags & PATHITEM_COMPRESS) Session->Flags |= FLAG_COMPRESS;
-				if (PI->Flags & PATHITEM_NO_COMPRESS) Session->Flags &= ~FLAG_COMPRESS;
-				if (PI->CacheTime > 0) Session->CacheTime=PI->CacheTime;
-			}
-			Curr=ListGetNext(Curr);
+			if (PI->Flags & PATHITEM_COMPRESS) Session->Flags |= FLAG_COMPRESS;
+			if (PI->Flags & PATHITEM_NO_COMPRESS) Session->Flags &= ~FLAG_COMPRESS;
+			if (PI->CacheTime > 0) Session->CacheTime=PI->CacheTime;
 		}
 
 		//One day we will be able to handle scripts inside of chroot using embedded
@@ -1656,7 +1697,7 @@ int AuthOkay=TRUE, result;
 
 if (Settings.Flags & FLAG_SSL)
 {
-	if (! ActivateSSL(Session,Settings.SSLKeys)) return;
+	if (! HTTPServerActivateSSL(Session,Settings.SSLKeys)) return;
 }
 
 while (1)
@@ -1705,7 +1746,7 @@ if (! (Session->Flags & SESSION_REUSE)) HTTPServerSetUserContext(Session);
 switch (Session->MethodID)
 {
 	case METHOD_POST:
-		HTTPServerFindAndSendDocument(Session->S,Session,HEADERS_SENDFILE | HEADERS_POST);
+	if (! VPathProcess(Session->S, Session, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE)) HTTPServerHandlePost(Session->S,Session);
 	break;
 
 	case METHOD_GET:

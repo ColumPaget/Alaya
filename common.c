@@ -72,6 +72,7 @@ Session->UserAgent=CopyStr(Session->UserAgent, Src->UserAgent);
 Session->UserName=CopyStr(Session->UserName, Src->UserName);
 Session->RealUser=CopyStr(Session->RealUser, Src->RealUser);
 Session->ContentType=CopyStr(Session->ContentType, Src->ContentType);
+Session->ContentBoundary=CopyStr(Session->ContentBoundary, Src->ContentBoundary);
 Session->Host=CopyStr(Session->Host, Src->Host);
 Session->Path=CopyStr(Session->Path, Src->Path);
 Session->Arguments=CopyStr(Session->Arguments, Src->Arguments);
@@ -80,7 +81,10 @@ Session->ClientIP=CopyStr(Session->ClientIP, Src->ClientIP);
 Session->ClientMAC=CopyStr(Session->ClientMAC, Src->ClientMAC);
 Session->ClientReferrer=CopyStr(Session->ClientReferrer, Src->ClientReferrer);
 Session->StartDir=CopyStr(Session->StartDir, Src->StartDir);
+Session->Cookies=CopyStr(Session->Cookies, Src->Cookies);
+Session->Cipher=CopyStr(Session->Cipher, Src->Cipher);
 Session->Depth=Src->Depth;
+Session->ContentSize=Src->ContentSize;
 Session->CacheTime=Src->CacheTime;
 Session->Flags=Src->Flags;
 Session->AuthFlags=Src->AuthFlags;
@@ -89,6 +93,44 @@ CopyVars(Session->Headers, Src->Headers);
 
 return(Session);
 }
+
+
+//This copies certain fields from a request session object
+//to a new response session object, but only those ones that
+//are appropriate to a response!
+HTTPSession *HTTPSessionResponse(HTTPSession *Src)
+{
+HTTPSession *Session;
+
+Session=(HTTPSession *) calloc(1,sizeof(HTTPSession));
+
+//Must set all these to "" otherwise nulls can cause trouble later
+Session->Protocol=CopyStr(Session->Protocol, Src->Protocol);
+Session->Method=CopyStr(Session->Method, Src->Method);
+Session->URL=CopyStr(Session->URL, Src->URL);
+Session->ServerName=CopyStr(Session->ServerName, Src->ServerName);
+Session->UserAgent=CopyStr(Session->UserAgent, Src->UserAgent);
+Session->UserName=CopyStr(Session->UserName, Src->UserName);
+Session->RealUser=CopyStr(Session->RealUser, Src->RealUser);
+Session->ContentType=CopyStr(Session->ContentType, Src->ContentType);
+Session->Host=CopyStr(Session->Host, Src->Host);
+Session->Path=CopyStr(Session->Path, Src->Path);
+Session->Arguments=CopyStr(Session->Arguments, Src->Arguments);
+Session->ClientHost=CopyStr(Session->ClientHost, Src->ClientHost);
+Session->ClientIP=CopyStr(Session->ClientIP, Src->ClientIP);
+Session->ClientMAC=CopyStr(Session->ClientMAC, Src->ClientMAC);
+Session->StartDir=CopyStr(Session->StartDir, Src->StartDir);
+Session->Depth=Src->Depth;
+Session->CacheTime=Src->CacheTime;
+
+//only copy certain flags!
+Session->Flags=Src->Flags & (SESSION_KEEP_ALIVE | SESSION_REUSE | SESSION_AUTHENTICATED | SESSION_SSL | SESSION_ICECAST) ;
+Session->AuthFlags=Src->AuthFlags;
+Session->Headers=ListCreate();
+
+return(Session);
+}
+
 
 
 void HTTPSessionDestroy(void *p_Trans)

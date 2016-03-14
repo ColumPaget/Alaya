@@ -8,9 +8,8 @@
 #include "FileProperties.h"
 #include "AccessTokens.h"
 
-//These are defined like flags, but used like an enumberated type
-//This is because I might want to use them in combintation with other
-//actual flags in future
+//These are defined like flags, but masked an used like an enumberated type
+//This is because I'm combining other flags into the same int 
 #define SORT_TYPE_MASK 0xFF 
 #define SORT_TYPE 1
 #define SORT_NAME 2
@@ -20,9 +19,10 @@
 #define SORT_RNAME 6
 #define SORT_RTIME 7
 #define SORT_RSIZE 8
+#define SELECT_ALL 512
 
-const char *DirActionTypes[]={"html","csv","m3u","rss","pack","upload","edit","delete","rename","mkdir-query","mkdir","saveprops","editaccesstoken",NULL};
-typedef enum {ACTION_HTML,ACTION_CSV,ACTION_M3U,ACTION_RSS,ACTION_PACK,ACTION_UPLOAD,ACTION_EDIT,ACTION_DELETE,ACTION_RENAME, ACTION_MKDIRQUERY, ACTION_MKDIR, ACTION_SAVEPROPS, ACTION_EDIT_ACCESSTOKEN} TDIRFORMAT;
+const char *DirActionTypes[]={"html","csv","m3u","rss","pack","upload","edit","delete","delete-selected","rename","mkdir","saveprops","editaccesstoken",NULL};
+typedef enum {ACTION_HTML,ACTION_CSV,ACTION_M3U,ACTION_RSS,ACTION_PACK,ACTION_UPLOAD,ACTION_EDIT,ACTION_DELETE,ACTION_DELETE_SELECTED,ACTION_RENAME, ACTION_MKDIR, ACTION_SAVEPROPS, ACTION_EDIT_ACCESSTOKEN} TDIRFORMAT;
 
 
 time_t Now;
@@ -158,11 +158,14 @@ if (Settings.DirListFlags & DIR_SHOW_VPATHS) val+=ListSize(Settings.VPaths);
 *fl_ptr=(TPathItem **) calloc(val , sizeof(TPathItem *));
 Files=*fl_ptr;
 
+//if we are at '/' then don't offer a parent directory
+if (StrLen(Path) > 1)
+{
 Tempstr=ParentDirectory(Tempstr, Session->URL);
 URL=FormatURL(URL,Session,Tempstr);
 Files[0]=PathItemCreate(PATHTYPE_DIR,Tempstr,"..");
 fcount++;
-
+}
 
 
 //LoadVPaths if in top-level dir
@@ -219,7 +222,7 @@ return(fcount);
 }
 
 
-char *FormatFileType(char *RetStr, TPathItem *File, ListNode *Vars)
+char *FormatFileType(char *RetStr, TPathItem *File, ListNode *Vars, const char *MimeIconsURL)
 {
 char *Tempstr=NULL, *URL=NULL, *ptr;
 TFileMagic *FM;
@@ -244,25 +247,15 @@ if (StrLen(ptr))
 {
 	RetStr=CopyStr(RetStr, ptr);
 }
-else if (Settings.DirListFlags & DIR_MIMEICONS)
+else if ((Settings.DirListFlags & DIR_MIMEICONS) && MimeIconsURL)
 {
-	Curr=ListGetNext(Settings.VPaths);
-	while (Curr)
-	{
-		PathItem=(TPathItem *) Curr->Item;
-		if (PathItem->Type == PATHTYPE_MIMEICONS)
-		{
-				ptr=strrchr(File->Name,'.');
-				if (ptr) ptr++;
+	ptr=strrchr(File->Name,'.');
+	if (ptr) ptr++;
 
-					if (File->Type==PATHTYPE_DIR) URL=MCopyStr(URL,PathItem->URL,"?MimeType=inode/directory&RetStr=folder&FileExtn=",NULL);
-					else URL=MCopyStr(URL,PathItem->URL,"?MimeType=",RetStr,"&FileExtn=",ptr,NULL);
-					Tempstr=MCopyStr(Tempstr,"<img src=\"",URL,"\" alt=\"",RetStr,"\">",NULL);
-					RetStr=CopyStr(RetStr, Tempstr);
-					break;
-		}
-		Curr=ListGetNext(Curr);
-	}
+	if (File->Type==PATHTYPE_DIR) URL=MCopyStr(URL,MimeIconsURL,"?Type=folder&MimeType=inode/directory&FileExtn=",NULL);
+	else URL=MCopyStr(URL,MimeIconsURL,"?MimeType=",RetStr,"&FileExtn=",ptr,NULL);
+	Tempstr=MCopyStr(Tempstr,"<img src=\"",URL,"\" alt=\"",RetStr,"\">",NULL);
+	RetStr=CopyStr(RetStr, Tempstr);
 }
 
 DestroyString(Tempstr);
@@ -295,10 +288,10 @@ return(RetStr);
 }
 
 
-char *FormatFancyDirItem(char *RetStr, int count, TPathItem *File)
+char *FormatFancyDirItem(char *RetStr, int count, TPathItem *File, const char *MimeIconsURL, int Flags)
 {
 char *Tempstr=NULL, *FileType=NULL, *DateStr=NULL, *DisplayName=NULL, *Interact=NULL;
-char *Comment=NULL, *ptr;
+char *Comment=NULL, *CheckBox=NULL, *ptr;
 char *bgcolor;
 ListNode *Vars;
 
@@ -326,35 +319,42 @@ ListNode *Vars;
 		}
 		else DateStr=CopyStr(DateStr,GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",File->Mtime,NULL));
 
-		if (strcmp(File->Name,"..")==0) DisplayName=CopyStr(DisplayName,".. (Parent Directory)");
-		else if (Settings.DisplayNameLen && (StrLen(File->Name) > Settings.DisplayNameLen)) 
-		{
-			DisplayName=CopyStrLen(DisplayName,File->Name,Settings.DisplayNameLen);
-			DisplayName=CatStr(DisplayName,"...");
-		}
-		else DisplayName=CopyStr(DisplayName,File->Name);
-
-		FileType=FormatFileType(FileType, File, Vars);
-
-
+		FileType=FormatFileType(FileType, File, Vars, MimeIconsURL);
 		//Okay, start building the actual table row
 		RetStr=MCatStr(RetStr, "<tr bgcolor=\"",bgcolor,"\">",NULL);
+		Interact=CopyStr(Interact,"");
+		CheckBox=CopyStr(CheckBox,"");
 
-		if (Settings.DirListFlags & DIR_INTERACTIVE) 
+		if (strcmp(File->Name,"..")==0) 
 		{
-			//Append checkbox to start of things
-			RetStr=MCatStr(RetStr,"<td><input type=\"checkbox\" name=\"selected\" value=\"",File->Name,"\" /></td>",NULL);
+			DisplayName=CopyStr(DisplayName,".. (Parent Directory)");
+			CheckBox=CopyStr(CheckBox,"<td align=\"center\">&nbsp;</td>");
+		}
+		else 
+		{
+			if (Settings.DisplayNameLen && (StrLen(File->Name) > Settings.DisplayNameLen)) 
+			{
+			DisplayName=CopyStrLen(DisplayName,File->Name,Settings.DisplayNameLen);
+			DisplayName=CatStr(DisplayName,"...");
+			}
+			else DisplayName=CopyStr(DisplayName,File->Name);
+
+
+		if (Settings.DirListFlags & DIR_INTERACTIVE)
+		{
+			if (Flags & SELECT_ALL) CheckBox=MCatStr(CheckBox,"<td align=\"center\"><input type=\"checkbox\" name=\"selected\" value=\"",File->Name,"\" checked /></td>",NULL);
+			else CheckBox=MCatStr(CheckBox,"<td align=\"center\"><input type=\"checkbox\" name=\"selected\" value=\"",File->Name,"\" /></td>",NULL);
 
 			//Interaction string will be added to end of line
-			Interact=CopyStr(Interact,"<td align=\"center\">");
 			Interact=MCatStr(Interact,"<input type='submit' name='edit:",File->URL,"' value='Edit' /> ",NULL);
 			Interact=MCatStr(Interact,"<input type='submit' name='del:",File->URL,"' value='Del' /> ",NULL);
-			if (strncasecmp(File->ContentType,"audio/",6)==0) Interact=MCatStr(Interact,"<input type=\"button\" onclick=\"javascript: addaudio('",File->URL,"');\" value=\"Play\" /> ",NULL);
-			Interact=CatStr(Interact,"</td>");
+			
+			//one day, but not yet
+			//if (strncasecmp(File->ContentType,"audio/",6)==0) Interact=MCatStr(Interact,"<input type=\"button\" onclick=\"javascript: addaudio('",File->URL,"');\" value=\"Play\" /> ",NULL);
 		}
-		else Interact=CopyStr(Interact,"");
+		}
 
-		Tempstr=FormatStr(Tempstr,"<td title=\"%s\">%s</td><td><a href=\"%s\" title=\"%s\">%s</a></td><td align=right> &nbsp; %s</td><td align=right> &nbsp; %s</td>%s</td>",Comment,FileType,File->URL, File->Path, DisplayName, DateStr, GetHumanReadableDataQty((double) File->Size,0), Interact);
+		Tempstr=FormatStr(Tempstr,"%s<td title=\"%s\">%s</td><td><a href=\"%s\" title=\"%s\">%s</a></td><td align=right> &nbsp; %s</td><td align=right> &nbsp; %s</td><td align=center>%s</td>",CheckBox,Comment,FileType,File->URL, File->Path, DisplayName, DateStr, GetHumanReadableDataQty((double) File->Size,0), Interact);
 
 		//Append it all to our output
 		RetStr=MCatStr(RetStr,Tempstr,"</tr>\r\n",NULL);
@@ -399,7 +399,7 @@ if (StrLen(Settings.PackFormats))
 {
 ptr=GetNameValuePair(Settings.PackFormats,",",":",&Name,&Value);
 
-HTML=CatStr(HTML,"<td bgcolor='skyblue'>Download <select name='packtarget'><option value='all'>all\n<option value='selected'>selected</select> as <select name=\"PackType\">");
+HTML=CatStr(HTML,"<td align=center colspan='2' bgcolor='skyblue'>Download as <select name=\"PackType\">");
 while (ptr)
 {
 	HTML=MCatStr(HTML,"<option value=\"",Name,"\">",Name,NULL);
@@ -418,45 +418,62 @@ char *DisplayDirActions(char *Buffer, HTTPSession *Session, int Flags)
 {
 char *HTML=NULL;
 
-if (Flags & (DIR_TARBALLS | DIR_INTERACTIVE))
+if (Flags & DIR_INTERACTIVE)
 {
-HTML=CatStr(Buffer,"<table align=center><tr>\r\n");
+HTML=MCatStr(HTML, "<script>function setCheckboxes(OnOrOff){ var i; var checkboxes=document.getElementsByName('selected'); for (i=0; i < checkboxes.length; i++) { if (OnOrOff==1) checkboxes[i].checked=true; else checkboxes[i].checked=false; } return(false); }</script>",NULL);
+HTML=CatStr(Buffer,"<table align=center>\r\n");
 
-HTML=DisplayPackAction(HTML, Session);
-if (Flags & DIR_INTERACTIVE) 
-{
-	HTML=MCatStr(HTML,"<td bgcolor='pink'><a href=\"",Session->URL,"?format=upload\">Upload Files</a></td>\r\n",NULL);
-	HTML=MCatStr(HTML,"<td bgcolor='yellow'><a href=\"",Session->URL,"?format=mkdir-query\">MkDir</a></td>\r\n",NULL);
-}
-if (Settings.Flags & FLAG_LOGOUT_AVAILABLE) HTML=MCatStr(HTML,"<td bgcolor='#AAFFAA'><a href=\"",GetLogoutPath(),"\">Logout</a></td>\r\n",NULL);
-HTML=CatStr(HTML,"</tr></table>");
+	HTML=CatStr(HTML,"<tr>");
+	if (Flags & DIR_TARBALLS) HTML=DisplayPackAction(HTML, Session);
+	if ((Flags & DIR_HASMEDIA) && (Flags & DIR_MEDIA_EXT))
+	{
+		HTML=MCatStr(HTML,"<td bgcolor=\"#FFAAFF\"><input type=submit name='m3u:",Session->URL,"' value='M3U Playlist'></td>",NULL);
+
+		/* One day, but not yet
+		HTML=MCatStr(HTML,"<audio id=\"audioplayer\" controls autoplay></audio>",NULL);
+		HTML=MCatStr(HTML,"<script>function addaudio(url){document.getElementById('audioplayer').src=url;}</script></td>",NULL);
+		*/
+
+	}
+	HTML=CatStr(HTML,"</tr>");
+
+	HTML=CatStr(HTML,"<tr>");
+	HTML=MCatStr(HTML,"<td align=center bgcolor='pink'><input type=submit name='upload:",Session->URL,"' value='Upload Files'></td>",NULL);
+	HTML=MCatStr(HTML,"<td align=center bgcolor='yellow'><input type=submit name='mkdir:",Session->URL,"' value='MkDir'><input type=text name=mkdir></td>",NULL);
+	HTML=MCatStr(HTML,"<td align=center bgcolor='red'><input type=submit name='delete-selected:",Session->URL,"' value='Delete Selected'></td>",NULL);
+
+
+	HTML=CatStr(HTML,"</tr>");
+	HTML=CatStr(HTML,"</table>");
 }
 
 return(HTML);
 }
 
 
-char *FinalizeDirListHTML(char *Buffer, HTTPSession *Session, char *Path, char *DirItemsHtml, int Flags)
+char *FinalizeDirListHTML(char *Buffer, HTTPSession *Session, const char *Path, const char *DirItemsHtml, const char *MimeIconsURL, int Flags)
 {
 char *HTML=NULL;
 
-	HTML=MCopyStr(Buffer,"<html>\r\n<head><title>Index of ",Session->URL,"</title></head>\r\n<body>\r\n",NULL);
-	if (Settings.Flags & FLAG_SSL) HTML=MCatStr(HTML,"<p align=center><font color=green>SECURE SESSION: Encrypted with ",Session->Cipher,"</font></p>\n",NULL);
+	HTML=MCopyStr(Buffer,"<html>\r\n<head><title>",Session->URL,"</title></head>\r\n<body>\r\n",NULL);
 
 	if ((Flags & DIR_FANCY))
 	{
 		if (Flags & DIR_INTERACTIVE) HTML=CatStr(HTML,"<form>\r\n");
-		HTML=MCatStr(HTML,"<p align=center>Index of ",Session->URL," @",Session->Host, " ",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",Now,NULL)," User: ",Session->UserName,NULL);
+
+		HTML=CatStr(HTML,"<table align=center border=0><tr>\n");
+		if (Settings.Flags & FLAG_SSL) HTML=MCatStr(HTML,"<td><font color=green size=-1>SECURE<br/>",Session->Cipher,"</font></td>\n",NULL);
+		else HTML=MCatStr(HTML,"<td><font color=red size=-1>Unencrypted<br/>Connection</font></td>\n",NULL);
+
+		HTML=MCatStr(HTML,"<td><b>",Session->URL,"</b> at ",Session->Host, " <i>",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",Now,NULL),"</i><br/>",NULL);
 
 		HTML=DisplayDirActions(HTML,Session,Flags);
+		HTML=CatStr(HTML,"</td>\n");
 
 
- 		if ((Flags & DIR_HASMEDIA) && (Flags & DIR_MEDIA_EXT))
-		{
-			 HTML=MCatStr(HTML,"<a href=\"",Session->URL,"?format=m3u\">","<br />Playlist of Media in this Directory","</a><br/>\r\n",NULL);
-			 HTML=MCatStr(HTML,"<audio id=\"audioplayer\" controls autoplay></audio>",NULL);
-			 HTML=MCatStr(HTML,"<script>function addaudio(url){document.getElementById('audioplayer').src=url;}</script>",NULL);
-		}
+		HTML=MCatStr(HTML,"<td>User: ",Session->UserName,"<br/>",NULL);
+		if (Settings.Flags & FLAG_LOGOUT_AVAILABLE) HTML=MCatStr(HTML,"<a href=\"",GetLogoutPath(),"\">( Logout )</a>",NULL);
+		HTML=CatStr(HTML,"</td></tr></table>\n");
 	}
 	HTML=MCatStr(HTML,DirItemsHtml,"<br />&nbsp;<br />",NULL);
 	if (Flags & DIR_INTERACTIVE) HTML=CatStr(HTML,"</form>\r\n");
@@ -508,7 +525,13 @@ void HTTPServerSendDirList(STREAM *S, HTTPSession *Session, char *Path, int Flag
 char *HTML=NULL, *Tempstr=NULL;
 int i, HasMedia=FALSE;
 int FileCount=0, DirCount=0, ByteCount=0;
+TPathItem *PI;
+const char *p_MimeIconsURL=NULL;
 
+//The title headers for the directory are added in 'FinalizeDirListHTML' believe it or not
+
+PI=VPathFind(PATHTYPE_MIMEICONS, NULL);
+if (PI) p_MimeIconsURL=PI->URL;
 
 if (Settings.DirListFlags & DIR_FANCY) 
 {
@@ -518,7 +541,7 @@ Tempstr=CopyStr(Tempstr,Session->URL);
 HTML=CatStr(HTML,"<tr bgcolor=\"#AAAAFF\">");
 
 //This one is for checkbox
-if (Settings.DirListFlags & DIR_INTERACTIVE) HTML=CatStr(HTML,"<td> &nbsp; </td>");
+if (Settings.DirListFlags & DIR_INTERACTIVE) HTML=MCatStr(HTML,"<th align=center><a href=\"",Session->URL,"?format=html&all-selected=true\" onclick=\"setCheckboxes(1); return(false);\">all</a> - <a href=\"",Session->URL,"\" onclick=\"setCheckboxes(0); return(false);\">none</a></th>",NULL);
 HTML=FancyHeading(HTML,"Type",SORT_TYPE,Tempstr,Flags);
 HTML=FancyHeading(HTML,"Name",SORT_NAME,Tempstr,Flags);
 HTML=FancyHeading(HTML,"Last Modified",SORT_TIME,Tempstr,Flags);
@@ -533,7 +556,7 @@ for (i=0; i < NoOfFiles; i++)
 {
 	if (Settings.DirListFlags & DIR_FANCY) 
 	{
-		HTML=FormatFancyDirItem(HTML,i,Files[i]);
+		HTML=FormatFancyDirItem(HTML,i,Files[i],p_MimeIconsURL, Flags);
 		if (InFileTypeList(Files[i]->Path,Settings.M3UFileTypes)) HasMedia=DIR_HASMEDIA;
 		if (Files[i]->Type==PATHTYPE_DIR) DirCount++;
 		else
@@ -562,7 +585,7 @@ if (Settings.DirListFlags & DIR_FANCY)
 }
 
 
-Tempstr=FinalizeDirListHTML(Tempstr, Session, Path, HTML, HasMedia | Settings.DirListFlags);
+Tempstr=FinalizeDirListHTML(Tempstr, Session, Path, HTML, p_MimeIconsURL, HasMedia | Settings.DirListFlags);
 HTTPServerSendResponse(S, Session, "200 OK","text/html",Tempstr);
 
 DestroyString(Tempstr);
@@ -574,23 +597,43 @@ DestroyString(HTML);
 
 void HTTPServerSendM3U(STREAM *S, HTTPSession *Session, char *Path, int NoOfFiles, TPathItem **Files)
 {
-char *Tempstr=NULL, *M3U=NULL, *URL=NULL, *Salt=NULL, *AccessToken=NULL;
+char *Tempstr=NULL, *M3U=NULL, *URL=NULL, *Salt=NULL, *AccessToken=NULL, *ptr;
+ListNode *Vars;
+STREAM *F;
 int i;
 
 M3U=CopyStr(M3U,"#EXTM3U\n");
-//#EXTINF - extra info - length (seconds), title
 
 for (i=0; i < NoOfFiles; i++)
 {
 	if (InFileTypeList(Files[i]->Path,Settings.M3UFileTypes))
 	{
+
+		//Examine file for Artist/title information
+		Vars=ListCreate();
+		F=STREAMOpenFile(Files[i]->Path, SF_RDONLY);
+		MediaReadDetails(F, Vars);
+		STREAMClose(F);
+		ptr=GetVar(Vars, "Media-title");
+		if (StrLen(ptr))
+		{
+			//#EXTINF - extra info - length (seconds), title
+			Tempstr=CopyStr(Tempstr, GetVar(Vars, "Media-artist"));
+			if (! StrLen(Tempstr)) Tempstr=CopyStr(Tempstr,"unknown-artist");
+			M3U=MCatStr(M3U,"#EXTINF: -1, ", Tempstr, "-", GetVar(Vars,"Media-title"),"\n",NULL);
+		}
+
+		//Actually supply the URL
 		M3U=CatStr(M3U,Files[i]->URL);
+
+		//if we are supporting access token authentication, supply that
 		if (AuthenticateExamineMethods(Settings.AuthMethods, FALSE) & AUTH_ACCESSTOKEN)
 		{
 			GenerateRandomBytes(&Salt,24,ENCODE_HEX);
 			AccessToken=MakeAccessToken(AccessToken, Salt, Session->UserName, Session->ClientIP, Files[i]->URL);
 			M3U=MCatStr(M3U,"?AccessToken=",AccessToken,"&Salt=",Salt,"&User=",Session->UserName,"\n",NULL);
 		}
+		ListDestroy(Vars,DestroyString);
 		M3U=CatStr(M3U,"\n");
 	}	
 }
@@ -663,10 +706,6 @@ STREAM *Pipe;
 			FM=GetFileMagicForFile(Extn, NULL);
 			Response->ContentType=CopyStr(Response->ContentType, FM->ContentType);
 		}
-		else if (strcasecmp(Name,"packtarget")==0) 
-		{
-			if (strcmp(Value,"all")==0) PackList=CopyStr(PackList, " *");
-		}
 		else if (strcasecmp(Name,"selected")==0) 
 		{
 			if (strcmp(PackList," *") !=0) PackList=MCatStr(PackList, " ", Value, NULL);
@@ -676,6 +715,7 @@ STREAM *Pipe;
 	ptr=GetNameValuePair(ptr, "&","=",&Name,&Value);
 	}
 
+	if (StrLen(PackList)==0) PackList=CopyStr(PackList, " *");
 	DirName=CopyStr(DirName,Dir);
 	StripDirectorySlash(DirName);
 	ptr=GetBasename(DirName);
@@ -792,6 +832,7 @@ if (! (Settings.DirListFlags & DIR_SHOWFILES)) return(DIR_REJECT);
 				else if (strcmp(Value,"rname")==0) *Flags=SORT_RNAME;
 				//if (strcmp(Value,"rss")==0) *SortFlags=DIR_RSS;
 			}
+			else if (strcmp(Name,"all-selected")==0) *Flags|=SELECT_ALL;
 		}
 	ptr=GetNameValuePair(ptr,"&","=",&Name,&Value);
 	}
@@ -800,28 +841,6 @@ DestroyString(Name);
 DestroyString(Value);
 
 return(Action);
-}
-
-
-
-void DirectoryMkDirQuery(STREAM *S, HTTPSession *Session, char *Path)
-{
-char *HTML=NULL, *Tempstr=NULL;
-
-HTML=MCopyStr(HTML,"<html>\r\n<head><title>MkDir in ",Session->URL,"</title></head>\r\n<body>\r\n<form>\r\n",NULL);
-
-HTML=MCatStr(HTML,"<p align=center>MkDir in ",Session->URL,"</p>\r\n",NULL);
-Tempstr=FormatURL(Tempstr,Session,Session->URL);
-HTML=CatStr(HTML,"<table align=center width=90%% border=0>");
-HTML=MCatStr(HTML,"<tr bgcolor=#CCCCFF><td>Dir Name:</td><td><input type=text name='mkdir' /><input type=submit name='mkdir:",Tempstr,"' value='Commit' /></td></tr>",NULL);
-
-HTML=CatStr(HTML,"</table>");
-HTML=CatStr(HTML,"</form></body></html>");
-
-HTTPServerSendResponse(S, Session, "200 OKAY", "text/html",HTML);
-
-DestroyString(Tempstr);
-DestroyString(HTML);
 }
 
 
@@ -838,6 +857,45 @@ void HTTPServerSendToParentDir(STREAM *S, HTTPSession *Session)
 		DestroyString(Path);
 }
 
+
+
+
+void DirectoryDeleteItem(STREAM *S, HTTPSession *Session, const char *Path)
+{
+	      if (unlink(Path)!=0) 
+				{
+						//maybe it's a directory?
+						if (rmdir(Path)==0) LogToFile(Settings.LogPath,"Deleted Directory: [%s]",Path);
+ 	     			else LogToFile(Settings.LogPath,"ERROR: Failed to Delete Item: [%s]",Path);
+				}
+				else LogToFile(Settings.LogPath,"Deleted File: [%s]",Path);
+			//File deleted, send them to the parent directory
+}
+
+
+void DirectoryDeleteSelected(STREAM *S, HTTPSession *Session, const char *Dir)
+{
+char *Name=NULL, *Value=NULL, *Path=NULL, *ptr;
+
+	LogToFile(Settings.LogPath,"DeleteSelected: [%s]\n",Session->Arguments);
+	ptr=GetNameValuePair(Session->Arguments, "&","=",&Name,&Value);
+	while (ptr)
+	{
+		if ( StrLen(Name) )
+		{
+		if (strcasecmp(Name,"selected")==0) 
+		{
+			Path=MCopyStr(Path,Dir,"/",Value,NULL);
+			DirectoryDeleteItem(S, Session, Path);
+		}
+		}
+	ptr=GetNameValuePair(ptr, "&","=",&Name,&Value);
+	}
+
+DestroyString(Value);
+DestroyString(Name);
+DestroyString(Path);
+}
 
 
 
@@ -888,10 +946,9 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 			//TAR doesn't send a list of files, it sends the actual files, so it doesn't need to use
 			//LoadDir in order to handle VPaths etc.
 			case ACTION_PACK: result=HTTPServerSendPackedDir(S,Session,Path); break;
-			case ACTION_UPLOAD: HtmlUploadPage(S,Session,Path); break;
+			case ACTION_UPLOAD: UploadSelectPage(S,Session,Path); break;
 			case ACTION_EDIT: DirectoryItemEdit(S,Session,Path,0); break;
 			case ACTION_EDIT_ACCESSTOKEN: DirectoryItemEdit(S,Session,Path, FDETAILS_ACCESSTOKEN); break;
-			case ACTION_MKDIRQUERY: DirectoryMkDirQuery(S,Session,Path); break;
 			case ACTION_MKDIR: 
 				Token=SessionGetArgument(Token, Session, "mkdir");
 				Tempstr=CopyStr(Tempstr,Path);
@@ -903,15 +960,13 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 			break;
 
 			case ACTION_DELETE:
-	      if (unlink(Path)!=0) 
-				{
-						//maybe it's a directory?
-						if (rmdir(Path)==0) LogToFile(Settings.LogPath,"Deleted Directory: [%s]",Path);
- 	     			else LogToFile(Settings.LogPath,"ERROR: Failed to Delete Item: [%s]",Path);
-				}
-				else LogToFile(Settings.LogPath,"Deleted File: [%s]",Path);
-			//File deleted, send them to the parent directory
+				DirectoryDeleteItem(S, Session, Path);
 				HTTPServerSendToParentDir(S, Session);
+			break;
+
+			case ACTION_DELETE_SELECTED:
+				DirectoryDeleteSelected(S, Session, Path);
+      	HTTPServerSendResponse(S, Session, "302", "", Session->URL);
 			break;
 
 			case ACTION_RENAME:
@@ -938,8 +993,7 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 			break;
 
 
-			//default: HTTPServerSendHTML(S, Session, "403 Index Listing Forbidden","This server is not configured to list directories."); break;
-			default: HTTPServerSendHTML(S, Session, "403 Index Listing Forbidden", Session->Arguments); break;
+			default: HTTPServerSendHTML(S, Session, "403 Index Listing Forbidden","This server is not configured to list directories."); break;
 		}
 	}
 

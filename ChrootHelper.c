@@ -162,7 +162,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		else if (strcmp(Name,"Host")==0) Response->Host=CopyStr(Response->Host,Value);
 		else if (strcmp(Name,"UserAgent")==0) Response->UserAgent=CopyStr(Response->UserAgent,Value);
 		else if (strcmp(Name,"Method")==0) Response->Method=CopyStr(Response->Method,Value);
-		else if (strcmp(Name,"ContentType")==0) Response->ContentType=CopyStr(Response->ContentType,Value);
+		else if (strcmp(Name,"ContentType")==0) HTTPServerParsePostContentType(Response, Value);
 		else if (strcmp(Name,"SearchPath")==0) Response->SearchPath=DeQuoteStr(Response->SearchPath,Value);
 		else if (strcmp(Name,"Path")==0) Response->Path=DeQuoteStr(Response->Path,Value);
 		else if (strcmp(Name,"URL")==0) Response->URL=DeQuoteStr(Response->URL,Value);
@@ -209,8 +209,8 @@ char *Tempstr=NULL, *ptr;
 	Tempstr=FormatStr(Tempstr,"%d",Session->ContentSize);
 	SetEnvironmentVariable("CONTENT_LENGTH",Tempstr);
 
-
 	SetEnvironmentVariable("CONTENT_TYPE",Session->ContentType);
+
 	ptr=strrchr(Session->Path,'/');
 	if (ptr) ptr++;
 	else ptr=Session->Path;
@@ -219,6 +219,7 @@ char *Tempstr=NULL, *ptr;
 	SetEnvironmentVariable("QUERY_STRING",Session->Arguments);
 	SetEnvironmentVariable("HTTP_USER_AGENT",Session->UserAgent);
 	SetEnvironmentVariable("HTTP_REFERER",Session->ClientReferrer);
+	SetEnvironmentVariable("HTTP_COOKIE",Session->Cookies);
 	SetEnvironmentVariable("HTTP_COOKIES",Session->Cookies);
 	SetEnvironmentVariable("REQUEST_METHOD",Session->Method);
 	SetEnvironmentVariable("REQUEST_URI",Session->URL);
@@ -338,6 +339,10 @@ HTTPSession *Response;
 			close(1);
 			dup(ClientCon->out_fd);
 
+      if (! SwitchGroup(Response->Group))
+			{
+        LogToFile(Settings.LogPath,"WARN: Failed to switch to group '%s' to execute script: %s using handler '%s'", Response->RealUser, ScriptPath, Tempstr);
+			}
 
       //Switch user. ALAYA WILL NOT RUN SCRIPTS AS ROOT!
       if (! SwitchUser(Response->RealUser))
@@ -433,6 +438,9 @@ HTTPSession *Response;
 			close(1);
 			dup(ClientCon->out_fd);
 
+			//must use write because stream is embargoed
+			write(1,"READY\n",6);
+
 			HTTPServerExecCGI(ClientCon, Response, ScriptPath);
 
 			//exit whether script ran or not!
@@ -463,11 +471,27 @@ char *Tempstr=NULL;
 pid_t pid;
 
 
-Response=ParseSessionInfo(Data);
 pid=fork();
 if (pid==0)
 {
+	Response=ParseSessionInfo(Data);
 	Tempstr=FindFileInPath(Tempstr,Response->Path,Response->SearchPath);
+	if (! SwitchGroup(Response->Group))
+	{
+		LogToFile(Settings.LogPath,"WARN: Failed to switch to group '%s' when getting document '%s'", Response->RealUser, Tempstr);
+	}
+
+
+	if (! SwitchUser(Response->RealUser))
+	{
+		LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' when getting document '%s'", Tempstr);
+		LogFileFlushAll(TRUE);
+		_exit(0);
+	}
+
+ LogToFile(Settings.LogPath,"SWITCH USER: '%s:%s' getting document '%s'", Response->RealUser, Response->Group, Tempstr);
+
+	STREAMWriteLine("READY\n",ClientCon); STREAMFlush(ClientCon);
 	HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 		
 	//exit 1 means that we can keep connection alive for re-use
@@ -475,6 +499,51 @@ if (pid==0)
 	if (Response->Flags & SESSION_KEEP_ALIVE) _exit(1);
 	_exit(0);
 }
+
+DestroyString(Tempstr);
+
+return(pid);
+}
+
+
+pid_t HandlePostFileRequest(STREAM *ClientCon, char *Data)
+{
+HTTPSession *Response;
+STREAM *S;
+char *Tempstr=NULL;
+pid_t pid;
+
+pid=fork();
+if (pid==0)
+{	
+	Response=ParseSessionInfo(Data);
+	Tempstr=FindFileInPath(Tempstr,Response->Path,Response->SearchPath);
+	Response->Path=CopyStr(Response->Path, Tempstr);
+
+	if (! SwitchGroup(Response->Group))
+	{
+		LogToFile(Settings.LogPath,"WARN: Failed to switch to group '%s' when posting  '%s'", Response->RealUser, Tempstr);
+	}
+
+
+	if (! SwitchUser(Response->RealUser))
+	{
+		LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' when posting to document '%s'", Tempstr);
+		LogFileFlushAll(TRUE);
+		_exit(0);
+	}
+
+ LogToFile(Settings.LogPath,"SWITCH USER: '%s:%s' posting document '%s'", Response->RealUser, Response->Group, Tempstr);
+
+	STREAMWriteLine("READY\n",ClientCon); STREAMFlush(ClientCon);
+	HTTPServerHandlePost(ClientCon, Response);
+	
+	//exit 1 means that we can keep connection alive for re-use
+	LogFileFlushAll(TRUE);
+	if (Response->Flags & SESSION_KEEP_ALIVE) _exit(1);
+	_exit(0);
+}
+else ClientCon->State |= SS_EMBARGOED;
 
 DestroyString(Tempstr);
 
@@ -492,6 +561,10 @@ char *Tempstr=NULL;
 ListNode *Vars;
 pid_t pid;
 
+
+pid=fork();
+if (pid==0)
+{
 Response=ParseSessionInfo(Data);
 Vars=ListCreate();
 ptr=GetNameValuePair(Response->Arguments,"&","=",&Name,&Tempstr);
@@ -508,10 +581,20 @@ while (ptr)
 	ptr=GetNameValuePair(ptr,"&","=",&Name,&Tempstr);
 }
 
+	if (! SwitchGroup(Response->Group))
+	{
+		LogToFile(Settings.LogPath,"WARN: Failed to switch to group '%s' for mimeicons '%s'", Response->RealUser, Tempstr);
+	}
 
-pid=fork();
-if (pid==0)
-{
+	if (! SwitchUser(Response->RealUser))
+	{
+		LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' when getting icons from '%s'", Response->SearchPath);
+		LogFileFlushAll(TRUE);
+		_exit(0);
+	}
+
+
+	STREAMWriteLine("READY\n",ClientCon); STREAMFlush(ClientCon);
 	ptr=GetToken(Response->SearchPath,":",&Value,0);
 	while (ptr)
 	{
@@ -544,10 +627,11 @@ HTTPSession *Response;
 char *Tempstr=NULL;
 int pid;
 
-Response=ParseSessionInfo(Data);
 pid=fork();
 if (pid==0)
 {
+	Response=ParseSessionInfo(Data);
+	STREAMWriteLine("READY\n",ClientCon); STREAMFlush(ClientCon);
 	HTTPProxyRGETURL(ClientCon,Response);
 	//void HTTPProxyConnect(STREAM *S,HTTPSession *ClientHeads);
 
@@ -555,6 +639,7 @@ if (pid==0)
 	STREAMFlush(ClientCon);
 	_exit(1);
 }
+else ClientCon->State |= SS_EMBARGOED;
 
 DestroyString(Tempstr);
 
@@ -664,6 +749,7 @@ else if (strcmp(Token,"LOG")==0)
 	Pid=0;
 }
 else if (strcmp(Token,"GETF")==0) Pid=HandleGetFileRequest(S,ptr);
+else if (strcmp(Token,"POST")==0) Pid=HandlePostFileRequest(S,ptr);
 else if (strcmp(Token,"GETIP")==0) Pid=HandleResolveIPRequest(S,ptr);
 else if (strcmp(Token,"REG")==0) Pid=HandleChildRegisterRequest(S,ptr);
 else if (strcmp(Token,"PROXY")==0) Pid=HandleProxyRequest(S,ptr);
@@ -684,10 +770,8 @@ STREAM *ChrootSendRequest(HTTPSession *Session, const char *Type, const char *Pa
 {
 char *Tempstr=NULL, *ContentLengthStr=NULL;
 char *Quoted=NULL;
-int PostArguments=FALSE;
 
 if (! ParentProcessPipe) return(NULL);
-if ((strcmp(Type, "PROXY") != 0) && (strcmp(Session->Method,"POST") ==0)) PostArguments=TRUE;
 
 ContentLengthStr=FormatStr(ContentLengthStr,"%d",Session->ContentSize);
 
@@ -730,11 +814,8 @@ if (StrLen(Session->UserName)) Tempstr=MCatStr(Tempstr," User='",Session->UserNa
 if (StrLen(Session->RealUser)) Tempstr=MCatStr(Tempstr," RealUser='",Session->RealUser,"'",NULL);
 if (StrLen(Session->RemoteAuthenticate)) Tempstr=MCatStr(Tempstr," RemoteAuthenticate='",Session->RemoteAuthenticate,"'",NULL);
 
-if (! PostArguments)
-{
 Quoted=QuoteCharsInStr(Quoted,Session->Arguments,"'&");
 Tempstr=MCatStr(Tempstr, " Arguments='",Quoted,"'", NULL);
-}
 
 Tempstr=CatStr(Tempstr,"\n");
 
@@ -758,27 +839,33 @@ int ChrootProcessRequest(STREAM *S, HTTPSession *Session, const char *Type, cons
 char *Tempstr=NULL;
 char *ResponseLine=NULL, *Headers=NULL, *ptr;
 off_t ContentLength=0;
-int PostArguments=FALSE, KeepAlive=FALSE, RetVal=FALSE;
+int KeepAlive=FALSE, RetVal=FALSE;
 
 
+LogFileFlushAll(TRUE);
 if (! ChrootSendRequest(Session, Type, Path, SearchPath)) return(FALSE);
 
+//Wait till process outside of chroot responds to our request, 
+while (STREAMCheckForBytes(ParentProcessPipe)==0) usleep(10000);
 
-if ((strcmp(Type, "PROXY") != 0) && (strcmp(Session->Method,"POST") ==0)) PostArguments=TRUE;
+//Read 'OKAY' line
+Tempstr=STREAMReadLine(Tempstr, ParentProcessPipe);
+LogToFile(Settings.LogPath,"PREP: [%s]",Tempstr);
 
-if (PostArguments && StrLen(Session->Arguments))
+//then send it the post data if there is any
+if ((strcmp(Type, "PROXY") != 0) && (strcmp(Session->Method,"POST") ==0)) 
 {
-	//Wait till process outside of chroot responds to our request, (is ready)
-	//then send it the post data
-	while (STREAMCheckForBytes(ParentProcessPipe)==0) usleep(10000);
-	STREAMWriteLine(Session->Arguments,ParentProcessPipe);
+if (Session->ContentSize > 0) 
+{
+	LogToFile(Settings.LogPath,"PUSH POST: [%d]",Session->ContentSize);
+	STREAMSendFile(S, ParentProcessPipe, Session->ContentSize, SENDFILE_KERNEL|SENDFILE_LOOP);
+}
 
-LogToFile(Settings.LogPath,"POST: [%s]",Session->Arguments);
-	//we shouldn't need this CR-LF, as we've sent 'Content-Length' characters
-	//but some CGI implementations seem to expect it, and it does no harm to
-	//provide it anyway
-	STREAMWriteLine("\r\n",ParentProcessPipe); 
-	STREAMFlush(ParentProcessPipe);
+//we shouldn't need this CR-LF, as we've sent 'Content-Length' characters
+//but some CGI implementations seem to expect it, and it does no harm to
+//provide it anyway
+STREAMWriteLine("\r\n",ParentProcessPipe); 
+STREAMFlush(ParentProcessPipe);
 }
 
 //Handle Headers from CGI script

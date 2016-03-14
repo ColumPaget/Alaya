@@ -24,4 +24,5 @@ void HTTPServerSendDocument(STREAM *S, HTTPSession *Session, char *Path, int Fla
 int HTTPServerDecideToCompress(HTTPSession *Session, char *Path);
 int HTTPServerReadBody(HTTPSession *Session, char **Data);
 
+void HTTPServerParsePostContentType(HTTPSession *Session, char *Data);
 #endif

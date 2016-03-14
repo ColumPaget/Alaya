@@ -4,7 +4,7 @@
 #define UPLOAD_DONE 1
 #define UPLOAD_UNPACK 2
 
-int HTTPServerReadMultipartHeaders(STREAM *S, char **Field, char **FileName)
+int UploadReadMultipartHeaders(STREAM *S, char **Field, char **FileName)
 {
 char *Tempstr=NULL, *Name=NULL, *Value=NULL, *ptr;
 int result=FALSE;
@@ -96,13 +96,14 @@ return(RetVal);
 }
 
 
-void HTTPServerHandleMultipartPost(STREAM *S, HTTPSession *Session)
+void UploadMultipartPost(STREAM *S, HTTPSession *Session)
 {
 char *Tempstr=NULL, *Name=NULL, *FileName=NULL, *QName=NULL, *QValue=NULL;
 int blen=0;
 
 blen=StrLen(Session->ContentBoundary);
 
+LogToFile(Settings.LogPath,"HANDLE UPLOAD: %s %s %d",Session->URL, Session->ContentBoundary, Session->ContentSize);
 Tempstr=STREAMReadLine(Tempstr,S);
 while (Tempstr)
 {
@@ -112,7 +113,7 @@ while (Tempstr)
 		//Check for end boundary
 		if (strcmp(Tempstr+blen,"--")==0) break;
 
-		if (HTTPServerReadMultipartHeaders(S, &Name, &FileName))
+		if (UploadReadMultipartHeaders(S, &Name, &FileName))
 		{
 			if (StrLen(FileName) > 0)
 			{
@@ -154,7 +155,7 @@ DestroyString(QValue);
 }
 
 
-void HtmlUploadPage(STREAM *S,HTTPSession *Session,char *Path)
+void UploadSelectPage(STREAM *S,HTTPSession *Session,char *Path)
 {
 char *HTML=NULL, *Tempstr=NULL;
 int i;
@@ -172,7 +173,7 @@ int i;
 
   HTML=MCatStr(HTML,"</form></body></html>\r\n",NULL);
 
-HTTPServerSendResponse(S, Session, "200 OK","text/html",HTML);
+	HTTPServerSendResponse(S, Session, "200 OK","text/html",HTML);
 
 DestroyString(HTML);
 DestroyString(Tempstr);

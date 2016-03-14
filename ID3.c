@@ -89,11 +89,39 @@ return((Top * 65536) + (High * 256) + Low);
 typedef enum {TAG_COMPOSER,TAG_ALBUM,TAG_TITLE,TAG_COMMENT,TAG_BPM,TAG_ARTIST,TAG_BAND,TAG_YEAR,TAG_LEN,TAG_GENRE,TAG_TRACK,TAG_WEBPAGE_COM,TAG_WEBPAGE_COPYRIGHT,TAG_WEBPAGE_AUDIOFILE, TAG_WEBPAGE_ARTIST, TAG_WEBPAGE_AUDIOSOURCE, TAG_WEBPAGE_STATION,TAG_WEBPAGE_PUBLISHER,TAG_USER_URL,TAG_IMAGE} TID3Tags;
 
 
+
+
+
+/*
+Picture type:  $00  Other
+                  $01  32x32 pixels 'file icon' (PNG only)
+                  $02  Other file icon
+                  $03  Cover (front)
+                  $04  Cover (back)
+                  $05  Leaflet page
+                  $06  Media (e.g. lable side of CD)
+                  $07  Lead artist/lead performer/soloist
+                  $08  Artist/performer
+                  $09  Conductor
+                  $0A  Band/Orchestra
+                  $0B  Composer
+                  $0C  Lyricist/text writer
+                  $0D  Recording Location
+                  $0E  During recording
+                  $0F  During performance
+                  $10  Movie/video screen capture
+                  $11  A bright coloured fish
+                  $12  Illustration
+                  $13  Band/artist logotype
+                  $14  Publisher/Studio logotype
+*/
+
 void ID3v2ReadPicture(char *Data, int Len, ListNode *Vars)
 {
 char *ptr, *imgtype;
 int offset;
 char *Tempstr=NULL, *Encoded=NULL;
+uint8_t Type;
 
 	ptr=Data;
 
@@ -102,18 +130,21 @@ char *Tempstr=NULL, *Encoded=NULL;
 
 	if (strncmp(ptr,"JPG",3)==0) imgtype="image/jpeg";
 	if (strncmp(ptr,"PNG",3)==0) imgtype="image/png";
-	ptr+=4; //4 includes the image type byte
+	ptr+=3;
+
+	//Image type, see above commented list
+	Type=*ptr;
+	ptr++;
 	
 	for (; ptr != '\0'; ptr++) /*description string*/ ;
 	ptr++;
 
 	offset=ptr-Data;
-	if (ptr)
+	if (ptr && (Len < 8196))
 	{
 		Encoded=EncodeBytes(Encoded, ptr,Len-offset,ENCODE_BASE64);
 		Tempstr=MCopyStr(Tempstr,"<img src='data:",imgtype,";base64,",Encoded,"'>",NULL);
 		SetVar(Vars,"Thumbnail",Tempstr);
-		LogToFile(Settings.LogPath,"IMG TAG: [%s] %d\n", Tempstr, Len);
 	}
 
 DestroyString(Tempstr);
@@ -167,7 +198,6 @@ Tempstr[result]='\0';
 if (result > 0)
 {
 	result=MatchTokenFromList(TagName,ID3v2Fields,0);
-	LogToFile(Settings.LogPath,"v2 TAG: [%s] [%s] %d\n",TagName,Tempstr,result);
 	switch (result)
 	{
 		case TAG_ARTIST:
@@ -263,7 +293,6 @@ Tempstr[result]='\0';
 if (StrLen(Tempstr))
 {
 	TagType=MatchTokenFromList(TagName,ID3v3Fields,0);
-	//LogToFile(Settings.LogPath,"v3 TAG: [%s] [%s] %d %d\n",TagName,Tempstr,result,len);
 	switch (TagType)
 	{
 		case TAG_ARTIST:
@@ -320,7 +349,6 @@ for (i=0; TagTypes[i] !=NULL; i++)
 }
 STREAMSeek(S,(double) 0, SEEK_SET); 
 
-//LogToFile(Settings.LogPath,"TAGTYPE: %d [%s]\n",result,Tempstr);
 
 DestroyString(Tempstr);
 	
@@ -428,7 +456,7 @@ ptr=GetToken(Tempstr," ",&Token,GETTOKEN_QUOTES);
 while (ptr)
 {
 	Value=CopyStr(Value,GetToken(Token,"=",&Name,0));
-	Token=MCopyStr(Token,"Media-",Value,NULL);
+	Token=MCopyStr(Token,"Media-",Name,NULL);
 	SetVar(Vars,Token,Value);
 ptr=GetToken(ptr," ",&Token,GETTOKEN_QUOTES);
 }
@@ -466,7 +494,6 @@ int offset, NoOfTags;
 
 ptr=Data+4;
 
-//LogToFile(Settings.LogPath,"DATA: [%s]",Data);
 if (strncmp(Data,"II",2)==0)
 {
 	offset=(* (uint32_t *) ptr);
@@ -480,7 +507,6 @@ else
 	NoOfTags=(ntohs(* (uint16_t *) ptr));
 }
 
-LogToFile(Settings.LogPath,"Offset: %d NoOfTags: %d",offset,NoOfTags);
 return(NoOfTags);
 }
 
@@ -538,7 +564,6 @@ ptr+=2;
 if (memcmp(ptr,"\xFF\xE0",2)==0) ptr=JPEGParseAPP0(ptr+2, Vars);
 
 
-//LogToFile(Settings.LogPath,"PTR: [%s] [%x] [%x] [%s]",Data,ptr[0],ptr[1],ptr+4);
 
 /*
 if (
@@ -547,7 +572,6 @@ if (
 	)
 	{
 		ptr+=10;
-LogToFile(Settings.LogPath,"TIFF!");
 		TIFFParseHeader(ptr,(Data+READ_LEN)-ptr, Vars);
 	}
 */

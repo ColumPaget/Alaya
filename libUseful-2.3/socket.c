@@ -495,11 +495,7 @@ sa.sin_addr=*(struct in_addr *) *hostdata->h_addr_list;
 }
 
 salen=sizeof(sa);
-if (Flags & CONNECT_NONBLOCK) 
-{
-printf("CONNECT NON BLOCK!\n");
-fcntl(sock,F_SETFL,O_NONBLOCK);
-}
+if (Flags & CONNECT_NONBLOCK) fcntl(sock,F_SETFL,O_NONBLOCK);
 
 if (! (Flags & CONNECT_NOKEEPALIVE))
 {

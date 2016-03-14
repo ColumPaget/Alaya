@@ -64,7 +64,6 @@ int DisplayNameLen;
 unsigned long DocumentCacheTime;
 ListNode *SSLKeys;
 ListNode *VPaths;
-ListNode *FileTypes;
 ListNode *ScriptHandlers;
 ListNode *LoginEntries;
 ListNode *SanitizeArgumentsAllowedTags;

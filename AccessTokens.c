@@ -1,6 +1,29 @@
 #include "AccessTokens.h"
 
 
+void ParseAccessToken(HTTPSession *Session)
+{
+char *Salt=NULL, *Token=NULL;
+char *Name=NULL, *Value=NULL, *ptr;
+
+    ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
+    while (ptr)
+    {
+      //Put salt in User settings, it will get overwritten during 'Authenticate'
+      if (strcasecmp(Name,"Salt")==0) Salt=CopyStr(Salt,Value);
+      if (strcasecmp(Name,"User")==0) Session->UserName=CopyStr(Session->UserName,Value);
+      if (strcasecmp(Name,"AccessToken")==0) Token=CopyStr(Token,Value);
+      ptr=GetNameValuePair(ptr,"&","=",&Name,&Value);
+    }
+    Session->Password=MCopyStr(Session->Password,Salt,":",Token,NULL);
+
+  DestroyString(Salt);
+  DestroyString(Name);
+  DestroyString(Value);
+  DestroyString(Token);
+}
+
+
 char *MakeAccessToken(char *Buffer, const char *Salt, const char *User, const char *RequestingHost, const char *RequestURL)
 {
 char *Tempstr=NULL, *RetStr=NULL;
@@ -74,11 +97,15 @@ return(result);
 int AccessTokenAuthCookie(HTTPSession *Session)
 {
 char *ptr, *tptr, *Name=NULL, *Value=NULL, *Token=NULL;
+char *Tempstr=NULL;
 int result=FALSE;
 
-ptr=GetNameValuePair(Session->Cookies, ";", "=", &Name, &Value);
+Tempstr=CopyStr(Tempstr, Session->Cookies);
+Session->Cookies=CopyStr(Session->Cookies, "");
+ptr=GetNameValuePair(Tempstr, ";", "=", &Name, &Value);
 while (ptr)
 {
+
 if (strcasecmp(Name,"AlayaAccessToken")==0)
 {
 	tptr=GetToken(Value,":",&Token, 0);
@@ -93,12 +120,16 @@ if (strcasecmp(Name,"AlayaAccessToken")==0)
 		}
 	}
 }
+else Session->Cookies=MCatStr(Session->Cookies, Name, "=", Value, ";", NULL);
+
+while (isspace(*ptr)) ptr++;
 ptr=GetNameValuePair(ptr, ";", "=", &Name, &Value);
 }
 
 DestroyString(Name);
 DestroyString(Value);
 DestroyString(Token);
+DestroyString(Tempstr);
 
 return(result);
 }
@@ -110,7 +141,7 @@ char *Salt=NULL, *AccessToken=NULL;
 
 GenerateRandomBytes(&Salt,24,ENCODE_HEX);
 AccessToken=MakeAccessToken(AccessToken, Salt, Session->UserName, Session->ClientIP, "*");
-RetStr=MCopyStr(RetStr, "AlayaAccessToken=",Session->UserName,":",Salt,":",AccessToken,NULL);
+RetStr=MCopyStr(RetStr, "AlayaAccessToken=",Session->UserName,":",Salt,":",AccessToken," domain=",Session->Host, NULL);
 
 DestroyString(AccessToken);
 DestroyString(Salt);

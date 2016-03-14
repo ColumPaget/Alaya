@@ -1436,7 +1436,7 @@ while (len > 0)
 			Out->BytesWritten+=result;
 		}
   }
-
+	STREAMFlush(Out);
   if (result > 0) bytes_transferred+=result;
   else if (result ==STREAM_CLOSED)
   {

@@ -311,12 +311,12 @@ if (StrLen(Helper))
 	STREAMWriteBytes(S, Tempstr, val);
 	}
 	STREAMFlush(S);
-
 	WebsocketTransact(S, Session, Helper);
 }
 else
 {
-HTTPServerSendResponse(S, Session, "404 Not Found","","");
+	HTTPServerSendResponse(S, Session, "404 Not Found","","");
+	LogFileFlushAll(TRUE);
 }
 
 HTTPSessionDestroy(Response);

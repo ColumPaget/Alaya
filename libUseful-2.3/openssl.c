@@ -149,6 +149,7 @@ if (InitDone) return(TRUE);
   SSL_load_error_strings();
 	Tempstr=MCopyStr(Tempstr,SSLeay_version(SSLEAY_VERSION)," : ", SSLeay_version(SSLEAY_BUILT_ON), " : ",SSLeay_version(SSLEAY_CFLAGS),NULL);
 	LibUsefulSetValue("SSL-Library", Tempstr);
+	LibUsefulSetValue("SSL-Level", "tls");
 	DestroyString(Tempstr);
   InitDone=TRUE;
   return(TRUE);
@@ -175,11 +176,14 @@ if (! ptr) return(NULL);
 const SSL_CIPHER *Cipher;
 char *Tempstr=NULL;
 
+STREAMSetValue(S,"SSL-Cipher","none");
 Cipher=SSL_get_current_cipher((const SSL *) ptr);
 
 if (Cipher)
 {
-Tempstr=FormatStr(Tempstr,"%d bit %s",SSL_CIPHER_get_bits(Cipher,NULL), SSL_CIPHER_get_name(Cipher));
+Tempstr=FormatStr(Tempstr,"%d",SSL_CIPHER_get_bits(Cipher,NULL));
+STREAMSetValue(S,"SSL-Bits",Tempstr);
+Tempstr=FormatStr(Tempstr,"%s",SSL_CIPHER_get_name(Cipher));
 STREAMSetValue(S,"SSL-Cipher",Tempstr);
 
 Tempstr=SetStrLen(Tempstr,1024);
@@ -292,7 +296,7 @@ return(RetVal);
 
 int DoSSLClientNegotiation(STREAM *S, int Flags)
 {
-int result=FALSE;
+int result=FALSE, Options=0;
 #ifdef HAVE_LIBSSL
 const SSL_METHOD *Method;
 SSL_CTX *ctx;
@@ -314,7 +318,19 @@ if (S)
   ssl=SSL_new(ctx);
   SSL_set_fd(ssl,S->in_fd);
   STREAMSetItem(S,"LIBUSEFUL-SSL-CTX",ssl);
-	SSL_set_options(ssl, SSL_OP_SINGLE_DH_USE | SSL_OP_NO_SSLv2);  //SSL_OP_NO_SSLv2, SSL_OP_NO_SSLv3, SSL_OP_NO_TLSv1
+
+    Options=SSL_OP_SINGLE_DH_USE | SSL_OP_NO_SSLv2;
+    ptr=STREAMGetValue(S,"SSL-Level");
+    if (! StrLen(ptr)) ptr=LibUsefulGetValue("SSL-Level");
+
+    if (StrLen(ptr))
+    {
+      if (strncasecmp(ptr,"tls",3)==0) Options |=SSL_OP_NO_SSLv3;
+      if (strcasecmp(ptr,"tls1.1")==0) Options |=SSL_OP_NO_TLSv1;
+      if (strcasecmp(ptr,"tls1.2")==0) Options |=SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1;
+    }
+
+	SSL_set_options(ssl, Options);  
 	ptr=LibUsefulGetValue("SSL-Permitted-Ciphers");
 	if (ptr) SSL_set_cipher_list(ssl, ptr);
   result=SSL_connect(ssl);
@@ -395,7 +411,7 @@ DestroyString(Tempstr);
 
 int DoSSLServerNegotiation(STREAM *S, int Flags)
 {
-int result=FALSE;
+int result=FALSE, Options=0;
 #ifdef HAVE_LIBSSL
 const SSL_METHOD *Method;
 SSL_CTX *ctx;
@@ -426,27 +442,50 @@ if (S)
 		}
 		SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
 	  ssl=SSL_new(ctx);
-		SSL_set_options(ssl, SSL_OP_NO_SSLv2|SSL_OP_SINGLE_DH_USE|SSL_OP_CIPHER_SERVER_PREFERENCE);  //SSL_OP_NO_SSLv2, SSL_OP_NO_SSLv3, SSL_OP_NO_TLSv1
+
+    Options=SSL_OP_NO_SSLv2|SSL_OP_SINGLE_DH_USE|SSL_OP_CIPHER_SERVER_PREFERENCE;
+    ptr=STREAMGetValue(S,"SSL-Level");
+    if (! StrLen(ptr)) ptr=LibUsefulGetValue("SSL-Level");
+
+    if (StrLen(ptr))
+    {
+      if (strncasecmp(ptr,"tls",3)==0) Options |=SSL_OP_NO_SSLv3;
+      if (strcasecmp(ptr,"tls1.1")==0) Options |=SSL_OP_NO_TLSv1;
+      if (strcasecmp(ptr,"tls1.2")==0) Options |=SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1;
+    }
+
+		SSL_set_options(ssl, Options);
 	  SSL_set_fd(ssl,S->in_fd);
 	  STREAMSetItem(S,"LIBUSEFUL-SSL-CTX",ssl);
 		ptr=LibUsefulGetValue("SSL-Permitted-Ciphers");
 		if (ptr) SSL_set_cipher_list(ssl, ptr);
 	  SSL_set_accept_state(ssl);
-	  result=SSL_accept(ssl);
-		if (result == TRUE)
+		result=-1;
+		while (result < 0)
 		{
-	  S->Flags|=SF_SSL;
-		OpenSSLQueryCipher(S);
-		if (Flags & SSL_VERIFY_PEER) OpenSSLVerifyCertificate(S);
-		}
-		else
-	  {
-			result=SSL_get_error(ssl,result);
-			result=ERR_get_error();
-			STREAMSetValue(S, "SSL-Error", ERR_error_string(result,NULL));
-		 	result=FALSE;
+	  	result=SSL_accept(ssl);
+			if (result != TRUE) result=SSL_get_error(ssl,result);
+			switch (result)
+			{
+				case SSL_ERROR_WANT_READ:
+				case SSL_ERROR_WANT_WRITE: 
+				usleep(300);
+				result=-1;
+				break;
+
+				case TRUE:
+				S->Flags|=SF_SSL;
+				if (Flags & SSL_VERIFY_PEER) OpenSSLVerifyCertificate(S);
+				OpenSSLQueryCipher(S);
+				break;
+
+				default:
+				result=ERR_get_error();
+				STREAMSetValue(S, "SSL-Error", ERR_error_string(result,NULL));
+				result=FALSE;
+				break;
+			}
 	  }
-	
 	}
   }
 }

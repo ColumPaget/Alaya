@@ -475,7 +475,7 @@ char *Tempstr=NULL, *RandomBytes=NULL;
 int fd;
 
 
-fd=open("/dev/random",O_RDONLY);
+fd=open("/dev/urandom",O_RDONLY);
 if (fd > -1)
 {
 	RandomBytes=SetStrLen(RandomBytes,ReqLen);

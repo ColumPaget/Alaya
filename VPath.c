@@ -15,6 +15,104 @@ of chroot. Finally some values, like cache time, can be set on a VPath.
 #include "VPath.h"
 #include "server.h"
 
+void VPathParse(ListNode *List, const char *PathType, const char *Data)
+{
+const char *PathTypes[]={"Files","Cgi","Websocket","Stream","Logout","Proxy","MimeIcons","FileType",NULL};
+char *URL=NULL, *Path=NULL, *Tempstr=NULL;
+const char *ptr;
+TPathItem *PI=NULL;
+int Type, Flags=0;
+unsigned int CacheTime=0;
+char *User=NULL, *Group=NULL;
+
+Type=MatchTokenFromList(PathType,PathTypes,0);
+if (Type > -1)
+{
+  ptr=GetToken(Data,",",&Tempstr,0);
+
+  StripLeadingWhitespace(Tempstr);
+  if (*Tempstr !='/') URL=MCopyStr(URL,"/",Tempstr,NULL);
+  else URL=CopyStr(URL,Tempstr);
+
+
+  ptr=GetToken(ptr,",",&Tempstr,0);
+  while (ptr)
+  {
+  StripLeadingWhitespace(Tempstr);
+  if (strncasecmp(Tempstr,"cache=",6)==0) CacheTime=atoi(Tempstr+6);
+  else if (strncasecmp(Tempstr,"user=",5)==0) User=CopyStr(User, Tempstr+5);
+  else if (strncasecmp(Tempstr,"group=",6)==0) Group=CopyStr(Group, Tempstr+6);
+  else if ( (strncasecmp(Tempstr,"exec=",5)==0) && YesNoTrueFalse(Tempstr+5)) Flags |= PATHITEM_EXEC;
+  else if ( (strncasecmp(Tempstr,"upload=",7)==0) && YesNoTrueFalse(Tempstr+7)) Flags |= PATHITEM_UPLOAD;
+  else if ( (strncasecmp(Tempstr,"uploads=",8)==0) && YesNoTrueFalse(Tempstr+8)) Flags |= PATHITEM_UPLOAD;
+  else if (strncasecmp(Tempstr,"compress=",9)==0)
+  {
+    if (YesNoTrueFalse(Tempstr+9)) Flags |= PATHITEM_COMPRESS;
+    else Flags |= PATHITEM_NO_COMPRESS;
+  }
+  else
+  {
+    if (StrLen(Path)) Path=MCatStr(Path, ":", Tempstr,NULL);
+    else Path=CopyStr(Path, Tempstr);
+  }
+  ptr=GetToken(ptr,",",&Tempstr,0);
+  }
+
+
+  PI=PathItemCreate(Type, URL, Path);
+  PI->Flags=Flags;
+  PI->CacheTime=CacheTime;
+  PI->User=CopyStr(PI->User, User);
+  PI->Group=CopyStr(PI->Group, Group);
+  switch (PI->Type)
+  {
+    case PATHTYPE_LOGOUT: Settings.Flags |= FLAG_LOGOUT_AVAILABLE; break;
+    case PATHTYPE_FILETYPE:
+      ptr=PI->URL;
+      if (*ptr=='/') ptr++;
+      PI->Path=CopyStr(PI->Path, ptr);
+    break;
+  }
+  ListAddNamedItem(List,PI->URL,PI);
+}
+else LogToFile(Settings.LogPath,"ERROR: Unknown Path type '%s' in Config File",Tempstr);
+
+
+DestroyString(Tempstr);
+DestroyString(Group);
+DestroyString(User);
+DestroyString(Path);
+DestroyString(URL);
+}
+
+
+
+TPathItem *VPathFind(int Type, char *Match)
+{
+TPathItem *VPath=NULL, *Default=NULL;
+ListNode *Curr;
+
+Curr=ListGetNext(Settings.VPaths);
+while (Curr)
+{
+	VPath=(TPathItem *) Curr->Item;
+
+	switch (VPath->Type)
+	{
+	case PATHTYPE_MIMEICONS: if (Type==VPath->Type) return(VPath); break;
+	case PATHTYPE_FILETYPE:  if ((Type==VPath->Type) && (fnmatch(Curr->Tag, Match, 0)==0)) return(VPath); break;
+	default:
+	if (StrLen(Curr->Tag) < 2) Default=VPath;
+	if (
+			StrLen(Match) && (strncmp(Match, Curr->Tag, StrLen(Curr->Tag))==0)
+		) return(VPath);
+	break;
+	}
+	Curr=ListGetNext(Curr);
+}
+
+return(Default);
+}
 
 
 char *HTTPServerSubstituteArgs(char *RetStr, const char *Template, HTTPSession *Session)
@@ -48,7 +146,6 @@ char *Tempstr=NULL, *ptr;
 char *LocalPath=NULL, *ExternalPath=NULL, *DocName=NULL;
 
 //Document name here is whatever part of the Path is *beyond* the VPath component
-LogToFile(Settings.LogPath,"SA: [%s] [%s]", Session->URL, VPath->URL);
 DocName=HTTPServerSubstituteArgs(DocName, Session->Path+StrLen(VPath->URL), Session);
 
 
@@ -70,8 +167,24 @@ if (StrLen(LocalPath)) Tempstr=FindFileInPath(Tempstr,DocName,LocalPath);
 if (StrLen(Tempstr)) HTTPServerSendDocument(S, Session, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 else if (StrLen(ExternalPath))
 {
-	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s  %d", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath,Session->Flags & SESSION_KEEP_ALIVE);
+	if (strcmp(Session->Method,"POST")==0)
+	{
+		if (VPath->Flags & PATHITEM_UPLOAD)
+		{
+		LogToFile(Settings.LogPath,"%s@%s (%s) uploading to %s in VPATH %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
+		ChrootProcessRequest(S, Session, "POST", DocName, ExternalPath);
+		}
+		else 
+		{
+			LogToFile(Settings.LogPath,"%s@%s (%s) uploading DENIED to %s in VPATH %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
+			HTTPServerSendHTML(S, Session, "403 Forbidden","Uploads not allowed to this path.");
+		}
+	}
+	else
+	{
+	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
 	ChrootProcessRequest(S, Session, "GETF", DocName, ExternalPath);
+	}
 }
 //This will send '404'
 else HTTPServerSendDocument(S, Session, DocName, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
@@ -106,7 +219,6 @@ HTTPSession *VPathSession=NULL;
 int result=FALSE;
 
 	
-LogToFile(Settings.LogPath,"VP: %d ",Session->Flags & SESSION_KEEP_ALIVE);
 	Curr=ListGetNext(Settings.VPaths);
 	while (Curr)
 	{
@@ -133,7 +245,7 @@ LogToFile(Settings.LogPath,"VP: %d ",Session->Flags & SESSION_KEEP_ALIVE);
 
 	
 
-		if (Flags & HEADERS_POST) HTTPServerHandlePost(S,Session,PI->Type);
+//		if (Flags & HEADERS_POST) HTTPServerHandlePost(S,Session,PI->Type);
 		LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s]",PI->Type,Curr->Tag,PI->Path);
 		switch (PI->Type)
 		{
