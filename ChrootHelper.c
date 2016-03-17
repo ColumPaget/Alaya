@@ -147,9 +147,11 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 	Response->LastModified=0;
 	Response->CacheTime=Settings.DocumentCacheTime;
 	Response->RealUser=CopyStr(Response->RealUser, Settings.DefaultUser);
+	Response->Group=CopyStr(Response->Group, Settings.DefaultGroup);
 	//if we got as far as calling this function, then the original session must be
 	//authenticated.
 	Response->Flags |= SESSION_AUTHENTICATED;
+	Response->Flags &= ~SESSION_UPLOAD;
 
 	ptr=GetNameValuePair(Data," ","=",&Name,&Tempstr);
 	while (ptr)
@@ -159,6 +161,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 
 		if (strcmp(Name,"User")==0) Response->UserName=CopyStr(Response->UserName,Value);
 		else if (strcmp(Name,"RealUser")==0) Response->RealUser=CopyStr(Response->RealUser,Value);
+		else if (strcmp(Name,"Group")==0) Response->Group=CopyStr(Response->Group,Value);
 		else if (strcmp(Name,"Host")==0) Response->Host=CopyStr(Response->Host,Value);
 		else if (strcmp(Name,"UserAgent")==0) Response->UserAgent=CopyStr(Response->UserAgent,Value);
 		else if (strcmp(Name,"Method")==0) Response->Method=CopyStr(Response->Method,Value);
@@ -178,6 +181,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		else if (strcmp(Name,"Cipher")==0) Response->Cipher=CopyStr(Response->Cipher,Value);
 		else if (strcmp(Name,"Cookies")==0) Response->Cookies=CopyStr(Response->Cookies,Value);
 		else if (strcmp(Name,"KeepAlive")==0) Response->Flags |= SESSION_KEEP_ALIVE;
+		else if (strcmp(Name,"Upload")==0) Response->Flags |= SESSION_UPLOAD;
 		else if (strcmp(Name,"AuthCookie")==0) Response->AuthFlags |= FLAG_AUTH_HASCOOKIE;
 		else if (strcmp(Name,"Cache")==0) Response->CacheTime=atoi(Value);
 
@@ -209,7 +213,8 @@ char *Tempstr=NULL, *ptr;
 	Tempstr=FormatStr(Tempstr,"%d",Session->ContentSize);
 	SetEnvironmentVariable("CONTENT_LENGTH",Tempstr);
 
-	SetEnvironmentVariable("CONTENT_TYPE",Session->ContentType);
+	Tempstr=MCopyStr(Tempstr, Session->ContentType, "; ", Session->ContentBoundary, NULL);
+	SetEnvironmentVariable("CONTENT_TYPE",Tempstr);
 
 	ptr=strrchr(Session->Path,'/');
 	if (ptr) ptr++;
@@ -480,7 +485,6 @@ if (pid==0)
 	{
 		LogToFile(Settings.LogPath,"WARN: Failed to switch to group '%s' when getting document '%s'", Response->RealUser, Tempstr);
 	}
-
 
 	if (! SwitchUser(Response->RealUser))
 	{
@@ -804,6 +808,7 @@ Quoted=QuoteCharsInStr(Quoted,Session->ClientReferrer,"'&");
 Tempstr=MCatStr(Tempstr, " ClientReferrer='",Quoted,"'",NULL);
 
 if (Session->Flags & SESSION_KEEP_ALIVE) Tempstr=CatStr(Tempstr," KeepAlive=Y");
+if (Session->Flags & SESSION_UPLOAD) Tempstr=CatStr(Tempstr," Upload=Y");
 if (Session->AuthFlags & FLAG_AUTH_HASCOOKIE) Tempstr=CatStr(Tempstr," AuthCookie=Y");
 if (Session->CacheTime > 0)
 {
@@ -812,6 +817,7 @@ if (Session->CacheTime > 0)
 }
 if (StrLen(Session->UserName)) Tempstr=MCatStr(Tempstr," User='",Session->UserName,"'",NULL);
 if (StrLen(Session->RealUser)) Tempstr=MCatStr(Tempstr," RealUser='",Session->RealUser,"'",NULL);
+if (StrLen(Session->Group)) Tempstr=MCatStr(Tempstr," Group='",Session->Group,"'",NULL);
 if (StrLen(Session->RemoteAuthenticate)) Tempstr=MCatStr(Tempstr," RemoteAuthenticate='",Session->RemoteAuthenticate,"'",NULL);
 
 Quoted=QuoteCharsInStr(Quoted,Session->Arguments,"'&");
@@ -850,7 +856,7 @@ while (STREAMCheckForBytes(ParentProcessPipe)==0) usleep(10000);
 
 //Read 'OKAY' line
 Tempstr=STREAMReadLine(Tempstr, ParentProcessPipe);
-LogToFile(Settings.LogPath,"PREP: [%s]",Tempstr);
+LogToFile(Settings.LogPath,"PREP: Method=[%s] Size=[%d] [%s]",Session->Method,Session->ContentSize,Tempstr);
 
 //then send it the post data if there is any
 if ((strcmp(Type, "PROXY") != 0) && (strcmp(Session->Method,"POST") ==0)) 

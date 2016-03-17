@@ -19,11 +19,11 @@ void VPathParse(ListNode *List, const char *PathType, const char *Data)
 {
 const char *PathTypes[]={"Files","Cgi","Websocket","Stream","Logout","Proxy","MimeIcons","FileType",NULL};
 char *URL=NULL, *Path=NULL, *Tempstr=NULL;
+char *User=NULL, *Group=NULL;
 const char *ptr;
 TPathItem *PI=NULL;
 int Type, Flags=0;
 unsigned int CacheTime=0;
-char *User=NULL, *Group=NULL;
 
 Type=MatchTokenFromList(PathType,PathTypes,0);
 if (Type > -1)
@@ -242,11 +242,12 @@ int result=FALSE;
 		if (PI->CacheTime) VPathSession->CacheTime=PI->CacheTime;
 		if (StrLen(PI->User)) VPathSession->RealUser=CopyStr(VPathSession->RealUser, PI->User);
 		if (StrLen(PI->Group)) VPathSession->Group=CopyStr(VPathSession->Group, PI->Group);
-
+		VPathSession->Flags &= ~SESSION_UPLOAD;
+		if (PI->Flags & PATHITEM_UPLOAD) VPathSession->Flags |= SESSION_UPLOAD;
 	
 
 //		if (Flags & HEADERS_POST) HTTPServerHandlePost(S,Session,PI->Type);
-		LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s]",PI->Type,Curr->Tag,PI->Path);
+		LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s] %d",PI->Type,Curr->Tag,PI->Path,VPathSession->Flags & SESSION_UPLOAD);
 		switch (PI->Type)
 		{
 			case PATHTYPE_CGI:

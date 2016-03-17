@@ -11,3 +11,7 @@ Windows 'netfolders' has issues surrounding authentication. It will only support
 Read more here http://en.wikipedia.org/wiki/WebDAV
 
 Safari seems to have some problems with the 'Logout' type of VPath, where it won't logout sent to the 'logout' URL. Using it in 'private browsing mode' solves this.
+
+Safari also has issues with websockets. It won't send authentication details for a websocket after logging in with standard HTTP. The solution to this is to include 'cookie' in the list of authentication types.
+
+Safari is also broken when it comes to client certificates. Instead of treating a certificate request from the server as optional, and falling back to username/password, Safari will require a certificate if the server asks for one.

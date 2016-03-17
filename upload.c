@@ -101,6 +101,7 @@ void UploadMultipartPost(STREAM *S, HTTPSession *Session)
 char *Tempstr=NULL, *Name=NULL, *FileName=NULL, *QName=NULL, *QValue=NULL;
 int blen=0;
 
+if (! (Session->Flags & SESSION_UPLOAD)) return;
 blen=StrLen(Session->ContentBoundary);
 
 LogToFile(Settings.LogPath,"HANDLE UPLOAD: %s %s %d",Session->URL, Session->ContentBoundary, Session->ContentSize);

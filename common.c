@@ -51,6 +51,7 @@ Session->StartDir=CopyStr(Session->StartDir,"");
 Session->Depth=1;
 Session->CacheTime=Settings.DocumentCacheTime;
 Session->Headers=ListCreate();
+Session->Flags |= SESSION_UPLOAD;
 
 return(Session);
 }
@@ -69,8 +70,11 @@ Session->Method=CopyStr(Session->Method, Src->Method);
 Session->URL=CopyStr(Session->URL, Src->URL);
 Session->ServerName=CopyStr(Session->ServerName, Src->ServerName);
 Session->UserAgent=CopyStr(Session->UserAgent, Src->UserAgent);
+
 Session->UserName=CopyStr(Session->UserName, Src->UserName);
 Session->RealUser=CopyStr(Session->RealUser, Src->RealUser);
+Session->Group=CopyStr(Session->Group, Src->Group);
+
 Session->ContentType=CopyStr(Session->ContentType, Src->ContentType);
 Session->ContentBoundary=CopyStr(Session->ContentBoundary, Src->ContentBoundary);
 Session->Host=CopyStr(Session->Host, Src->Host);
@@ -110,8 +114,11 @@ Session->Method=CopyStr(Session->Method, Src->Method);
 Session->URL=CopyStr(Session->URL, Src->URL);
 Session->ServerName=CopyStr(Session->ServerName, Src->ServerName);
 Session->UserAgent=CopyStr(Session->UserAgent, Src->UserAgent);
+
 Session->UserName=CopyStr(Session->UserName, Src->UserName);
 Session->RealUser=CopyStr(Session->RealUser, Src->RealUser);
+Session->Group=CopyStr(Session->Group, Src->Group);
+
 Session->ContentType=CopyStr(Session->ContentType, Src->ContentType);
 Session->Host=CopyStr(Session->Host, Src->Host);
 Session->Path=CopyStr(Session->Path, Src->Path);
@@ -124,7 +131,7 @@ Session->Depth=Src->Depth;
 Session->CacheTime=Src->CacheTime;
 
 //only copy certain flags!
-Session->Flags=Src->Flags & (SESSION_KEEP_ALIVE | SESSION_REUSE | SESSION_AUTHENTICATED | SESSION_SSL | SESSION_ICECAST) ;
+Session->Flags=Src->Flags & (SESSION_KEEP_ALIVE | SESSION_REUSE | SESSION_AUTHENTICATED | SESSION_SSL | SESSION_ICECAST | SESSION_UPLOAD) ;
 Session->AuthFlags=Src->AuthFlags;
 Session->Headers=ListCreate();
 
@@ -180,7 +187,7 @@ if (! p_Trans) return;
 Trans=(HTTPSession *) p_Trans;
 
 //Clear everything but SESSION_REUSE, SESSION_AUTHENTICATED and HTTP_SSL, which are persistent
-Trans->Flags &= (SESSION_REUSE | SESSION_AUTHENTICATED | HTTP_SSL);
+Trans->Flags &= (SESSION_REUSE | SESSION_AUTHENTICATED | SESSION_UPLOAD | HTTP_SSL);
 
 Trans->Method=CopyStr(Trans->Method,"");
 Trans->ResponseCode=CopyStr(Trans->ResponseCode,"");

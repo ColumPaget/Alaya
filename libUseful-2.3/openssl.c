@@ -325,6 +325,7 @@ if (S)
 
     if (StrLen(ptr))
     {
+      if (strncasecmp(ptr,"ssl",3)==0) Options &= ~(SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
       if (strncasecmp(ptr,"tls",3)==0) Options |=SSL_OP_NO_SSLv3;
       if (strcasecmp(ptr,"tls1.1")==0) Options |=SSL_OP_NO_TLSv1;
       if (strcasecmp(ptr,"tls1.2")==0) Options |=SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1;
@@ -449,6 +450,7 @@ if (S)
 
     if (StrLen(ptr))
     {
+      if (strncasecmp(ptr,"ssl",3)==0) Options &= ~(SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
       if (strncasecmp(ptr,"tls",3)==0) Options |=SSL_OP_NO_SSLv3;
       if (strcasecmp(ptr,"tls1.1")==0) Options |=SSL_OP_NO_TLSv1;
       if (strcasecmp(ptr,"tls1.2")==0) Options |=SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1;

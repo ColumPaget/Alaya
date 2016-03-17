@@ -437,13 +437,15 @@ HTML=CatStr(Buffer,"<table align=center>\r\n");
 	}
 	HTML=CatStr(HTML,"</tr>");
 
+	if (Session->Flags & SESSION_UPLOAD) 
+	{
 	HTML=CatStr(HTML,"<tr>");
 	HTML=MCatStr(HTML,"<td align=center bgcolor='pink'><input type=submit name='upload:",Session->URL,"' value='Upload Files'></td>",NULL);
 	HTML=MCatStr(HTML,"<td align=center bgcolor='yellow'><input type=submit name='mkdir:",Session->URL,"' value='MkDir'><input type=text name=mkdir></td>",NULL);
 	HTML=MCatStr(HTML,"<td align=center bgcolor='red'><input type=submit name='delete-selected:",Session->URL,"' value='Delete Selected'></td>",NULL);
-
-
 	HTML=CatStr(HTML,"</tr>");
+	}
+
 	HTML=CatStr(HTML,"</table>");
 }
 

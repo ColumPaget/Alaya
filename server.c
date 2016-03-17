@@ -557,8 +557,11 @@ else
 
 	if ((Settings.AuthFlags & FLAG_AUTH_COOKIE) && (Session->Flags & SESSION_AUTHENTICATED) && (! (Session->AuthFlags & FLAG_AUTH_HASCOOKIE)))
 	{
-		if (strstr(Settings.AuthMethods, "cookie")) Tempstr=MakeAccessCookie(Tempstr, Session);
-		HTTPServerSendHeader(S, "Set-Cookie", Tempstr);
+		if (strstr(Settings.AuthMethods, "cookie")) 
+		{
+			Tempstr=MakeAccessCookie(Tempstr, Session);
+			HTTPServerSendHeader(S, "Set-Cookie", Tempstr);
+		}
 	}
 
 //If we are running a CGI script, then the script will handle all headers relating to content
@@ -894,6 +897,11 @@ int HTTPServerExecCGI(STREAM *ClientCon, HTTPSession *Session, const char *Scrip
 {
 char *Tempstr=NULL;
 int i;
+
+      if (StrLen(Session->Group) && (! SwitchGroup(Session->Group)))
+      {
+        LogToFile(Settings.LogPath,"WARN: Failed to switch to group '%s' to execute script: %s",Session->Group, ScriptPath);
+      }
 
 
     //Switch user. ALAYA WILL NOT RUN SCRIPTS AS ROOT!

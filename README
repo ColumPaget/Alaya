@@ -113,6 +113,7 @@ AuthMethods=<list>  Which methods (native, shadow, passwd, pam, accesstoken) sho
 SSLKey=<path>		Path to SSL key file
 SSLCert=<path>	Path to SSL certificate file
 SSLCiphers=<cipher list> 	List of Ciphers to use with SSL (in standard openssl format)
+SSLVersion=<ssl version> 	Lowest SSL Version to use. Can be 'ssl', 'tls', 'tls1.1' or 'tls1.2'. 
 SSLVerifyPath=<path>		Path to file or directory containing Certificate Authority certificates for peer authentication.
 SSLClientCertificate=<type>		'required', 'sufficient' or 'required+sufficient' (See 'Client Certificates' below)
 SSLDHParams=<path>		Path to an openssl generated Diffie Helman parameters file.
@@ -140,7 +141,7 @@ WebsocketHandler:<path>:<protocol>=<script path>   Specify a program that handle
 
 AUTHENTICATION
 
-Alaya supports authentication as 'real users' via old style '/etc/passwd', newer '/etc/shadow' or via Pluggable Authentication Modules (PAM). However, alaya also supports it's own 'native' authentication using it's own password file (defaults to /etc/alaya.auth).  The native authentication method allows some of the config settings to be set against an individual user. This can be used to limit the HTTP methods a given user can use, or to limit CGI access to certain users, etc, etc. Finally alaya has an 'access token' authentication method for allowing access to individual files through use of a URL that includes an access key.
+Alaya supports authentication as 'real users' via old style '/etc/passwd', newer '/etc/shadow' or via Pluggable Authentication Modules (PAM). However, alaya also supports it's own 'native' authentication using it's own password file (defaults to /etc/alaya.auth). The native authentication method allows some of the config settings to be set against an individual user. This can be used to limit the HTTP methods a given user can use, or to limit CGI access to certain users, etc, etc. Finally alaya has 'access token' and 'access cookie' authentication methods to handle special cases. Access tokens allow access to individual files through use of a URL that includes an access key. Access Cookies help in situations where clients don't always send authentication details.
 
 
 
@@ -259,6 +260,7 @@ Examples:
 	DirListType=none,IndexPages   Don't allow access to directory listings, but show index.html pages where available.
 
 	DirListType=Fancy,Media      Show 'fancy' directory listings, and offer .m3u playlists in directories with media files.
+
 
 
 PACK FORMATS
@@ -459,9 +461,21 @@ compress=<Y/n>     Should the server use compression (TransferEncoding: gzip) wh
 
 WEBSOCKETS
 
+Alaya supports websockets. These are persistent connections that are more like a standard bidirectional TCP link. Websockets are booked against a URL and a 'protocol'. The URL doesn't need to exist as any kind of document, and the protocol is just a string selected to represent a particular websocket service. Websockets are configured in the config file as:
 
+ WebsocketHandler:<path>:<protocol>=<script path>
 
-WebsocketHandler:<path>:<protocol>=<script path>   Specify a program that handles websockets requests to a particular path and protocol.
+So, if you had a perl script 'chat.pl' that implements a chat protocol that exists under the /user URL you might write:
+
+ WebsocketHandler:/user:chat=/usr/local/bin/chat.pl
+
+The <path> option can be an fnmatch wildcard pattern, so you can make your chat program available under any URL via:
+
+ WebsocketHandler:*:chat=/usr/local/bin/chat.pl
+
+The scripts that provide the services over websockets simply write to stdout and read from stdin. Thus they behave similarly to 'inetd' programs, or indeed to command-line programs.
+
+For websocket programs Alaya provides the standard CGI environment variables like REMOTE_USER, REMOTE_ADDRESS, etc. Don't assume that the stdin of your program is connected directly to the incoming network connection from the client program, it probably won't be, thus you can't discover the IP address of the peer with socket functions, you have to get the REMOTE_ADDRESS environment variable.
 
 
 
@@ -487,6 +501,7 @@ Some certificates need supporting 'intermediate' or 'chain' certificates. These 
 The '-ciphers' command-line-argument and the 'SSLCiphers' config file entry can be used to set a list of ciphers that should be used in openssl mode, though the default settings should be a suitable list of ciphers.
 
 
+
 PERFECT FORWARD SECRECY
 
 This is a complex topic. A better discussion than I can provide is to be found here: http://vincent.bernat.im/en/blog/2011-ssl-perfect-forward-secrecy.html
@@ -500,6 +515,7 @@ An alternative scheme to Eliptic Curves is Diffie Helmann Key Exchange. Unfortun
 openssl dhparam -out dhparams.pem 1024
 
 The path to the dhparams.pem file should then be provided to alaya with the -dhparams command-line-argument, or with the SSLDHParams config file entry.
+
 
 
 IPv6
