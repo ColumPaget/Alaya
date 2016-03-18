@@ -304,6 +304,8 @@ DestroyString(Hash);
 return(result);
 }
 
+
+
 pid_t HandleWebsocketExecRequest(STREAM *ClientCon, char *Data)
 {
 char *Tempstr=NULL, *Name=NULL, *Value=NULL;
@@ -434,6 +436,7 @@ HTTPSession *Response;
 	else
 	{
 		STREAMFlush(ClientCon);
+		LogFileFlushAll(TRUE);
 		result=fork();
 		if (result==0)
 		{
@@ -464,7 +467,6 @@ DestroyString(Value);
 //Always return STREAM_CLOSED, so that pipe gets closed regardless of exit status of 
 //forked helper process
 return(STREAM_CLOSED);
-
 }
 
 
@@ -759,7 +761,9 @@ else if (strcmp(Token,"REG")==0) Pid=HandleChildRegisterRequest(S,ptr);
 else if (strcmp(Token,"PROXY")==0) Pid=HandleProxyRequest(S,ptr);
 else if (strcmp(Token,"MIMEICON")==0) Pid=HandleIconRequest(S, ptr);
 else if (strcmp(Token,"EVENT")==0) Pid=RunEventScript(S, ptr);
- 
+
+STREAMSetValue(S,"HelperType", Token); 
+
 STREAMFlush(S);
 
 DestroyString(Tempstr);

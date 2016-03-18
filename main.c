@@ -196,6 +196,42 @@ setrlimit(RLIMIT_STACK, &limit);
 }
 
 
+
+// This function sets up the TLS/SSL environment, logging some warnings if settings are
+// inconsistent
+void InitSSL()
+{
+char *ptr;
+
+	if (Settings.Flags & FLAG_SSL_PFS) 
+	{
+	//if (! StrLen(LibUsefulGetValue("SSL-DHParams-File"))) OpenSSLGenerateDHParams();
+	}
+
+	ptr=LibUsefulGetValue("SSL-Permitted-Ciphers");
+	if (! StrLen(ptr))
+	{
+		LibUsefulSetValue("SSL-Permitted-Ciphers", "DH+AESGCM:DH+AES256:DH+CAMELLIA256:ECDH+AESGCM:ECDH+AES256:ECDH+AES128:DH+AES:EDH-RSA-DES-CBC3-SHA:ECDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:CAMELLIA256:AES128-SHA256:CAMELLIA128:AES128-GCM-SHA256:AES128-SHA256:AES128-SHA:DES-CBC3-SHA:!ADH:!AECDH:!aNULL:!eNULL:!LOW:!EXPORT:!MD5");
+	}
+
+	ptr=LibUsefulGetValue("SSL_VERIFY_CERTFILE");
+	if (! StrLen(ptr)) ptr=LibUsefulGetValue("SSL_VERIFY_CERTDIR");
+
+	if ((Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED) && (! StrLen(ptr)))
+	{
+		HandleError(ERR_PRINT|ERR_LOG|ERR_EXIT, "ERROR: Client SSL Certificate required, but no certificate verify file/directory given.\nPlease Supply one with the -verify-path command-line-argument, or the SSLVerifyPath config file entry.");
+	}
+
+	ptr=LibUsefulGetValue("SSL-DHParams-File");
+	if (! StrLen(ptr))
+	{
+		HandleError(ERR_PRINT|ERR_LOG, "WARNING: No DH parameters file given for SSL. Perfect Forward Secrecy can only be achieved with Eliptic Curve (ECDH) methods. ECDH depends on fixed values recomended by the U.S. National Institute of Standards and technology (NIST) and thus may not be trustworthy.\n\nCreate a DHParams file with 'openssl dhparam -2 -out dhparams.pem 4096' and give the path to it using the -dhparams command-line-argument or the DHParams config file entry, if you want DiffieHelman key exchange for Perfect Forward Secrecy.");
+
+	}
+}
+
+
+
 main(int argc, char *argv[])
 {
 STREAM *ServiceSock, *S;
@@ -212,6 +248,12 @@ DropCapabilities(CAPS_LEVEL_STARTUP);
 nice(10);
 InitSettings();
 
+
+//We should handle failed User/Group switches within alaya,
+//so we don't need libUseful to handle them for us
+LibUsefulSetValue("SwitchUserAllowFail","yes");
+LibUsefulSetValue("SwitchGroupAllowFail","yes");
+
 if (StrLen(Settings.Timezone)) setenv("TZ",Settings.Timezone,TRUE);
 //LibUsefulMemFlags |= MEMORY_CLEAR_ONFREE;
 
@@ -225,22 +267,21 @@ ReadConfigFile(&Settings);
 ParseSettings(argc,argv,&Settings);
 PostProcessSettings(&Settings);
 
-if (Settings.Flags & FLAG_SSL_PFS) 
-{
-	//if (! StrLen(LibUsefulGetValue("SSL-DHParams-File"))) OpenSSLGenerateDHParams();
-}
 
 //Do this before any logging!
 if (! (Settings.Flags & FLAG_NODEMON)) demonize();
 
 SetResourceLimits();
 
-Tempstr=MCopyStr(Tempstr, "Alaya Starting up. Version: ",Version,NULL);
+Tempstr=FormatStr(Tempstr, "Alaya Version %s Starting up on %s:%d",Version,Settings.BindAddress,Settings.Port);
 ReopenLogFile(Tempstr);
+
 
 //Not only handles signals, but registers itself too, so we
 //run it to set up signal handling
 SigHandler(0);
+
+if (Settings.Flags & FLAG_SSL) InitSSL();
 
 LoadFileMagics("/etc/mime.types","/etc/magic");
 

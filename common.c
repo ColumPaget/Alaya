@@ -74,6 +74,7 @@ Session->UserAgent=CopyStr(Session->UserAgent, Src->UserAgent);
 Session->UserName=CopyStr(Session->UserName, Src->UserName);
 Session->RealUser=CopyStr(Session->RealUser, Src->RealUser);
 Session->Group=CopyStr(Session->Group, Src->Group);
+Session->RemoteAuthenticate=CopyStr(Session->RemoteAuthenticate, Src->RemoteAuthenticate);
 
 Session->ContentType=CopyStr(Session->ContentType, Src->ContentType);
 Session->ContentBoundary=CopyStr(Session->ContentBoundary, Src->ContentBoundary);
@@ -118,6 +119,7 @@ Session->UserAgent=CopyStr(Session->UserAgent, Src->UserAgent);
 Session->UserName=CopyStr(Session->UserName, Src->UserName);
 Session->RealUser=CopyStr(Session->RealUser, Src->RealUser);
 Session->Group=CopyStr(Session->Group, Src->Group);
+Session->RemoteAuthenticate=CopyStr(Session->RemoteAuthenticate, Src->RemoteAuthenticate);
 
 Session->ContentType=CopyStr(Session->ContentType, Src->ContentType);
 Session->Host=CopyStr(Session->Host, Src->Host);

@@ -1361,7 +1361,9 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 	{
 		//if this looks back-to-front it's because for some methods we only get the username
 		//after we've completed authentication (e.g. it's taken from a cookie)
-		if (Authenticate(Session) && StrLen(Session->UserName)) result=TRUE;
+
+		//ANYTHING OTHER THAN TRUE FROM AUTHENTICATE MEANS IT FAILED
+		if ((Authenticate(Session)==TRUE) && StrLen(Session->UserName)) result=TRUE;
 
 		//If authentication provided any users settings, then apply those
 		if (StrLen(Session->UserSettings)) ParseConfigItemList(Session->UserSettings);
@@ -1836,6 +1838,7 @@ LogFileFlushAll(TRUE);
 
 STREAMFlush(Session->S);
 if (! (Session->Flags & SESSION_REUSE)) break;
+LogToFile(Settings.LogPath,"REUSE: %s %s for %s@%s (%s)",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP);
 }
 
 

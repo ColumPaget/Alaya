@@ -43,31 +43,6 @@ if (Settings->Port < 1)
   else Settings->Port=80;
 }
 
-
-if (Settings->Flags & FLAG_SSL)
-{
-	ptr=LibUsefulGetValue("SSL-Permitted-Ciphers");
-	if (! StrLen(ptr))
-	{
-		LibUsefulSetValue("SSL-Permitted-Ciphers", "DH+AESGCM:DH+AES256:DH+CAMELLIA256:ECDH+AESGCM:ECDH+AES256:ECDH+AES128:DH+AES:EDH-RSA-DES-CBC3-SHA:ECDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:CAMELLIA256:AES128-SHA256:CAMELLIA128:AES128-GCM-SHA256:AES128-SHA256:AES128-SHA:DES-CBC3-SHA:!ADH:!AECDH:!aNULL:!eNULL:!LOW:!EXPORT:!MD5");
-	}
-
-	ptr=LibUsefulGetValue("SSL_VERIFY_CERTFILE");
-	if (! StrLen(ptr)) ptr=LibUsefulGetValue("SSL_VERIFY_CERTDIR");
-
-	if ((Settings->AuthFlags & FLAG_AUTH_CERT_REQUIRED) && (! StrLen(ptr)))
-	{
-		HandleError(ERR_PRINT|ERR_LOG|ERR_EXIT, "ERROR: Client SSL Certificate required, but no certificate verify file/directory given.\nPlease Supply one with the -verify-path command-line-argument, or the SSLVerifyPath config file entry.");
-	}
-
-	ptr=LibUsefulGetValue("SSL-DHParams-File");
-	if (! StrLen(ptr))
-	{
-		HandleError(ERR_PRINT|ERR_LOG, "WARNING: No DH parameters file given for SSL. Perfect Forward Secrecy can only be achieved with Eliptic Curve (ECDH) methods. ECDH depends on fixed values recomended by the U.S. National Institute of Standards and technology (NIST) and thus may not be trustworthy.\n\nCreate a DHParams file with 'openssl dhparam -2 -out dhparams.pem 4096' and give the path to it using the -dhparams command-line-argument or the DHParams config file entry, if you want DiffieHelman key exchange for Perfect Forward Secrecy.");
-
-	}
-}
-
 DestroyString(Tempstr);
 DestroyString(Token);
 }
@@ -434,7 +409,7 @@ char *Tempstr=NULL, *ptr;
       }
     }
 
-PostProcessSettings(&Settings);
+	PostProcessSettings(&Settings);
 
 DestroyString(Tempstr);
 }
