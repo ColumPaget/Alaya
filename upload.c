@@ -99,17 +99,19 @@ return(RetVal);
 void UploadMultipartPost(STREAM *S, HTTPSession *Session)
 {
 char *Tempstr=NULL, *Name=NULL, *FileName=NULL, *QName=NULL, *QValue=NULL;
+char *Boundary;
 int blen=0;
 
 if (! (Session->Flags & SESSION_UPLOAD)) return;
-blen=StrLen(Session->ContentBoundary);
+Boundary=MCopyStr(Boundary,"--",Session->ContentBoundary, NULL);
+blen=StrLen(Boundary);
 
-LogToFile(Settings.LogPath,"HANDLE UPLOAD: %s %s %d",Session->URL, Session->ContentBoundary, Session->ContentSize);
+LogToFile(Settings.LogPath,"HANDLE UPLOAD: %s %s %d",Session->URL, Boundary, Session->ContentSize);
 Tempstr=STREAMReadLine(Tempstr,S);
 while (Tempstr)
 {
 	StripTrailingWhitespace(Tempstr);
-	if ((blen > 0) && (strncmp(Tempstr,Session->ContentBoundary,StrLen(Session->ContentBoundary))==0)) 
+	if ((blen > 0) && (strncmp(Tempstr,Boundary,blen)==0)) 
 	{
 		//Check for end boundary
 		if (strcmp(Tempstr+blen,"--")==0) break;
@@ -119,12 +121,12 @@ while (Tempstr)
 			if (StrLen(FileName) > 0)
 			{
 			Tempstr=MCopyStr(Tempstr,Session->Path,"/",FileName,NULL);
-			if (MultipartReadFile(S,Tempstr,Session->ContentBoundary, blen)==UPLOAD_DONE) break;
+			if (MultipartReadFile(S,Tempstr,Boundary, blen)==UPLOAD_DONE) break;
 			else 
 			{
 				//we must have found a content boundary in ReadMultipartHeaders,
 				//so don't read another line, deal with the content boundary
-				Tempstr=CopyStr(Tempstr,Session->ContentBoundary);
+				Tempstr=CopyStr(Tempstr,Boundary);
 				continue;
 			}
 			}
@@ -148,6 +150,7 @@ Session->Arguments=CatStr(Session->Arguments,"&");
 Session->ContentSize=StrLen(Session->Arguments);
 if (Session->ContentSize > 0) Session->ContentType=CopyStr(Session->ContentType,"application/x-www-form-urlencoded");
 
+DestroyString(Boundary);
 DestroyString(FileName);
 DestroyString(Tempstr);
 DestroyString(Name);

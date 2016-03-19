@@ -136,7 +136,7 @@ while (isspace(*ptr)) ptr++;
 ptr=GetNameValuePair(ptr,";","=",&Name,&Value);
 while (ptr)
 {
-	if (strcmp(Name,"boundary")==0) Session->ContentBoundary=MCopyStr(Session->ContentBoundary,"--",Value,NULL);
+	if (strcmp(Name,"boundary")==0) Session->ContentBoundary=CopyStr(Session->ContentBoundary,Value);
 	ptr=GetNameValuePair(ptr,";","=",&Name,&Value);
 }
 }

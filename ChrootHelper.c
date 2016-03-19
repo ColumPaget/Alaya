@@ -129,6 +129,7 @@ for (i=0; ForbiddenStrings[i] !=NULL; i++)
 	}
 }
 
+if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"SET ENV: %s=%s",Name,Tempstr);
 setenv(Name, Tempstr, TRUE);
 
 DestroyString(Tempstr);
@@ -213,7 +214,8 @@ char *Tempstr=NULL, *ptr;
 	Tempstr=FormatStr(Tempstr,"%d",Session->ContentSize);
 	SetEnvironmentVariable("CONTENT_LENGTH",Tempstr);
 
-	Tempstr=MCopyStr(Tempstr, Session->ContentType, "; ", Session->ContentBoundary, NULL);
+	Tempstr=CopyStr(Tempstr, Session->ContentType);
+	if (StrLen(Session->ContentBoundary)) Tempstr=MCatStr(Tempstr, "; boundary=", Session->ContentBoundary, NULL);
 	SetEnvironmentVariable("CONTENT_TYPE",Tempstr);
 
 	ptr=strrchr(Session->Path,'/');
@@ -418,7 +420,6 @@ HTTPSession *Response;
 	CleanStr(Response->SearchPath);
 	CleanStr(Response->StartDir);
 	ScriptPath=FindFileInPath(ScriptPath,Response->Path,Response->SearchPath);
-	LogToFile(Settings.LogPath,"Script: Found=[%s] SearchPath=[%s] ScriptName=[%s] Arguments=[%s]",ScriptPath,Response->SearchPath,Response->Path,Response->Arguments);
 
 	if (access(ScriptPath,F_OK) !=0)
 	{
@@ -638,12 +639,17 @@ if (pid==0)
 {
 	Response=ParseSessionInfo(Data);
 	STREAMWriteLine("READY\n",ClientCon); STREAMFlush(ClientCon);
+
+	if (strcmp(Response->Method,"POST")==0) Response->MethodID=METHOD_RPOST;
+	else Response->MethodID=METHOD_RGET;
+
 	HTTPProxyRGETURL(ClientCon,Response);
 	//void HTTPProxyConnect(STREAM *S,HTTPSession *ClientHeads);
 
+	LogFileFlushAll(TRUE);
 		
 	STREAMFlush(ClientCon);
-	_exit(1);
+	_exit(0);
 }
 else ClientCon->State |= SS_EMBARGOED;
 
@@ -744,7 +750,7 @@ Tempstr=STREAMReadLine(Tempstr,S);
 if (! Tempstr) return(FALSE);
 
 StripTrailingWhitespace(Tempstr);
-LogToFile(Settings.LogPath, "HCPR: %s",Tempstr);
+if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath, "HANDLE CHROOT REQUEST: %s",Tempstr);
 
 ptr=GetToken(Tempstr,"\\S",&Token,0);
 if (strcmp(Token,"EXEC")==0) Pid=HandleCGIExecRequest(S,ptr);
@@ -797,7 +803,7 @@ Tempstr=MCatStr(Tempstr, " SearchPath='",Quoted,"'",NULL);
 
 Tempstr=MCatStr(Tempstr," Method=",Session->Method," UserAgent='",Session->UserAgent,"' ContentLength='",ContentLengthStr,"'",NULL);
 
-if (StrLen(Session->ContentBoundary) > 2) Tempstr=MCatStr(Tempstr, " ContentType='",Session->ContentType, "; boundary=",Session->ContentBoundary+2, "'",NULL);
+if (StrLen(Session->ContentBoundary)) Tempstr=MCatStr(Tempstr, " ContentType='",Session->ContentType, "; boundary=",Session->ContentBoundary, "'",NULL);
 else Tempstr=MCatStr(Tempstr, " ContentType='",Session->ContentType,"'", NULL);
 
 Quoted=FormatStr(Quoted,"%d",Session->ServerPort);
@@ -829,8 +835,7 @@ Tempstr=MCatStr(Tempstr, " Arguments='",Quoted,"'", NULL);
 
 Tempstr=CatStr(Tempstr,"\n");
 
-//if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) 
-LogToFile(Settings.LogPath,"REQUESTING DATA FROM OUTSIDE CHROOT: [%s]",Tempstr);
+if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"REQUESTING DATA FROM OUTSIDE CHROOT: [%s]",Tempstr);
 STREAMWriteLine(Tempstr,ParentProcessPipe);
 STREAMFlush(ParentProcessPipe);
 
@@ -860,15 +865,15 @@ while (STREAMCheckForBytes(ParentProcessPipe)==0) usleep(10000);
 
 //Read 'OKAY' line
 Tempstr=STREAMReadLine(Tempstr, ParentProcessPipe);
-LogToFile(Settings.LogPath,"PREP: Method=[%s] Size=[%d] [%s]",Session->Method,Session->ContentSize,Tempstr);
 
-//then send it the post data if there is any
-if ((strcmp(Type, "PROXY") != 0) && (strcmp(Session->Method,"POST") ==0)) 
+//then send it the post data if there is any.
+if (strcmp(Session->Method,"POST") ==0) 
 {
 if (Session->ContentSize > 0) 
 {
 	LogToFile(Settings.LogPath,"PUSH POST: [%d]",Session->ContentSize);
 	STREAMSendFile(S, ParentProcessPipe, Session->ContentSize, SENDFILE_KERNEL|SENDFILE_LOOP);
+	LogToFile(Settings.LogPath,"PUSH POST:DONE [%d]",Session->ContentSize);
 }
 
 //we shouldn't need this CR-LF, as we've sent 'Content-Length' characters

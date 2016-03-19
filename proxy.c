@@ -58,17 +58,24 @@ char *Tempstr=NULL;
 HTTPInfoStruct *Info;
 ListNode *Curr;
 
-Tempstr=MCopyStr(Tempstr,Session->Path,"?",Session->Arguments,NULL);
-if (Session->MethodID==METHOD_RPOST) Info=HTTPInfoFromURL("POST",Tempstr);
-else Info=HTTPInfoFromURL("GET",Tempstr);
+if (StrLen(Session->Arguments)) Tempstr=MCopyStr(Tempstr,Session->Path,"?",Session->Arguments,NULL);
+else Tempstr=CopyStr(Tempstr,Session->Path);
 
-Info->PostContentLength=Session->ContentSize;
-if (StrLen(Session->ContentType))Info->PostContentType=CopyStr(Info->ContentType,Session->ContentType);
+if (Session->MethodID==METHOD_RPOST) 
+{
+	Info=HTTPInfoFromURL("POST",Tempstr);
+	Info->PostContentLength=Session->ContentSize;
+	if (StrLen(Session->ContentType))
+	{
+	Info->PostContentType=CopyStr(Info->PostContentType,Session->ContentType);
+	if (StrLen(Session->ContentBoundary)) Info->PostContentType=MCatStr(Info->PostContentType, "; boundary=", Session->ContentBoundary, NULL);
+	}
+}
+else Info=HTTPInfoFromURL("GET",Tempstr);
 
 if (StrLen(Session->RemoteAuthenticate))
 {
 	SetVar(Info->CustomSendHeaders,"Authorization",Session->RemoteAuthenticate);
-  LogToFile(Settings.LogPath,"SENDING AUTH: %s",Session->RemoteAuthenticate);
 }
 
 Curr=ListGetNext(Session->Headers);
@@ -76,7 +83,7 @@ while (Curr)
 {
 	//Don't use 'SetVar' here, as we can have multiple cookie headers
 	if (strcasecmp(Curr->Tag,"Cookie")==0) ListAddNamedItem(Info->CustomSendHeaders,"Cookie",CopyStr(NULL,Curr->Item));
-Curr=ListGetNext(Curr);
+	Curr=ListGetNext(Curr);
 }
 
 Info->Flags |= HTTP_NODECODE | HTTP_NOCOOKIES;
@@ -100,9 +107,23 @@ if (StrLen(Tempstr)) Info->Host=CopyStr(Info->Host,Tempstr);
 
 TargetS=HTTPTransact(Info);
 
-LogToFile(Settings.LogPath,"HTTP %s: [%s]",Session->Method,Session->Path);
 if (TargetS)
 {
+	LogToFile(Settings.LogPath,"PROXY: Connected To %s",Session->Path);
+	//Must send POST data before doing anything else
+	if (Session->ContentSize > 0)
+	{
+  STREAMSendFile(S, TargetS, Session->ContentSize, SENDFILE_LOOP);
+	//we shouldn't need this CR-LF, as we've sent 'Content-Length' characters
+	//but some CGI implementations seem to expect it, and it does no harm to
+	//provide it anyway
+	STREAMWriteLine("\r\n", TargetS);
+	STREAMFlush(TargetS);
+
+	//For POST we must call transact again
+	HTTPTransact(Info);
+	}
+
 	STREAMWriteLine("HTTP/1.1 200 OK Connection Established\r\n",S);
 	Curr=ListGetNext(Info->ServerHeaders);
 	while (Curr)
@@ -114,10 +135,13 @@ if (TargetS)
 	STREAMWriteLine("Connection: close\r\n",S);
 	STREAMWriteLine("\r\n",S);
 
-	HTTPProxyCopyData(TargetS,S);
+
+	//Still have to do this, it's a two-way copy
+	HTTPProxyCopyData(S, TargetS);
 }
 else
 {
+		LogToFile(Settings.LogPath,"PROXY: Connect FAILED to %s",Session->Path);
 		STREAMWriteLine("HTTP/1.1 502 Connection Failed\r\n",S);
 		Tempstr=MCopyStr(Tempstr, "Server: Alaya/",Version,"\r\n",NULL);
 		STREAMWriteLine(Tempstr,S);

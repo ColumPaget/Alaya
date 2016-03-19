@@ -279,7 +279,7 @@ int result=FALSE;
 			case PATHTYPE_PROXY:
 			if (StrLen(VPathSession->UserName)) 
 			{
-				//We don't normally copy Password into VPATH, so we need to get it from 'Sessoin' not 'VPathSession'
+				//We don't normally copy Password into VPATH, so we need to get it from 'Session' not 'VPathSession'
 				Path=MCopyStr(Path,VPathSession->UserName,":",Session->Password,NULL);
 				Tempstr=EncodeBytes(Tempstr, Path, StrLen(Path), ENCODE_BASE64);
 				VPathSession->RemoteAuthenticate=MCopyStr(VPathSession->RemoteAuthenticate,"Basic ",Tempstr,NULL);	

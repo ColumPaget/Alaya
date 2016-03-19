@@ -393,8 +393,16 @@ if (StrLen(Proto) && (strcmp(Proto,"https")==0)) Info->Flags |= HTTP_SSL;
 
 if (StrLen(Info->PostData))
 {
+	if (Info->Flags & HTTP_POSTARGS)
+	{
 	Info->PostContentType=CopyStr(Info->PostContentType,"application/x-www-form-urlencoded");
 	Info->PostContentLength=StrLen(Info->PostData);
+	}
+	else 
+	{
+		Info->Doc=MCatStr(Info->Doc,"?",Info->PostData, NULL);
+		Info->PostData=CopyStr(Info->PostData, "");
+	}
 }
 
 DestroyString(User);
