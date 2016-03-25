@@ -273,7 +273,7 @@ int result=FALSE;
 			HTTPServerHandleRegister(VPathSession, LOGIN_CHANGE);
 			Path=FormatURL(Path, VPathSession, "/");
 			Path=MCatStr(Path,"?Logout=",VPathSession->Path,NULL);
-			VPathSession->Flags &= ~SESSION_KEEP_ALIVE; 
+			VPathSession->Flags &= ~SESSION_KEEPALIVE; 
 			HTTPServerSendResponse(S, VPathSession, "302", "", Path);
 			break;
 

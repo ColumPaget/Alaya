@@ -353,8 +353,7 @@ while (StrLen(Tempstr) )
 	break;
 
 	case HEAD_CONNECTION:
-		if ((Settings.Flags & FLAG_KEEP_ALIVES) && (strcasecmp(ptr,"Keep-Alive")==0)) Session->Flags |= SESSION_KEEP_ALIVE | SESSION_REUSE;
-		LogToFile(Settings.LogPath,"REUSE1: %d %d",Session, Session->Flags & SESSION_REUSE);
+		if ((Settings.Flags & FLAG_KEEPALIVES) && (strcasecmp(ptr,"Keep-Alive")==0)) Session->Flags |= SESSION_KEEPALIVE;
 	break;
 
 	case HEAD_AGENT:
@@ -545,7 +544,7 @@ else
 	HTTPServerSendHeader(S, "Upgrade", "TLS/1.0");
 	}
 
-	if ((Session->Flags & SESSION_KEEP_ALIVE) && (Flags & HEADERS_KEEPALIVE))
+	if ((Session->Flags & SESSION_KEEPALIVE) && (Flags & HEADERS_KEEPALIVE))
 	{
 		HTTPServerSendHeader(S, "Connection", "Keep-Alive");
 		Session->Flags |= SESSION_REUSE;
@@ -613,8 +612,8 @@ if (Session)
 {
 	Response->MethodID=Session->MethodID;
 	Response->LastModified=Session->LastModified;
-	Response->Flags |= Session->Flags & (SESSION_KEEP_ALIVE | SESSION_AUTHENTICATED);
-	//Response->Flags |= SESSION_KEEP_ALIVE;
+	Response->Flags |= Session->Flags & (SESSION_KEEPALIVE | SESSION_AUTHENTICATED);
+	//Response->Flags |= SESSION_KEEPALIVE;
 	Response->ClientIP=CopyStr(Response->ClientIP,Session->ClientIP);
 	Response->Path=CopyStr(Response->Path,Session->Path);
 	Response->Method=CopyStr(Response->Method,Session->Method);
@@ -1230,6 +1229,7 @@ char *ChrootDir=NULL, *Tempstr=NULL;
 Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 ChrootDir=CopyStr(ChrootDir,Settings.DefaultDir);
 
+LogToFile(Settings.LogPath,"SETCTX: %d %s home=%s",Session->MethodID,ChrootDir,Session->HomeDir);
 
 if (IsProxyMethod(Session->MethodID))
 {
@@ -1238,6 +1238,9 @@ if (IsProxyMethod(Session->MethodID))
 else 
 {
 	if (Settings.Flags & FLAG_CHHOME) ChrootDir=CopyStr(ChrootDir,Session->HomeDir);
+
+		//if (Settings.Flags & FLAG_LOG_VERBOSE) 
+LogToFile(Settings.LogPath,"ChRoot to: %s home=%s",ChrootDir,Session->HomeDir);
 
 	if (chdir(ChrootDir) !=0) 
 	{
@@ -1755,6 +1758,9 @@ else if (AuthOkay)
 //and so we should setup a new user context 
 if (! (Session->Flags & SESSION_REUSE)) HTTPServerSetUserContext(Session);
 
+//We can do this only after we've SetUserContext, as we won't want to
+//keep doing it if we're reusing sessions
+if (Session->Flags & SESSION_KEEPALIVE) Session->Flags |= SESSION_REUSE;
 
 
 switch (Session->MethodID)
@@ -1842,7 +1848,7 @@ LogFileFlushAll(TRUE);
 
 STREAMFlush(Session->S);
 if (! (Session->Flags & SESSION_REUSE)) break;
-LogToFile(Settings.LogPath,"REUSE: %s %s for %s@%s (%s)",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP);
+//LogToFile(Settings.LogPath,"REUSE: %s %s for %s@%s (%s)",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP);
 }
 
 

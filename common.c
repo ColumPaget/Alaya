@@ -133,7 +133,7 @@ Session->Depth=Src->Depth;
 Session->CacheTime=Src->CacheTime;
 
 //only copy certain flags!
-Session->Flags=Src->Flags & (SESSION_KEEP_ALIVE | SESSION_REUSE | SESSION_AUTHENTICATED | SESSION_SSL | SESSION_ICECAST | SESSION_UPLOAD) ;
+Session->Flags=Src->Flags & (SESSION_KEEPALIVE | SESSION_REUSE | SESSION_AUTHENTICATED | SESSION_SSL | SESSION_ICECAST | SESSION_UPLOAD) ;
 Session->AuthFlags=Src->AuthFlags;
 Session->Headers=ListCreate();
 

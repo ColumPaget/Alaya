@@ -181,7 +181,7 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		else if (strcmp(Name,"RemoteAuthenticate")==0) Response->RemoteAuthenticate=CopyStr(Response->RemoteAuthenticate,Value);
 		else if (strcmp(Name,"Cipher")==0) Response->Cipher=CopyStr(Response->Cipher,Value);
 		else if (strcmp(Name,"Cookies")==0) Response->Cookies=CopyStr(Response->Cookies,Value);
-		else if (strcmp(Name,"KeepAlive")==0) Response->Flags |= SESSION_KEEP_ALIVE;
+		else if (strcmp(Name,"KeepAlive")==0) Response->Flags |= SESSION_KEEPALIVE;
 		else if (strcmp(Name,"Upload")==0) Response->Flags |= SESSION_UPLOAD;
 		else if (strcmp(Name,"AuthCookie")==0) Response->AuthFlags |= FLAG_AUTH_HASCOOKIE;
 		else if (strcmp(Name,"Cache")==0) Response->CacheTime=atoi(Value);
@@ -502,7 +502,7 @@ if (pid==0)
 		
 	//exit 1 means that we can keep connection alive for re-use
 	LogFileFlushAll(TRUE);
-	if (Response->Flags & SESSION_KEEP_ALIVE) _exit(1);
+	if (Response->Flags & SESSION_KEEPALIVE) _exit(1);
 	_exit(0);
 }
 
@@ -546,7 +546,7 @@ if (pid==0)
 	
 	//exit 1 means that we can keep connection alive for re-use
 	LogFileFlushAll(TRUE);
-	if (Response->Flags & SESSION_KEEP_ALIVE) _exit(1);
+	if (Response->Flags & SESSION_KEEPALIVE) _exit(1);
 	_exit(0);
 }
 else ClientCon->State |= SS_EMBARGOED;
@@ -817,7 +817,7 @@ Tempstr=MCatStr(Tempstr," StartDir='",Quoted,"'",NULL);
 Quoted=QuoteCharsInStr(Quoted,Session->ClientReferrer,"'&");
 Tempstr=MCatStr(Tempstr, " ClientReferrer='",Quoted,"'",NULL);
 
-if (Session->Flags & SESSION_KEEP_ALIVE) Tempstr=CatStr(Tempstr," KeepAlive=Y");
+if (Session->Flags & SESSION_KEEPALIVE) Tempstr=CatStr(Tempstr," KeepAlive=Y");
 if (Session->Flags & SESSION_UPLOAD) Tempstr=CatStr(Tempstr," Upload=Y");
 if (Session->AuthFlags & FLAG_AUTH_HASCOOKIE) Tempstr=CatStr(Tempstr," AuthCookie=Y");
 if (Session->CacheTime > 0)
@@ -936,8 +936,8 @@ STREAMFlush(S);
 
 //if we're running a cgi program, then it will close the session when done, so
 //turn off the 'reuse session' flag
-if (KeepAlive) Session->Flags |= SESSION_KEEP_ALIVE | SESSION_REUSE;
-else Session->Flags &= ~(SESSION_KEEP_ALIVE | SESSION_REUSE);
+if (KeepAlive) Session->Flags |= SESSION_KEEPALIVE | SESSION_REUSE;
+else Session->Flags &= ~(SESSION_KEEPALIVE | SESSION_REUSE);
 
 
 DestroyString(Tempstr);

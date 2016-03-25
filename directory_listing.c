@@ -457,7 +457,7 @@ char *FinalizeDirListHTML(char *Buffer, HTTPSession *Session, const char *Path, 
 {
 char *HTML=NULL;
 
-	HTML=MCopyStr(Buffer,"<html>\r\n<head><title>",Session->URL,"</title></head>\r\n<body>\r\n",NULL);
+	HTML=FormatStr(Buffer,"<html>\r\n<head><title>/%s%s</title></head>\r\n<body>\r\n",Session->Host, Session->URL);
 
 	if ((Flags & DIR_FANCY))
 	{

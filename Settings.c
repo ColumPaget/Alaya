@@ -148,7 +148,7 @@ const char *ConfTokens[]={"Chroot","Chhome","AllowUsers","DenyUsers","Port","Log
 "Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats",NULL};
 typedef enum {CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_PATH, CT_FILETYPE, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, 
 CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_SSL_VERSION, 
-CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEP_ALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS} TConfigTokens;
+CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS} TConfigTokens;
 
 char *Token=NULL, *ptr;
 struct group *grent;
@@ -360,9 +360,9 @@ switch(TokType)
 		Settings.DocumentCacheTime=strtol(ptr,NULL,10);
 	break;
 
-	case CT_SESSION_KEEP_ALIVE:
-		if (YesNoTrueFalse(ptr)) Settings.Flags |= FLAG_KEEP_ALIVES;
-		else Settings.Flags &= ~FLAG_KEEP_ALIVES;
+	case CT_SESSION_KEEPALIVE:
+		if (YesNoTrueFalse(ptr)) Settings.Flags |= FLAG_KEEPALIVES;
+		else Settings.Flags &= ~FLAG_KEEPALIVES;
 	break;
 
 	case CT_ACCESS_TOKEN_KEY:
@@ -729,7 +729,7 @@ Settings.LogPath=CopyStr(Settings.LogPath,"SYSLOG");
 Settings.ConfigPath=CopyStr(Settings.ConfigPath,"/etc/alaya.conf");
 Settings.DefaultDir=CopyStr(Settings.DefaultDir,"./");
 Settings.BindAddress=CopyStr(Settings.BindAddress,"");
-Settings.Flags |= FLAG_KEEP_ALIVES;
+Settings.Flags |= FLAG_KEEPALIVES;
 Settings.DirListFlags=DIR_SHOWFILES | DIR_FANCY;
 Settings.AuthFlags=FLAG_AUTH_REQUIRED | FLAG_AUTH_COOKIE;
 Settings.AuthPath=CopyStr(Settings.AuthPath,"/etc/alaya.auth");
