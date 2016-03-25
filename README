@@ -23,7 +23,7 @@ SYNOPSIS:
 
 
 
-Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-key <path>] [-cert <path>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>]
+Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-sslv <version>] [-key <path>] [-cert <path>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>]
 
 	-v:		Verbose logging.
 	-v -v:		Even more verbose logging.
@@ -40,6 +40,7 @@ Comma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for reado
 'BASE' will set GET,POST,HEAD. 'DAV' will set everything needed for WebDAV. 'RGET' will allow proxy-server gets. 'PROXY' will enable CONNECT and RGET. 'DAV,PROXY' enables everything.
 	-p:		Set port to listen on.
 	-r:		'ChRoot mode', chroot into directory and offer services from it
+	-sslv: Lowest SSL Version to use. One of ssl, tls, tls1.2, tls1.2
 	-key:   Keyfile for SSL (HTTPS)
 	-cert:  Certificate for SSL (HTTPS). This can be a certificate chain bundled in .pem format.
 	-ciphers:		List of SSL ciphers to use.
@@ -112,8 +113,8 @@ HttpMethods=<list>	List of methods like GET, PUT that are allowed
 AuthMethods=<list>  Which methods (native, shadow, passwd, pam, accesstoken) should be used for user authentication, and in what order. See more in 'AUTHENTICATION' below.
 SSLKey=<path>		Path to SSL key file
 SSLCert=<path>	Path to SSL certificate file
-SSLCiphers=<cipher list> 	List of Ciphers to use with SSL (in standard openssl format)
 SSLVersion=<ssl version> 	Lowest SSL Version to use. Can be 'ssl', 'tls', 'tls1.1' or 'tls1.2'. 
+SSLCiphers=<cipher list> 	List of Ciphers to use with SSL (in standard openssl format)
 SSLVerifyPath=<path>		Path to file or directory containing Certificate Authority certificates for peer authentication.
 SSLClientCertificate=<type>		'required', 'sufficient' or 'required+sufficient' (See 'Client Certificates' below)
 SSLDHParams=<path>		Path to an openssl generated Diffie Helman parameters file.
@@ -137,6 +138,47 @@ MaxMemory=<max bytes>			Maximum amount of memory per alaya process. A suffix can
 MaxStack=<max bytes>			Maximum Stack Size. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
 PackFormats=<list>	List of 'pack formats' to offer in the 'download as packed' item on the directory page.
 WebsocketHandler:<path>:<protocol>=<script path>   Specify a program that handles websockets requests to a particular path and protocol.
+
+
+
+HTTPS ENCRYPTION
+
+HTTPS can be turned on (if compiled in) by using the -key and -cert command-line options to indictate where the SSL key and certificate files can be found.
+
+Some certificates need supporting 'intermediate' or 'chain' certificates. These can be bundled together in one pem format file by simply 'cat'-ing the certificates, in .pem format, into one file and supplying that file to alaya with the -cert command-line option or the SSLCert config-file entry.
+
+The optional '-ciphers' command-line-argument and the 'SSLCiphers' config file entry can be used to set a list of ciphers that should be used in openssl mode, though the default settings should be a suitable list of ciphers.
+
+The optional '-sslv' command-line-argument and the 'SSLVersion' config file entry can be used to set the minimum SSL version to use. This can be one of:
+
+ssl			sslv3 and above (so sslv3 + any tls)
+tls			any tls
+tls1.1	tls1.1 and above
+tls1.2	tls1.2 and above
+
+
+
+PERFECT FORWARD SECRECY
+
+This is a complex topic. A better discussion than I can provide is to be found here: http://vincent.bernat.im/en/blog/2011-ssl-perfect-forward-secrecy.html
+
+If the appropriate ciphers are set in SSLCiphers then alaya should support Perfect Forward Secrecy, a mode of SSL in which an ephemeral, short-lived key is created for encryption. Without this feature SSL creates keys from a long-lived server key, allowing recorded communications to be retrospectively read if this server key ever falls into the wrong hands.
+
+Two types of PFS cipher are supported, those based on Eliptic Curves, and those based on Diffie-Helmann key exchange (actually both involve Diffie-Helmann, but whatever). An eliptic curve is a mathematical object that can be used for encryption, but for this system to work both the server and the client must agree to use the same curve. Unfortunately Firefox only supports a choice of three curves, and these three are ones recomended by the U.S. National Institute of Security and Technology, and some people (you know, the tin-hat types who say the government is spying on us) believe they may be 'backdoored' (i.e. contain weaknesses that would allow the government to decrypt communications using them).
+
+An alternative scheme to Eliptic Curves is Diffie Helmann Key Exchange. Unfortunately this has a considerably performance-hit and  requires the pre-generation of a file of random numbers, the 'DHParams' file. This file can be generated with the openssl command-line tool, with the command:
+
+openssl dhparam -out dhparams.pem 1024
+
+The path to the dhparams.pem file should then be provided to alaya with the -dhparams command-line-argument, or with the SSLDHParams config file entry.
+
+
+
+IPv6
+
+Currently IPv6 is only supported for server-side, alaya will not proxy for IPv6 hosts. If specifying that an interface should be bound to in IPv6 mode the IPv6 address must be used (not the interface name), meaning that IPv4 will not be served (run without being bound to an address, alaya can service both IPv6 and IPv4 connections). If the IPv6 address being bound to is a link-local address then an interface identifier must be supplied (e.g. fe80::201:7ff6:ca5a:226b%eth0  Note the '%eth0').
+
+
 
 
 AUTHENTICATION
@@ -500,36 +542,6 @@ compress=<Y/n>     Should the server use compression (TransferEncoding: gzip) wh
 
 
 
-
-HTTPS ENCRYPTION
-
-HTTPS can be turned on (if compiled in) by using the -key and -cert command-line options to indictate where the SSL key and certificate files can be found.
-
-Some certificates need supporting 'intermediate' or 'chain' certificates. These can be bundled together in one pem format file by simply 'cat'-ing the certificates, in .pem format, into one file and supplying that file to alaya with the -cert command-line option or the SSLCert config-file entry.
-
-The '-ciphers' command-line-argument and the 'SSLCiphers' config file entry can be used to set a list of ciphers that should be used in openssl mode, though the default settings should be a suitable list of ciphers.
-
-
-
-PERFECT FORWARD SECRECY
-
-This is a complex topic. A better discussion than I can provide is to be found here: http://vincent.bernat.im/en/blog/2011-ssl-perfect-forward-secrecy.html
-
-If the appropriate ciphers are set in SSLCiphers then alaya should support Perfect Forward Secrecy, a mode of SSL in which an ephemeral, short-lived key is created for encryption. Without this feature SSL creates keys from a long-lived server key, allowing recorded communications to be retrospectively read if this server key ever falls into the wrong hands.
-
-Two types of PFS cipher are supported, those based on Eliptic Curves, and those based on Diffie-Helmann key exchange (actually both involve Diffie-Helmann, but whatever). An eliptic curve is a mathematical object that can be used for encryption, but for this system to work both the server and the client must agree to use the same curve. Unfortunately Firefox only supports a choice of three curves, and these three are ones recomended by the U.S. National Institute of Security and Technology, and some people (you know, the tin-hat types who say the government is spying on us) believe they may be 'backdoored' (i.e. contain weaknesses that would allow the government to decrypt communications using them).
-
-An alternative scheme to Eliptic Curves is Diffie Helmann Key Exchange. Unfortunately this has a considerably performance-hit and  requires the pre-generation of a file of random numbers, the 'DHParams' file. This file can be generated with the openssl command-line tool, with the command:
-
-openssl dhparam -out dhparams.pem 1024
-
-The path to the dhparams.pem file should then be provided to alaya with the -dhparams command-line-argument, or with the SSLDHParams config file entry.
-
-
-
-IPv6
-
-Currently IPv6 is only supported for server-side, alaya will not proxy for IPv6 hosts. If specifying that an interface should be bound to in IPv6 mode the IPv6 address must be used (not the interface name), meaning that IPv4 will not be served (run without being bound to an address, alaya can service both IPv6 and IPv4 connections). If the IPv6 address being bound to is a link-local address then an interface identifier must be supplied (e.g. fe80::201:7ff6:ca5a:226b%eth0  Note the '%eth0').
 
 
 PROXY SUPPORT

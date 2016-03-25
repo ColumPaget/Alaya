@@ -600,6 +600,11 @@ for (i=1; i < argc; i++)
 	}
 	else if (strcmp(argv[i],"-h")==0) ParseConfigItem("ChHome");
 	else if (strcmp(argv[i],"-chhome")==0) ParseConfigItem("ChHome");
+	else if (strcmp(argv[i],"-sslv")==0) 
+	{
+		Token=MCopyStr(Token,"SSLVersion=",argv[++i],NULL);
+		ParseConfigItem(Token);
+	}
 	else if (strcmp(argv[i],"-key")==0) 
 	{
 		Token=MCopyStr(Token,"SSLKey=",argv[++i],NULL);
