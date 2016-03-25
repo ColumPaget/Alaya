@@ -179,7 +179,7 @@ TProcessingModule *Mod=NULL;
 
 
 
-char *HTTPUnQuote(char *RetBuff,const char *Str)
+char *HTTPUnQuote(char *RetBuff, const char *Str)
 {
 char *RetStr=NULL, *Token=NULL;
 const char *ptr;
@@ -391,18 +391,21 @@ if (StrLen(User) || StrLen(Pass)) HTTPInfoSetAuth(Info,User, Pass, HTTP_AUTH_BAS
 
 if (StrLen(Proto) && (strcmp(Proto,"https")==0)) Info->Flags |= HTTP_SSL;
 
+
+//if there were arguments in URL, and HTTP_POSTARGS is set, then post these
+//otherwise include them in the URL again
 if (StrLen(Info->PostData))
 {
-	if (Info->Flags & HTTP_POSTARGS)
-	{
+if (Info->Flags & HTTP_POSTARGS)
+{
 	Info->PostContentType=CopyStr(Info->PostContentType,"application/x-www-form-urlencoded");
 	Info->PostContentLength=StrLen(Info->PostData);
-	}
-	else 
-	{
-		Info->Doc=MCatStr(Info->Doc,"?",Info->PostData, NULL);
-		Info->PostData=CopyStr(Info->PostData, "");
-	}
+}
+else 
+{
+	Info->Doc=MCatStr(Info->Doc,"?",Info->PostData, NULL);
+	Info->PostData=CopyStr(Info->PostData, "");
+}
 }
 
 DestroyString(User);
@@ -846,7 +849,7 @@ DestroyString(SendStr);
 
 void HTTPReadHeaders(STREAM *S, HTTPInfoStruct *Info)
 {
-char *Tempstr=NULL, *ptr;
+char *Tempstr=NULL, *Token=NULL, *ptr;
 
 
 ListClear(Info->ServerHeaders,DestroyString);
@@ -859,15 +862,10 @@ Tempstr=STREAMReadLine(Tempstr,S);
 if (Tempstr)
 {
 	if (Info->Flags & HTTP_DEBUG) fprintf(stderr,"RESPONSE: %s\n",Tempstr);
-  if (strncmp(Tempstr,"HTTP/",5)==0)
-  {
-    ptr=strchr(Tempstr,' ');
-    ptr++;
-
-    Info->ResponseCode=CopyStrLen(Info->ResponseCode,ptr,3);
-    STREAMSetValue(S,"HTTP:ResponseCode",Info->ResponseCode);
-  
-  }
+	//Token will be protocol (HTTP/1.0 or ICY or whatever)
+	ptr=GetToken(Tempstr,"\\S",&Token,0);
+  Info->ResponseCode=CopyStrLen(Info->ResponseCode,ptr,3);
+  STREAMSetValue(S,"HTTP:ResponseCode",Info->ResponseCode);
 Tempstr=STREAMReadLine(Tempstr,S);
 }
 
@@ -901,7 +899,9 @@ if (StrLen(Info->ResponseCode))
 }
 
 S->BytesRead=0;
+
 DestroyString(Tempstr);
+DestroyString(Token);
 }
 
 

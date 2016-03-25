@@ -19,7 +19,7 @@ void VPathParse(ListNode *List, const char *PathType, const char *Data)
 {
 const char *PathTypes[]={"Files","Cgi","Websocket","Stream","Logout","Proxy","MimeIcons","FileType",NULL};
 char *URL=NULL, *Path=NULL, *Tempstr=NULL;
-char *User=NULL, *Group=NULL;
+char *User=NULL, *Group=NULL, *Password=NULL;
 const char *ptr;
 TPathItem *PI=NULL;
 int Type, Flags=0;
@@ -41,6 +41,9 @@ if (Type > -1)
   StripLeadingWhitespace(Tempstr);
   if (strncasecmp(Tempstr,"cache=",6)==0) CacheTime=atoi(Tempstr+6);
   else if (strncasecmp(Tempstr,"user=",5)==0) User=CopyStr(User, Tempstr+5);
+  else if (strncasecmp(Tempstr,"pass=",5)==0) Password=CopyStr(Password, Tempstr+5);
+  else if (strncasecmp(Tempstr,"passwd=",7)==0) Password=CopyStr(Password, Tempstr+7);
+  else if (strncasecmp(Tempstr,"password=",9)==0) Password=CopyStr(Password, Tempstr+9);
   else if (strncasecmp(Tempstr,"group=",6)==0) Group=CopyStr(Group, Tempstr+6);
   else if ( (strncasecmp(Tempstr,"exec=",5)==0) && YesNoTrueFalse(Tempstr+5)) Flags |= PATHITEM_EXEC;
   else if ( (strncasecmp(Tempstr,"upload=",7)==0) && YesNoTrueFalse(Tempstr+7)) Flags |= PATHITEM_UPLOAD;
@@ -63,6 +66,7 @@ if (Type > -1)
   PI->Flags=Flags;
   PI->CacheTime=CacheTime;
   PI->User=CopyStr(PI->User, User);
+  PI->Password=CopyStr(PI->Password, Password);
   PI->Group=CopyStr(PI->Group, Group);
   switch (PI->Type)
   {
@@ -79,6 +83,7 @@ else LogToFile(Settings.LogPath,"ERROR: Unknown Path type '%s' in Config File",T
 
 
 DestroyString(Tempstr);
+DestroyString(Password);
 DestroyString(Group);
 DestroyString(User);
 DestroyString(Path);
@@ -279,8 +284,10 @@ int result=FALSE;
 			case PATHTYPE_PROXY:
 			if (StrLen(VPathSession->UserName)) 
 			{
-				//We don't normally copy Password into VPATH, so we need to get it from 'Session' not 'VPathSession'
-				Path=MCopyStr(Path,VPathSession->UserName,":",Session->Password,NULL);
+				//We don't normally copy Password into VPATH, so we need to get it from 'Session'
+				if (StrLen(PI->Password)) VPathSession->Password=CopyStr(VPathSession->Password, Session->Password);
+				else VPathSession->Password=CopyStr(VPathSession->Password, Session->Password);
+				Path=MCopyStr(Path,VPathSession->UserName,":",VPathSession->Password,NULL);
 				Tempstr=EncodeBytes(Tempstr, Path, StrLen(Path), ENCODE_BASE64);
 				VPathSession->RemoteAuthenticate=MCopyStr(VPathSession->RemoteAuthenticate,"Basic ",Tempstr,NULL);	
 			}

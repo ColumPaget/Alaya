@@ -38,7 +38,7 @@ char *GetHumanReadableDataQty(double Size, int Type);
 
 
 int GenerateRandomBytes(char **RetBuff, int ReqLen, int Encoding);
-char *DecodeBase64(char *Return, int *len, char *Text);
+
 
 #ifdef __cplusplus
 }

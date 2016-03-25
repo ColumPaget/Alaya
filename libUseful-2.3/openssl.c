@@ -176,7 +176,6 @@ if (! ptr) return(NULL);
 const SSL_CIPHER *Cipher;
 char *Tempstr=NULL;
 
-STREAMSetValue(S,"SSL-Cipher","none");
 Cipher=SSL_get_current_cipher((const SSL *) ptr);
 
 if (Cipher)
@@ -325,7 +324,7 @@ if (S)
 
     if (StrLen(ptr))
     {
-      if (strncasecmp(ptr,"ssl",3)==0) Options &= ~(SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
+			if (strncasecmp(ptr,"ssl",3)==0) Options &= ~(SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
       if (strncasecmp(ptr,"tls",3)==0) Options |=SSL_OP_NO_SSLv3;
       if (strcasecmp(ptr,"tls1.1")==0) Options |=SSL_OP_NO_TLSv1;
       if (strcasecmp(ptr,"tls1.2")==0) Options |=SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1;
@@ -342,7 +341,7 @@ if (S)
 	usleep(300);
   result=SSL_connect(ssl);
 	}
-  S->Flags|=SF_SSL;
+  S->State |= SS_SSL;
 
 	OpenSSLQueryCipher(S);
 	OpenSSLVerifyCertificate(S);
@@ -450,7 +449,7 @@ if (S)
 
     if (StrLen(ptr))
     {
-      if (strncasecmp(ptr,"ssl",3)==0) Options &= ~(SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
+			if (strncasecmp(ptr,"ssl",3)==0) Options &= ~(SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
       if (strncasecmp(ptr,"tls",3)==0) Options |=SSL_OP_NO_SSLv3;
       if (strcasecmp(ptr,"tls1.1")==0) Options |=SSL_OP_NO_TLSv1;
       if (strcasecmp(ptr,"tls1.2")==0) Options |=SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1;
@@ -462,32 +461,33 @@ if (S)
 		ptr=LibUsefulGetValue("SSL-Permitted-Ciphers");
 		if (ptr) SSL_set_cipher_list(ssl, ptr);
 	  SSL_set_accept_state(ssl);
-		result=-1;
-		while (result < 0)
+
+		while (1)
 		{
-	  	result=SSL_accept(ssl);
-			if (result != TRUE) result=SSL_get_error(ssl,result);
-			switch (result)
-			{
-				case SSL_ERROR_WANT_READ:
-				case SSL_ERROR_WANT_WRITE: 
-				usleep(300);
-				result=-1;
-				break;
+	  result=SSL_accept(ssl);
+		if (result != TRUE) result=SSL_get_error(ssl,result);
+		switch (result)
+		{
+			case SSL_ERROR_WANT_READ:
+			case SSL_ERROR_WANT_WRITE: 
+			usleep(300);
+			result=-1;
+			break;
 
-				case TRUE:
-				S->Flags|=SF_SSL;
-				if (Flags & SSL_VERIFY_PEER) OpenSSLVerifyCertificate(S);
-				OpenSSLQueryCipher(S);
-				break;
-
-				default:
-				result=ERR_get_error();
-				STREAMSetValue(S, "SSL-Error", ERR_error_string(result,NULL));
-				result=FALSE;
-				break;
-			}
-	  }
+			case TRUE:
+			S->State |= SS_SSL;
+			if (Flags & SSL_VERIFY_PEER) OpenSSLVerifyCertificate(S);
+			OpenSSLQueryCipher(S);
+			break;
+ 
+			default:
+			result=ERR_get_error();
+			STREAMSetValue(S, "SSL-Error", ERR_error_string(result,NULL));
+			result=FALSE;
+			break;
+		}
+		if (result !=-1) break;
+		}
 	}
   }
 }

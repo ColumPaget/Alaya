@@ -108,6 +108,45 @@ AC_CHECK_LIB(esd,esd_open_sound,,)
 cf_have_libesd=$ac_cv_lib_esd_esd_open_sound
 fi
 
-
 dnl read Makefile.in and write Makefile 
 AC_OUTPUT(Makefile)
+
+echo
+echo
+echo "############# libUseful Build Config: #############"
+if test "$ac_cv_sys_file_offset_bits" = "64"
+then
+echo "Largefiles ( > 2GB ) enabled"
+else
+echo "Largefiles ( > 2GB ) NOT enabled"
+fi
+
+if test "$cf_have_sendfile" = "yes"
+then
+echo "Linux sendfile syscall enabled"
+else
+echo "Linux sendfile syscall NOT enabled"
+fi
+
+if test "$cf_use_ip6" = "yes"
+then
+echo "IPv6 enabled"
+else
+echo "IPv6 NOT enabled"
+fi
+
+if test "$cf_have_libssl" = "yes"
+then
+echo "SSL/TLS enabled"
+else
+echo "SSL/TLS NOT enabled"
+fi
+
+if test "$cf_use_zlib" = "yes"
+then
+echo "zlib support enabled"
+else
+echo "zlib NOT enabled"
+fi
+
+

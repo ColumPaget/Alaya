@@ -199,66 +199,70 @@ configure: failed program was:
 configure:3414: gcc -c -g -O2  conftest.c >&5
 configure:3414: $? = 0
 configure:3422: result: 64
-configure:3528: checking for sys/types.h
-configure:3528: gcc -c -g -O2  conftest.c >&5
-configure:3528: $? = 0
-configure:3528: result: yes
-configure:3528: checking for sys/stat.h
-configure:3528: gcc -c -g -O2  conftest.c >&5
-configure:3528: $? = 0
-configure:3528: result: yes
-configure:3528: checking for stdlib.h
-configure:3528: gcc -c -g -O2  conftest.c >&5
-configure:3528: $? = 0
-configure:3528: result: yes
-configure:3528: checking for string.h
-configure:3528: gcc -c -g -O2  conftest.c >&5
-configure:3528: $? = 0
-configure:3528: result: yes
-configure:3528: checking for memory.h
-configure:3528: gcc -c -g -O2  conftest.c >&5
-configure:3528: $? = 0
-configure:3528: result: yes
-configure:3528: checking for strings.h
-configure:3528: gcc -c -g -O2  conftest.c >&5
-configure:3528: $? = 0
-configure:3528: result: yes
-configure:3528: checking for inttypes.h
-configure:3528: gcc -c -g -O2  conftest.c >&5
-configure:3528: $? = 0
-configure:3528: result: yes
-configure:3528: checking for stdint.h
-configure:3528: gcc -c -g -O2  conftest.c >&5
-configure:3528: $? = 0
-configure:3528: result: yes
-configure:3528: checking for unistd.h
-configure:3528: gcc -c -g -O2  conftest.c >&5
-configure:3528: $? = 0
-configure:3528: result: yes
-configure:3540: checking sys/sendfile.h usability
-configure:3540: gcc -c -g -O2  conftest.c >&5
-configure:3540: $? = 0
-configure:3540: result: yes
-configure:3540: checking sys/sendfile.h presence
-configure:3540: gcc -E  conftest.c
-configure:3540: $? = 0
-configure:3540: result: yes
-configure:3540: checking for sys/sendfile.h
-configure:3540: result: yes
-configure:3579: checking for SSL_library_init in -lssl
-configure:3604: gcc -o conftest -g -O2   conftest.c -lssl   >&5
-configure:3604: $? = 0
-configure:3613: result: yes
-configure:3626: checking for EVP_CIPHER_CTX_init in -lcrypto
-configure:3651: gcc -o conftest -g -O2   conftest.c -lcrypto  -lssl  >&5
-configure:3651: $? = 0
-configure:3660: result: yes
-configure:3676: checking for OpenSSL_add_all_algorithms
-configure:3676: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl  >&5
-/tmp/cc0iSazm.o: In function `main':
-/home/metacosm89/coding/alaya-next/libUseful-2.3/conftest.c:58: undefined reference to `OpenSSL_add_all_algorithms'
+configure:3517: checking for ptsname_r in -lc
+configure:3542: gcc -o conftest -g -O2   conftest.c -lc   >&5
+configure:3542: $? = 0
+configure:3551: result: yes
+configure:3583: checking for sys/types.h
+configure:3583: gcc -c -g -O2  conftest.c >&5
+configure:3583: $? = 0
+configure:3583: result: yes
+configure:3583: checking for sys/stat.h
+configure:3583: gcc -c -g -O2  conftest.c >&5
+configure:3583: $? = 0
+configure:3583: result: yes
+configure:3583: checking for stdlib.h
+configure:3583: gcc -c -g -O2  conftest.c >&5
+configure:3583: $? = 0
+configure:3583: result: yes
+configure:3583: checking for string.h
+configure:3583: gcc -c -g -O2  conftest.c >&5
+configure:3583: $? = 0
+configure:3583: result: yes
+configure:3583: checking for memory.h
+configure:3583: gcc -c -g -O2  conftest.c >&5
+configure:3583: $? = 0
+configure:3583: result: yes
+configure:3583: checking for strings.h
+configure:3583: gcc -c -g -O2  conftest.c >&5
+configure:3583: $? = 0
+configure:3583: result: yes
+configure:3583: checking for inttypes.h
+configure:3583: gcc -c -g -O2  conftest.c >&5
+configure:3583: $? = 0
+configure:3583: result: yes
+configure:3583: checking for stdint.h
+configure:3583: gcc -c -g -O2  conftest.c >&5
+configure:3583: $? = 0
+configure:3583: result: yes
+configure:3583: checking for unistd.h
+configure:3583: gcc -c -g -O2  conftest.c >&5
+configure:3583: $? = 0
+configure:3583: result: yes
+configure:3595: checking sys/sendfile.h usability
+configure:3595: gcc -c -g -O2  conftest.c >&5
+configure:3595: $? = 0
+configure:3595: result: yes
+configure:3595: checking sys/sendfile.h presence
+configure:3595: gcc -E  conftest.c
+configure:3595: $? = 0
+configure:3595: result: yes
+configure:3595: checking for sys/sendfile.h
+configure:3595: result: yes
+configure:3634: checking for SSL_library_init in -lssl
+configure:3659: gcc -o conftest -g -O2   conftest.c -lssl  -lc  >&5
+configure:3659: $? = 0
+configure:3668: result: yes
+configure:3681: checking for EVP_CIPHER_CTX_init in -lcrypto
+configure:3706: gcc -o conftest -g -O2   conftest.c -lcrypto  -lssl -lc  >&5
+configure:3706: $? = 0
+configure:3715: result: yes
+configure:3731: checking for OpenSSL_add_all_algorithms
+configure:3731: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl -lc  >&5
+/tmp/ccshTGMb.o: In function `main':
+/home/metacosm89/coding/alaya-next/libUseful-2.3/conftest.c:60: undefined reference to `OpenSSL_add_all_algorithms'
 collect2: error: ld returned 1 exit status
-configure:3676: $? = 1
+configure:3731: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME ""
@@ -269,6 +273,8 @@ configure: failed program was:
 | #define PACKAGE_URL ""
 | #define STDC_HEADERS 1
 | #define _FILE_OFFSET_BITS 64
+| #define HAVE_LIBC 1
+| #define HAVE_PTSNAME_R 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
 | #define HAVE_STDLIB_H 1
@@ -321,25 +327,25 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3676: result: no
-configure:3676: checking for EVP_bf_cbc
-configure:3676: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl  >&5
-configure:3676: $? = 0
-configure:3676: result: yes
-configure:3676: checking for EVP_rc2_cbc
-configure:3676: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl  >&5
-configure:3676: $? = 0
-configure:3676: result: yes
-configure:3676: checking for EVP_rc4
-configure:3676: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl  >&5
-configure:3676: $? = 0
-configure:3676: result: yes
-configure:3676: checking for EVP_rc5_32_12_16_cbc
-configure:3676: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl  >&5
-/tmp/ccC5O9Uq.o: In function `main':
-/home/metacosm89/coding/alaya-next/libUseful-2.3/conftest.c:61: undefined reference to `EVP_rc5_32_12_16_cbc'
+configure:3731: result: no
+configure:3731: checking for EVP_bf_cbc
+configure:3731: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl -lc  >&5
+configure:3731: $? = 0
+configure:3731: result: yes
+configure:3731: checking for EVP_rc2_cbc
+configure:3731: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl -lc  >&5
+configure:3731: $? = 0
+configure:3731: result: yes
+configure:3731: checking for EVP_rc4
+configure:3731: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl -lc  >&5
+configure:3731: $? = 0
+configure:3731: result: yes
+configure:3731: checking for EVP_rc5_32_12_16_cbc
+configure:3731: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl -lc  >&5
+/tmp/cc4Aa2PB.o: In function `main':
+/home/metacosm89/coding/alaya-next/libUseful-2.3/conftest.c:63: undefined reference to `EVP_rc5_32_12_16_cbc'
 collect2: error: ld returned 1 exit status
-configure:3676: $? = 1
+configure:3731: $? = 1
 configure: failed program was:
 | /* confdefs.h */
 | #define PACKAGE_NAME ""
@@ -350,6 +356,8 @@ configure: failed program was:
 | #define PACKAGE_URL ""
 | #define STDC_HEADERS 1
 | #define _FILE_OFFSET_BITS 64
+| #define HAVE_LIBC 1
+| #define HAVE_PTSNAME_R 1
 | #define HAVE_SYS_TYPES_H 1
 | #define HAVE_SYS_STAT_H 1
 | #define HAVE_STDLIB_H 1
@@ -405,44 +413,44 @@ configure: failed program was:
 |   ;
 |   return 0;
 | }
-configure:3676: result: no
-configure:3676: checking for EVP_des_cbc
-configure:3676: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl  >&5
-configure:3676: $? = 0
-configure:3676: result: yes
-configure:3676: checking for EVP_desx_cbc
-configure:3676: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl  >&5
-configure:3676: $? = 0
-configure:3676: result: yes
-configure:3676: checking for EVP_cast5_cbc
-configure:3676: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl  >&5
-configure:3676: $? = 0
-configure:3676: result: yes
-configure:3676: checking for EVP_idea_cbc
-configure:3676: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl  >&5
-configure:3676: $? = 0
-configure:3676: result: yes
-configure:3676: checking for EVP_aes_128_cbc
-configure:3676: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl  >&5
-configure:3676: $? = 0
-configure:3676: result: yes
-configure:3676: checking for EVP_aes_256_cbc
-configure:3676: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl  >&5
-configure:3676: $? = 0
-configure:3676: result: yes
-configure:3686: checking that OpenSSL Library is at least version 0.9.7
-configure:3700: result: yes
-configure:3787: checking sys/soundcard.h usability
-configure:3787: gcc -c -g -O2  conftest.c >&5
-configure:3787: $? = 0
-configure:3787: result: yes
-configure:3787: checking sys/soundcard.h presence
-configure:3787: gcc -E  conftest.c
-configure:3787: $? = 0
-configure:3787: result: yes
-configure:3787: checking for sys/soundcard.h
-configure:3787: result: yes
-configure:4004: creating ./config.status
+configure:3731: result: no
+configure:3731: checking for EVP_des_cbc
+configure:3731: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl -lc  >&5
+configure:3731: $? = 0
+configure:3731: result: yes
+configure:3731: checking for EVP_desx_cbc
+configure:3731: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl -lc  >&5
+configure:3731: $? = 0
+configure:3731: result: yes
+configure:3731: checking for EVP_cast5_cbc
+configure:3731: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl -lc  >&5
+configure:3731: $? = 0
+configure:3731: result: yes
+configure:3731: checking for EVP_idea_cbc
+configure:3731: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl -lc  >&5
+configure:3731: $? = 0
+configure:3731: result: yes
+configure:3731: checking for EVP_aes_128_cbc
+configure:3731: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl -lc  >&5
+configure:3731: $? = 0
+configure:3731: result: yes
+configure:3731: checking for EVP_aes_256_cbc
+configure:3731: gcc -o conftest -g -O2   conftest.c -lcrypto -lssl -lc  >&5
+configure:3731: $? = 0
+configure:3731: result: yes
+configure:3741: checking that OpenSSL Library is at least version 0.9.7
+configure:3755: result: yes
+configure:3842: checking sys/soundcard.h usability
+configure:3842: gcc -c -g -O2  conftest.c >&5
+configure:3842: $? = 0
+configure:3842: result: yes
+configure:3842: checking sys/soundcard.h presence
+configure:3842: gcc -E  conftest.c
+configure:3842: $? = 0
+configure:3842: result: yes
+configure:3842: checking for sys/soundcard.h
+configure:3842: result: yes
+configure:4058: creating ./config.status
 
 ## ---------------------- ##
 ## Running config.status. ##
@@ -507,6 +515,7 @@ ac_cv_header_sys_soundcard_h=yes
 ac_cv_header_sys_stat_h=yes
 ac_cv_header_sys_types_h=yes
 ac_cv_header_unistd_h=yes
+ac_cv_lib_c_ptsname_r=yes
 ac_cv_lib_crypto_EVP_CIPHER_CTX_init=yes
 ac_cv_lib_ssl_SSL_library_init=yes
 ac_cv_objext=o
@@ -528,7 +537,7 @@ CC='gcc'
 CFLAGS='-g -O2'
 CPP='gcc -E'
 CPPFLAGS=''
-DEFS='-DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DSTDC_HEADERS=1 -D_FILE_OFFSET_BITS=64 -DHAVE_SYS_TYPES_H=1 -DHAVE_SYS_STAT_H=1 -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_MEMORY_H=1 -DHAVE_STRINGS_H=1 -DHAVE_INTTYPES_H=1 -DHAVE_STDINT_H=1 -DHAVE_UNISTD_H=1 -DUSE_SENDFILE=1 -DUSE_INET6=1 -DHAVE_LIBSSL=1 -DHAVE_LIBCRYPTO=1 -DHAVE_EVP_BF_CBC=1 -DHAVE_EVP_RC2_CBC=1 -DHAVE_EVP_RC4=1 -DHAVE_EVP_DES_CBC=1 -DHAVE_EVP_DESX_CBC=1 -DHAVE_EVP_CAST5_CBC=1 -DHAVE_EVP_IDEA_CBC=1 -DHAVE_EVP_AES_128_CBC=1 -DHAVE_EVP_AES_256_CBC=1 -DUSE_OPENSSL_ADD_ALL_ALGORITHMS=1 -DHAVE_OSS=1'
+DEFS='-DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DSTDC_HEADERS=1 -D_FILE_OFFSET_BITS=64 -DHAVE_LIBC=1 -DHAVE_PTSNAME_R=1 -DHAVE_SYS_TYPES_H=1 -DHAVE_SYS_STAT_H=1 -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_MEMORY_H=1 -DHAVE_STRINGS_H=1 -DHAVE_INTTYPES_H=1 -DHAVE_STDINT_H=1 -DHAVE_UNISTD_H=1 -DUSE_SENDFILE=1 -DUSE_INET6=1 -DHAVE_LIBSSL=1 -DHAVE_LIBCRYPTO=1 -DHAVE_EVP_BF_CBC=1 -DHAVE_EVP_RC2_CBC=1 -DHAVE_EVP_RC4=1 -DHAVE_EVP_DES_CBC=1 -DHAVE_EVP_DESX_CBC=1 -DHAVE_EVP_CAST5_CBC=1 -DHAVE_EVP_IDEA_CBC=1 -DHAVE_EVP_AES_128_CBC=1 -DHAVE_EVP_AES_256_CBC=1 -DUSE_OPENSSL_ADD_ALL_ALGORITHMS=1 -DHAVE_OSS=1'
 ECHO_C=''
 ECHO_N='-n'
 ECHO_T=''
@@ -537,7 +546,7 @@ EXEEXT=''
 GREP='/bin/grep'
 LDFLAGS=''
 LIBOBJS=''
-LIBS='-lcrypto -lssl '
+LIBS='-lcrypto -lssl -lc '
 LTLIBOBJS=''
 OBJEXT='o'
 PACKAGE_BUGREPORT=''
@@ -590,6 +599,8 @@ target_alias=''
 #define PACKAGE_URL ""
 #define STDC_HEADERS 1
 #define _FILE_OFFSET_BITS 64
+#define HAVE_LIBC 1
+#define HAVE_PTSNAME_R 1
 #define HAVE_SYS_TYPES_H 1
 #define HAVE_SYS_STAT_H 1
 #define HAVE_STDLIB_H 1

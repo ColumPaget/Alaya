@@ -325,6 +325,55 @@ return(fd);
 
 
 
+int GenerateRandomBytes(char **RetBuff, int ReqLen, int Encoding)
+{
+struct utsname uts;
+int i, len;
+clock_t ClocksStart, ClocksEnd;
+char *Tempstr=NULL, *RandomBytes=NULL;
+int fd;
+
+
+fd=open("/dev/urandom",O_RDONLY);
+if (fd > -1)
+{
+	RandomBytes=SetStrLen(RandomBytes,ReqLen);
+  len=read(fd,RandomBytes,ReqLen);
+  close(fd);
+}
+else
+{
+	ClocksStart=clock();
+	//how many clock cycles used here will depend on overall
+	//machine activity/performance/number of running processes
+	for (i=0; i < 100; i++) sleep(0);
+	uname(&uts);
+	ClocksEnd=clock();
+
+
+	Tempstr=FormatStr(Tempstr,"%lu:%lu:%lu:%lu:%llu\n",getpid(),getuid(),ClocksStart,ClocksEnd,GetTime(TIME_MILLISECS));
+	//This stuff should be unique to a machine
+	Tempstr=CatStr(Tempstr, uts.sysname);
+	Tempstr=CatStr(Tempstr, uts.nodename);
+	Tempstr=CatStr(Tempstr, uts.machine);
+	Tempstr=CatStr(Tempstr, uts.release);
+	Tempstr=CatStr(Tempstr, uts.version);
+
+
+	len=HashBytes(&RandomBytes, "sha256", Tempstr, StrLen(Tempstr), 0);
+	if (len > ReqLen) len=ReqLen;
+}
+
+
+*RetBuff=EncodeBytes(*RetBuff, RandomBytes, len, Encoding);
+
+DestroyString(Tempstr);
+DestroyString(RandomBytes);
+
+return(len);
+}
+
+
 
 
 char *GetRandomData(char *RetBuff, int len, char *AllowedChars)
@@ -464,55 +513,6 @@ Str=FormatStr(Str,"%0.1f%c",(float) val,kMGT);
 return(Str);
 }
 
-
-
-int GenerateRandomBytes(char **RetBuff, int ReqLen, int Encoding)
-{
-struct utsname uts;
-int i, len;
-clock_t ClocksStart, ClocksEnd;
-char *Tempstr=NULL, *RandomBytes=NULL;
-int fd;
-
-
-fd=open("/dev/urandom",O_RDONLY);
-if (fd > -1)
-{
-	RandomBytes=SetStrLen(RandomBytes,ReqLen);
-  len=read(fd,RandomBytes,ReqLen);
-  close(fd);
-}
-else
-{
-	ClocksStart=clock();
-	//how many clock cycles used here will depend on overall
-	//machine activity/performance/number of running processes
-	for (i=0; i < 100; i++) sleep(0);
-	uname(&uts);
-	ClocksEnd=clock();
-
-
-	Tempstr=FormatStr(Tempstr,"%lu:%lu:%lu:%lu:%llu\n",getpid(),getuid(),ClocksStart,ClocksEnd,GetTime(TIME_MILLISECS));
-	//This stuff should be unique to a machine
-	Tempstr=CatStr(Tempstr, uts.sysname);
-	Tempstr=CatStr(Tempstr, uts.nodename);
-	Tempstr=CatStr(Tempstr, uts.machine);
-	Tempstr=CatStr(Tempstr, uts.release);
-	Tempstr=CatStr(Tempstr, uts.version);
-
-
-	len=HashBytes(&RandomBytes, "sha256", Tempstr, StrLen(Tempstr), 0);
-	if (len > ReqLen) len=ReqLen;
-}
-
-
-*RetBuff=EncodeBytes(*RetBuff, RandomBytes, len, Encoding);
-
-DestroyString(Tempstr);
-DestroyString(RandomBytes);
-
-return(len);
-}
 
 
 char *DecodeBase64(char *Return, int *len, char *Text)

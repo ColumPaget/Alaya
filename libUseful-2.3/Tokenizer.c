@@ -221,6 +221,8 @@ char *GetNameValuePair(const char *Input, const char *PairDelim, const char *Nam
 char *ptr, *ptr2;
 char *Token=NULL;
 
+*Name=CopyStr(*Name,"");
+*Value=CopyStr(*Value,"");
 ptr=GetToken(Input,PairDelim,&Token,GETTOKEN_HONOR_QUOTES);
 if (StrLen(Token))
 {

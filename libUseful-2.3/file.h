@@ -6,6 +6,8 @@
 #include "list.h"
 
 
+#define STREAM_FLUSH -1
+
 #define STREAM_CLOSED -1
 #define STREAM_NODATA -2
 #define STREAM_TIMEOUT -3
@@ -40,6 +42,7 @@
 #define FLUSH_BUFFER 8
 
 #define SF_RDWR 0 //is the default
+//FLUSH_ flags go in this gap
 #define SF_RDONLY 16
 #define SF_WRONLY 32
 #define SF_CREAT 64
@@ -52,8 +55,6 @@
 #define SF_FOLLOW 4096
 #define SF_SECURE 8192
 #define SF_NONBLOCK 16384
-#define SF_SSL 32768
-#define SF_AUTH 65536
 #define SF_EXEC_INHERIT 131072
 #define SF_SYMLINK_OK 262144
 #define SF_NOCACHE 524288
@@ -67,6 +68,7 @@
 #define SS_DATA_ERROR 8
 #define SS_WRITE_ERROR 16
 #define SS_EMBARGOED 32
+#define SS_SSL  4096
 #define SS_AUTH 8192
 #define SS_USER1 268435456
 #define SS_USER2 536870912

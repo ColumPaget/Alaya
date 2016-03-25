@@ -8,17 +8,32 @@
 #define LIST_FLAG_CACHE 16
 #define LIST_FLAG_DEBUG 256
 
+#define LIST_FLAG_USER1 1048576
+#define LIST_FLAG_USER2 2097152
+#define LIST_FLAG_USER3 4194304
+#define LIST_FLAG_USER4 8388608
+#define LIST_FLAG_USER5 16777216
+#define LIST_FLAG_USER6 33554432
+#define LIST_FLAG_USER7	67108864
+#define LIST_FLAG_USER8	134217728
+#define LIST_FLAG_USER0	268435456
+#define LIST_FLAG_USERA	536870912
+#define LIST_FLAG_USERB	1073741824
+#define LIST_FLAG_USERC	2147483648
+#define LIST_FLAG_USERD	4294967296
+
+
 typedef struct lnode
 {
-int ItemType;
-int Flags;
+unsigned int ItemType;
+unsigned int Flags;
 char *Tag;
 void *Item;
 struct lnode *Head;
 struct lnode *Jump;
 struct lnode *Prev;
 struct lnode *Next;
-int Hits;
+unsigned int Hits;
 time_t Time;
 } ListNode;
 

@@ -76,6 +76,7 @@ char *ContentType;
 off_t Size;
 unsigned int CacheTime;
 char *User;
+char *Password;
 char *Group;
 time_t Mtime;
 char *OnUpload;

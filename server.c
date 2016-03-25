@@ -353,7 +353,8 @@ while (StrLen(Tempstr) )
 	break;
 
 	case HEAD_CONNECTION:
-		if ((Settings.Flags & FLAG_KEEP_ALIVES) && (strcasecmp(ptr,"Keep-Alive")==0)) Session->Flags |= SESSION_KEEP_ALIVE;
+		if ((Settings.Flags & FLAG_KEEP_ALIVES) && (strcasecmp(ptr,"Keep-Alive")==0)) Session->Flags |= SESSION_KEEP_ALIVE | SESSION_REUSE;
+		LogToFile(Settings.LogPath,"REUSE1: %d %d",Session, Session->Flags & SESSION_REUSE);
 	break;
 
 	case HEAD_AGENT:
@@ -557,7 +558,7 @@ else
 
 	if ((Settings.AuthFlags & FLAG_AUTH_COOKIE) && (Session->Flags & SESSION_AUTHENTICATED) && (! (Session->AuthFlags & FLAG_AUTH_HASCOOKIE)))
 	{
-		if (strstr(Settings.AuthMethods, "cookie")) 
+		if (StrLen(Session->UserName)) 
 		{
 			Tempstr=MakeAccessCookie(Tempstr, Session);
 			HTTPServerSendHeader(S, "Set-Cookie", Tempstr);
@@ -612,12 +613,13 @@ if (Session)
 {
 	Response->MethodID=Session->MethodID;
 	Response->LastModified=Session->LastModified;
-	Response->Flags |= Session->Flags & SESSION_KEEP_ALIVE;
-	Response->Flags |= SESSION_KEEP_ALIVE;
+	Response->Flags |= Session->Flags & (SESSION_KEEP_ALIVE | SESSION_AUTHENTICATED);
+	//Response->Flags |= SESSION_KEEP_ALIVE;
 	Response->ClientIP=CopyStr(Response->ClientIP,Session->ClientIP);
 	Response->Path=CopyStr(Response->Path,Session->Path);
 	Response->Method=CopyStr(Response->Method,Session->Method);
 	Response->URL=CopyStr(Response->URL,Session->URL);
+	Response->UserName=CopyStr(Response->UserName,Session->UserName);
 }
 
 Response->ResponseCode=CopyStr(Response->ResponseCode,ResponseLine);
@@ -642,8 +644,8 @@ STREAMWriteBytes(S,Tempstr,Response->ContentSize);
 STREAMFlush(S);
 
 /* If HTTPServerSendHeaders set SESSION_REUSE then set that in the Session object */
-if (Response->Flags & SESSION_REUSE) Session->Flags |= SESSION_REUSE;
-else Session->Flags &= ~SESSION_REUSE;
+//if (Response->Flags & SESSION_REUSE) Session->Flags |= SESSION_REUSE;
+//else Session->Flags &= ~SESSION_REUSE;
 
 
 ProcessSessionEventTriggers(Response);
@@ -847,10 +849,11 @@ int ICYInterval=4096000;
 		else STREAMSendFile(Doc, S, 0, SENDFILE_KERNEL | SENDFILE_LOOP);
 		}
 
-	/* If HTTPServerSendHeaders set SESSION_REUSE then set that in the Session object */
+
+	/* If HTTPServerSendHeaders set SESSION_REUSE then set that in the Session object 
 	if (Response->Flags & SESSION_REUSE) Session->Flags |= SESSION_REUSE;
 	else Session->Flags &= ~SESSION_REUSE;
-
+	*/
 
 		STREAMClose(Doc);
 		HTTPSessionDestroy(Response);
@@ -1658,6 +1661,7 @@ if (DoSSLServerNegotiation(Session->S,Flags))
 	return(TRUE);
 }
 
+
 LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed with %s %s. Error was %s",Session->ClientHost,Session->ClientIP,STREAMGetValue(Session->S,"SSL-Error"));
 return(FALSE);
 }
@@ -1833,7 +1837,7 @@ switch (Session->MethodID)
 }
 }
 
-LogToFile(Settings.LogPath,"TRANSACTION COMPLETE: %s %s for %s@%s (%s)",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP);
+LogToFile(Settings.LogPath,"TRANSACTION COMPLETE: %s %s for %s@%s (%s) falgs=%d",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP, Session->Flags);
 LogFileFlushAll(TRUE);
 
 STREAMFlush(Session->S);

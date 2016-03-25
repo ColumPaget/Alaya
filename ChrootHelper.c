@@ -496,7 +496,6 @@ if (pid==0)
 		_exit(0);
 	}
 
- LogToFile(Settings.LogPath,"SWITCH USER: '%s:%s' getting document '%s'", Response->RealUser, Response->Group, Tempstr);
 
 	STREAMWriteLine("READY\n",ClientCon); STREAMFlush(ClientCon);
 	HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
@@ -610,7 +609,8 @@ while (ptr)
 		ptr=GetToken(ptr,":",&Value,0);
 	}
 		
-	HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
+	//HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
+	HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE);
 	//exit 1 means we can keep connection alive for reuse
 	LogFileFlushAll(TRUE);
 	_exit(1);

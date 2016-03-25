@@ -87,6 +87,55 @@ return(FALSE);
 }
 
 
+int SockSetOptions(int sock, int SetFlags, int UnsetFlags)
+{
+int result;
+
+result=TRUE;
+if (SetFlags & SOCK_BROADCAST) result=setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &result,sizeof(int));
+
+if (SetFlags & SOCK_DONTROUTE) result=setsockopt(sock, SOL_SOCKET, SO_DONTROUTE, &result,sizeof(int));
+
+if (SetFlags & SOCK_REUSEPORT) result=setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &result,sizeof(int));
+
+if (SetFlags & SOCK_TPROXY) result=setsockopt(sock, IPPROTO_IP, IP_TRANSPARENT, &result,sizeof(int));
+
+if (SetFlags & SOCK_PEERCREDS) result=setsockopt(sock, SOL_SOCKET, SO_PASSCRED, &result,sizeof(int));
+
+//Default is KEEPALIVE ON
+setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &result,sizeof(int));
+
+if (SetFlags & CONNECT_NONBLOCK) fcntl(sock,F_SETFL,O_NONBLOCK);
+
+
+result=FALSE;
+if (SetFlags & SOCK_NOKEEPALIVE) setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &result,sizeof(int));
+
+if (UnsetFlags & SOCK_BROADCAST) result=setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &result,sizeof(int));
+
+if (UnsetFlags & SOCK_DONTROUTE) result=setsockopt(sock, SOL_SOCKET, SO_DONTROUTE, &result,sizeof(int));
+
+if (UnsetFlags & SOCK_REUSEPORT) result=setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &result,sizeof(int));
+
+if (UnsetFlags & SOCK_TPROXY) result=setsockopt(sock, IPPROTO_IP, IP_TRANSPARENT, &result,sizeof(int));
+
+if (UnsetFlags & SOCK_PEERCREDS) result=setsockopt(sock, SOL_SOCKET, SO_PASSCRED, &result,sizeof(int));
+}
+
+
+int SockSetAttribute(int sock, int Attrib, int Value)
+{
+
+
+}
+
+int SockGetAttribute(int sock, int Attrib, int Value)
+{
+
+
+}
+
+
 
 int GetHostARP(const char *IP, char **Device, char **MAC)
 {
@@ -338,8 +387,8 @@ socklen_t salen;
 int sock;
 
 salen=sizeof(sa);
-sock=accept(ServerSock,(struct sockaddr *) &sa,&salen);
-if (Addr) 
+sock=accept(ServerSock,(struct sockaddr *) &sa, &salen);
+if (Addr && (sock > -1)) 
 {
 *Addr=SetStrLen(*Addr,NI_MAXHOST);
 getnameinfo((struct sockaddr *) &sa, salen, *Addr, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
@@ -495,13 +544,7 @@ sa.sin_addr=*(struct in_addr *) *hostdata->h_addr_list;
 }
 
 salen=sizeof(sa);
-if (Flags & CONNECT_NONBLOCK) fcntl(sock,F_SETFL,O_NONBLOCK);
-
-if (! (Flags & CONNECT_NOKEEPALIVE))
-{
-  result=TRUE;
-  setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE,&result,sizeof(int));
-}
+SockSetOptions(sock, Flags, 0);
 
 result=connect(sock,(struct sockaddr *)&sa, salen);
 if (result==0) result=TRUE;
@@ -721,11 +764,14 @@ if ((S->in_fd > -1) && (S->Timeout > 0) )
     S->in_fd=-1;
     S->out_fd=-1;
   }
-  else if (! (Flags & CONNECT_NONBLOCK))  STREAMSetFlags(S, 0, SF_NONBLOCK);
 }
 
 if (S->in_fd > -1)
 {
+//We will have been non-blocking during connection, but if we don't 
+//really want the stream to be non blocking, we unset that here
+if (! (Flags & CONNECT_NONBLOCK))  STREAMSetFlags(S, 0, SF_NONBLOCK);
+
 S->Type=STREAM_TYPE_TCP;
 result=TRUE;
 STREAMSetFlushType(S,FLUSH_LINE,0,0);
@@ -777,12 +823,9 @@ Curr=ListGetNext(Curr);
 if ((HopNo==0) && StrLen(DesiredHost))
 {
 	if (Flags & CONNECT_NONBLOCK) S->Flags |= SF_NONBLOCK;
-	val=Flags;
-
-	//STREAMDoPostConnect handles this	
-	//if (S->Timeout > 0) val |= CONNECT_NONBLOCK;
-
-	S->in_fd=ConnectToHost(DesiredHost,DesiredPort,val);
+	
+	//Flags are handled in this function
+	S->in_fd=ConnectToHost(DesiredHost,DesiredPort,Flags);
 
 	S->out_fd=S->in_fd;
 	if (S->in_fd > -1) result=TRUE;
@@ -810,7 +853,7 @@ return(result);
 
 
 
-int OpenUDPSock(int Port)
+int OpenUDPSock(int Port, int Flags)
 {
 	int result;
 	struct sockaddr_in addr;
@@ -823,13 +866,30 @@ int OpenUDPSock(int Port)
 
 	fd=socket(AF_INET, SOCK_DGRAM,0);
 	result=bind(fd,(struct sockaddr *) &addr, sizeof(addr));
-        if (result !=0)
-        {
+	if (result !=0)
+	{
 		close(fd);
 		return(-1);
-        }
-   return(fd);
+	}
+
+	SockSetOptions(fd, Flags, 0);
+	return(fd);
 }
+
+
+STREAM *STREAMOpenUDP(int Port, int Flags)
+{
+int fd;
+STREAM *Stream;
+
+fd=OpenUDPSock(Port, Flags);
+if (fd <0) return(NULL);
+Stream=STREAMFromFD(fd);
+Stream->Path=FormatStr(Stream->Path,"udp::%d",Port);
+Stream->Type=STREAM_TYPE_UDP;
+return(Stream);
+}
+
 
 
 int STREAMSendDgram(STREAM *S, const char *Host, int Port, char *Bytes, int len)
@@ -859,21 +919,6 @@ sa.sin_addr=*(struct in_addr *) *hostdata->h_addr_list;
 
 
 return(sendto(S->out_fd,Bytes,len,0,(struct sockaddr *) &sa,salen));
-}
-
-
-
-STREAM *STREAMOpenUDP(int Port,int NonBlock)
-{
-int fd;
-STREAM *Stream;
-
-fd=OpenUDPSock(Port);
-if (fd <0) return(NULL);
-Stream=STREAMFromFD(fd);
-Stream->Path=FormatStr(Stream->Path,"udp::%d",Port);
-Stream->Type=STREAM_TYPE_UDP;
-return(Stream);
 }
 
 

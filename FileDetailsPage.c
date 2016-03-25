@@ -17,8 +17,8 @@ const char *IgnoreFields[]={"FileSize","ContentType","CTime-Secs","MTime-Secs", 
 	if (Flags & FDETAILS_ACCESSTOKEN)
 	{
 		GenerateRandomBytes(&Salt,24,ENCODE_HEX);
-		Tempstr=MakeAccessToken(Tempstr, Salt, Session->UserName, Session->ClientIP, URL);
-		HTML=MCatStr(HTML,"<tr bgcolor=#FFAAAA><td>Access Token</td><td colspan=2>",URL,"?AccessToken=",Tempstr,"&Salt=",Salt,"&User=",Session->UserName,"</td></tr>",NULL);
+		Tempstr=MakeAccessToken(Tempstr, Session->UserName, Salt, Session->ClientIP, URL);
+		HTML=MCatStr(HTML,"<tr bgcolor=#FFAAAA><td>Access Token</td><td colspan=2>",URL,"?AccessToken=",Tempstr,"</td></tr>",NULL);
 	}
 
 	if (FType != FILE_DIR) 

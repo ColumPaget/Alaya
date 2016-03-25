@@ -7,10 +7,17 @@
 #define CONNECT_SSL 2
 #define CONNECT_HTTP_PROXY 4
 #define CONNECT_SOCKS_PROXY 8
-#define CONNECT_NOKEEPALIVE 16
+#define SOCK_NOKEEPALIVE 16
+#define SOCK_BROADCAST 32
+#define SOCK_DONTROUTE 64
+#define SOCK_REUSEPORT 128
+#define SOCK_TPROXY 256
+#define SOCK_PEERCREDS 512
 
 #define SOCK_CONNECTED 1
 #define SOCK_CONNECTING -1
+
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,6 +33,9 @@ int GetHostARP(const char *IP, char **Device, char **MAC);
 /* Server Socket Funcs*/
 int InitServerSock(int Type, const char *Address, int Port);
 int InitUnixServerSock(int Type, const char *Path);
+STREAM *STREAMOpenUDP(int Port,int NonBlock);
+int STREAMSendDgram(STREAM *S, const char *Host, int Port, char *Bytes, int len);
+
 int TCPServerSockAccept(int ServerSock,char **Addr);
 int UnixServerSockAccept(int ServerSock);
 
@@ -41,8 +51,6 @@ int ReadText(int sock, char *Buffer, int MaxLen);
 int ReadToCR(int fd, char *Buffer, int MaxLen);
 
 
-STREAM *STREAMOpenUDP(int Port,int NonBlock);
-int STREAMSendDgram(STREAM *S, const char *Host, int Port, char *Bytes, int len);
 int STREAMConnectToHost(STREAM *S, const char *Host, int Port, int Flags);
 int STREAMIsConnected(STREAM *S);
 int DoPostConnect(STREAM *S, int Flags);

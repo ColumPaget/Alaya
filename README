@@ -384,6 +384,13 @@ Path=proxy,/Portal,http://otherhost:port/Dir/
 
 This maps a path to another URL. All requests sent to alaya that are for paths below /Portal will be proxy-forwarded to the Path '/Dir' on host 'otherhost' at port 'port'. The current authentication
 
+'Proxy' VPaths can take some arguments. Supported arguments are
+
+user=<username>    Specifies the user that the Path is accessed as.
+pass=<password>    Specifies the password that the Path is accessed with.
+group=<groupname>  Specifies the group that the Path is accessed as.
+
+
 
 
 LOGOUT VPATHS (Logging out of HTTP sessions)
@@ -395,6 +402,7 @@ Configure this with:
 Path=Logout,/Logout
 
 This will mean that whenever the user requests to the imaginary document '/Logout' they will be asked to enter new login credentials.
+
 
 
 
@@ -492,6 +500,7 @@ compress=<Y/n>     Should the server use compression (TransferEncoding: gzip) wh
 
 
 
+
 HTTPS ENCRYPTION
 
 HTTPS can be turned on (if compiled in) by using the -key and -cert command-line options to indictate where the SSL key and certificate files can be found.
@@ -567,7 +576,17 @@ CACHING
 
 By default from version 1.3.2 alaya supports browser caching, and will tell browsers to cache files for 10 seconds. This is particularly useful for mime-type icons, as the same icon may appear many times in a directory listing.
 
-The amount of time that an item can be cached for can be increased using the '-cache' command-line argument or the "FileCacheTime" config file entry.
+The amount of time that an item can be cached for can be changed using the '-cache' command-line argument or the "FileCacheTime" config file entry.
+
+Cache time can be set on a file-extension basis with the file-type command, like so:
+
+FileType=*.jpg,cache=3600
+
+Similarly cache time can be set for file VPaths like so:
+
+Path=files,/Docs/,/usr/local/share/documents,cache=3600
+
+
 
 
 EVENTS

@@ -328,7 +328,7 @@ ListNode *Vars;
 		if (strcmp(File->Name,"..")==0) 
 		{
 			DisplayName=CopyStr(DisplayName,".. (Parent Directory)");
-			CheckBox=CopyStr(CheckBox,"<td align=\"center\">&nbsp;</td>");
+			if (Settings.DirListFlags & DIR_INTERACTIVE) CheckBox=CopyStr(CheckBox,"<td align=\"center\">&nbsp;</td>");
 		}
 		else 
 		{
@@ -632,8 +632,8 @@ for (i=0; i < NoOfFiles; i++)
 		if (AuthenticateExamineMethods(Settings.AuthMethods, FALSE) & AUTH_ACCESSTOKEN)
 		{
 			GenerateRandomBytes(&Salt,24,ENCODE_HEX);
-			AccessToken=MakeAccessToken(AccessToken, Salt, Session->UserName, Session->ClientIP, Files[i]->URL);
-			M3U=MCatStr(M3U,"?AccessToken=",AccessToken,"&Salt=",Salt,"&User=",Session->UserName,"\n",NULL);
+			AccessToken=MakeAccessToken(AccessToken, Session->UserName, Salt, Session->ClientIP, Files[i]->URL);
+			M3U=MCatStr(M3U,"?AccessToken=",AccessToken,NULL);
 		}
 		ListDestroy(Vars,DestroyString);
 		M3U=CatStr(M3U,"\n");
@@ -693,7 +693,7 @@ STREAM *Pipe;
 	//do this so we can strcmp it
 	PackList=CopyStr(PackList,"");
 
-	Response=HTTPSessionCreate();
+	Response=HTTPSessionResponse(Session);
 	Response->ResponseCode=CopyStr(Response->ResponseCode,"200 OK");
 
 	ptr=GetNameValuePair(Session->Arguments, "&","=",&Name,&Value);

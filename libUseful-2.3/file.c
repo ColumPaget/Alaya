@@ -116,8 +116,7 @@ void STREAMSetFlushType(STREAM *S, int Type, int StartPoint, int BlockSize)
 {
 S->Flags &= ~(FLUSH_ALWAYS | FLUSH_LINE | FLUSH_BLOCK | FLUSH_BUFFER);
 S->Flags |= Type;
-if (StartPoint==0) S->StartPoint=BlockSize;
-else S->StartPoint=StartPoint;
+S->StartPoint=StartPoint;
 S->BlockSize=BlockSize;
 }
 
@@ -125,6 +124,8 @@ S->BlockSize=BlockSize;
 /* the file pointer to that position */
 void STREAMResizeBuffer(STREAM *S, int size)
 {
+	if (S->Flags & SF_MMAP) return;
+
 	if (S->Flags & SF_SECURE) 
 	{
 		if (! (S->Flags & SF_WRONLY)) S->InputBuff=SecureRealloc(S->InputBuff, S->BuffSize, size, SMEM_SECURE);
@@ -258,15 +259,37 @@ return(FALSE);
 int STREAMInternalFinalWriteBytes(STREAM *S, const char *Data, int DataLen)
 {
 fd_set selectset;
-int result=0, count=0;
+int result=0, count=0, len;
 struct timeval tv;
 
 if (! S) return(STREAM_CLOSED);
 if (S->out_fd==-1) return(STREAM_CLOSED);
 
+
+//if we are flushing blocks, then pad out to the blocksize
+if (S->Flags & FLUSH_BLOCK) 
+{
+DataLen=S->BlockSize;
+if (DataLen > S->OutEnd) DataLen=S->OutEnd;
+
+/*
+ 	if (DataLen < S->BlockSize)
+	{
+	if (DataLen==0) DataLen=S->BlockSize;
+	else
+	{
+	len=(DataLen / S->BlockSize) * S->BlockSize;
+	if (S->OutEnd > len) len+=S->BlockSize;
+	memset(S->OutputBuff+S->OutEnd,0,len - S->OutEnd);
+	DataLen=len;
+	}
+	}
+*/
+}
+
 while (count < DataLen)
 {
-if (S->Flags & SF_SSL)
+if (S->State & SS_SSL)
 {
 #ifdef HAVE_LIBSSL
 result=SSL_write((SSL *) STREAMGetItem(S,"LIBUSEFUL-SSL-CTX"), Data + count, DataLen - count);
@@ -288,8 +311,8 @@ else
 	}
 
 	if (S->Flags & SF_WRLOCK) flock(S->out_fd,LOCK_EX);
-	if (S->BlockSize && (S->BlockSize < (DataLen-count))) result=S->BlockSize;
-	else result=DataLen-count;
+	result=DataLen-count;
+	//if (S->BlockSize && (S->BlockSize < (DataLen-count))) result=S->BlockSize;
   result=write(S->out_fd, Data + count, result);
 	if (S->Flags & SF_WRLOCK) flock(S->out_fd,LOCK_UN);
 
@@ -305,11 +328,6 @@ else
   if (result < 0) result=0;
   count+=result;
   S->BytesWritten+=result;
-	if (S->Flags & FLUSH_BUFFER)
-	{
-		S->StartPoint=0;
-		break;
-	}
 }
 
 
@@ -469,14 +487,17 @@ return(Stream);
 int STREAMOpenMMap(STREAM *S, int offset, int len, int Flags)
 {
 char *ptr;
+int MProt=PROT_READ;
 
 if (S->InputBuff) free(S->InputBuff);
-ptr=(char *) mmap(0, len, PROT_READ, Flags, S->in_fd, offset);
+if (Flags & (SF_WRONLY | SF_RDWR)) MProt |= PROT_WRITE;
+ptr=(char *) mmap(0, len, MProt, MAP_SHARED, S->in_fd, offset);
 if (ptr==MAP_FAILED) return(FALSE);
 S->InEnd=len;
 S->InStart=0;
 S->Flags |= SF_MMAP;
 S->InputBuff=ptr;
+if (Flags & SF_SECURE) mlock(ptr, len);
 
 return(TRUE);
 }
@@ -553,7 +574,7 @@ else
 	Stream=STREAMFromFD(fd);
 	STREAMSetTimeout(Stream,0);
 
-	if (Flags & (SF_RDONLY | SF_MMAP) == (SF_RDONLY | SF_MMAP)) STREAMOpenMMap(Stream, 0, myStat.st_size, MAP_SHARED);
+	if ( (Flags & (SF_RDONLY | SF_MMAP)) == (SF_RDONLY | SF_MMAP) ) STREAMOpenMMap(Stream, 0, myStat.st_size, Flags);
 	else
 	{
 	if (Flags & SF_TRUNC) ftruncate(fd,0);
@@ -573,6 +594,7 @@ return(Stream);
 STREAM *STREAMClose(STREAM *S)
 {
 ListNode *Curr;
+int val;
 
 if (! S) return(NULL);
 
@@ -610,7 +632,11 @@ if (
 Curr=ListGetNext(S->Values);
 while (Curr)
 {
-	if (strncmp(Curr->Tag,"HelperPID",9)==0) kill(atoi(Curr->Item),SIGKILL);
+	if (strncmp(Curr->Tag,"HelperPID",9)==0)
+	{
+		val=atoi(Curr->Item);
+ 		if (val > 1) kill(val, SIGKILL);
+	}
 	Curr=ListGetNext(Curr);
 }
 
@@ -703,7 +729,7 @@ SSL_CTX=STREAMGetItem(S,"LIBUSEFUL-SSL-CTX");
 //if there are bytes available in the internal OpenSSL buffers, when we don't have to 
 //wait on a select, we can just go straight through to SSL_read
 #ifdef HAVE_LIBSSL
-if (S->Flags & SF_SSL)
+if (S->State & SS_SSL)
 {
 if (SSL_pending((SSL *) SSL_CTX) > 0) WaitForBytes=FALSE;
 }
@@ -750,7 +776,7 @@ if (read_result==0)
 	tmpBuff=SetStrLen(tmpBuff,S->BuffSize-S->InEnd);
 
 	#ifdef HAVE_LIBSSL
-	if (S->Flags & SF_SSL)
+	if (S->State & SS_SSL)
 	{
 		read_result=SSL_read((SSL *) SSL_CTX, tmpBuff, S->BuffSize-S->InEnd);
 	}
@@ -798,9 +824,9 @@ inline int STREAMTransferBytesOut(STREAM *S, char *Dest, int DestSize)
 int bytes;
 
 	bytes=S->InEnd - S->InStart;
-	if (bytes < 1) return(0);
 	
 	if (bytes > DestSize) bytes=DestSize;
+	if (bytes < 1) return(0);
 	
 	memcpy(Dest,S->InputBuff+S->InStart,bytes);
 	S->InStart+=bytes;
@@ -966,10 +992,11 @@ return(AllDataWritten);
 }
 
 
-
+//this function returns the number of bytes *queued*, not number
+//written
 int STREAMInternalQueueBytes(STREAM *S, const char *Bytes, int Len)
 {
-int o_len, written=0, avail, val=0, result=0;
+int o_len, queued=0, avail, val=0, result=0;
 const char *ptr;
 
 	o_len=Len;
@@ -977,34 +1004,40 @@ const char *ptr;
 
 	do
 	{
-		avail=S->BuffSize - S->OutEnd;
-		if (avail > 0)
+		if (o_len > 0)
 		{
-		if (avail > o_len) avail=o_len;
+			avail=S->BuffSize - S->OutEnd;
+			if (avail > 0)
+			{
+			if (avail > o_len) avail=o_len;
 	
-		memcpy(S->OutputBuff+S->OutEnd,ptr,avail);
-		ptr+=avail;
-		o_len-=avail;
-		S->OutEnd+=avail;
+			memcpy(S->OutputBuff+S->OutEnd,ptr,avail);
+			ptr+=avail;
+			o_len-=avail;
+			S->OutEnd+=avail;
+
+			queued+=avail;
+			}
 		}
 	
-		if (
-					(S->StartPoint && (S->Flags & (FLUSH_BLOCK | FLUSH_ALWAYS)) && (S->OutEnd > S->StartPoint)) ||
-					(S->OutEnd >= S->BuffSize) 
+		//Buffer Full, Write some bytes!!!
+		if ( (S->OutEnd > S->StartPoint) &&
+			 	(
+					 (S->OutEnd >= S->BuffSize) ||
+					 (S->Flags & FLUSH_ALWAYS) ||
+					 ((S->Flags & FLUSH_BLOCK) && (S->OutEnd > S->BlockSize))
+				)
 			)
 		{
-		//Buffer Full, Write some bytes!!!
-		if (S->BlockSize) val=(S->OutEnd / S->BlockSize) * S->BlockSize;
-		else val=S->OutEnd;
-	
-		if (val > 0) result=STREAMInternalFinalWriteBytes(S, S->OutputBuff, val);
-		if (result==0) written=STREAM_TIMEOUT;
+		//Any decision about how much to write takes place in InternalFinalWrite
+		result=STREAMInternalFinalWriteBytes(S, S->OutputBuff, S->OutEnd);
 		if (result < 1) break;
-		written+=result;	
+		S->StartPoint=0;	
 		}
 	} while (o_len > 0);
 
-return(written);
+if ((result < 0) && (result != STREAM_TIMEOUT)) return(result);
+return(queued);
 }
 
 
@@ -1016,8 +1049,7 @@ int STREAMWriteBytes(STREAM *S, const char *Data, int DataLen)
 {
 const char *i_data;
 char *TempBuff=NULL;
-int len, written=0, result=0;
-int AllDataWritten=FALSE;
+int len, result=0;
 
 
 if (! S) return(STREAM_CLOSED);
@@ -1028,58 +1060,21 @@ if (S->State & SS_WRITE_ERROR) return(STREAM_CLOSED);
 i_data=Data;
 len=DataLen;
 
-
-while (! AllDataWritten)
+if (ListSize(S->ProcessingModules))
 {
-  AllDataWritten=TRUE;
-
-	if (ListSize(S->ProcessingModules))
-	{
-		STREAMInternalPushProcessingModules(S, i_data, len, &TempBuff, &len);
-		i_data=TempBuff;
-	}
-
-	result=STREAMInternalQueueBytes(S, i_data, len);
-	if (result < 0) 
-	{
-		DestroyString(TempBuff);
-		return(result);
-	}
-	//Whatever happened above, o_data/o_len should hold data to be written
-	
-	
-	//Must do this to avoid sending data into the queue multiple times!
-	len=0;
+	STREAMInternalPushProcessingModules(S, i_data, len, &TempBuff, &len);
+	i_data=TempBuff;
 }
 
-
-//We always claim to have written the data that we've accepted
-//Though this can be overridden below
-written=DataLen;
-
-
-
-//if we are told to write zero bytes, that's a flush
-if ((S->OutEnd > 0) && ((DataLen==0) || (S->Flags & FLUSH_ALWAYS)))
-{
-	//if we are flushing blocks, then pad out to the blocksize
-	if (S->Flags & FLUSH_BLOCK) 
-	{
-		len=(S->OutEnd / S->BlockSize) * S->BlockSize;
-		if (S->OutEnd > len) len+=S->BlockSize;
-		memset(S->OutputBuff+S->OutEnd,0,len - S->OutEnd);
-		S->OutEnd=len;
-	}
-
-	result=STREAMInternalFinalWriteBytes(S, S->OutputBuff, S->OutEnd);
-	if (result < 0) written=result;
-}
-
+//This always queues all the data, though it may not flush it all
+//thus the calling application always believes all data is written
+//Thus we only report errors if len==0;
+if (len > 0) result=STREAMInternalQueueBytes(S, i_data, len);
+else if (S->OutEnd > S->StartPoint) STREAMInternalFinalWriteBytes(S, S->OutputBuff, S->OutEnd);
 
 DestroyString(TempBuff);
 
-
-return(written);
+return(result);
 }
 
 
@@ -1368,8 +1363,8 @@ else len=(long) (Max-bytes_transferred);
 
 if (
       (Flags & SENDFILE_KERNEL) &&
-      (! (In->Flags & SF_SSL)) &&
-      (! (Out->Flags & SF_SSL)) &&
+      (! (In->State & SS_SSL)) &&
+      (! (Out->State & SS_SSL)) &&
       (ListSize(In->ProcessingModules)==0) &&
       (ListSize(Out->ProcessingModules)==0)
 )
@@ -1393,6 +1388,9 @@ while (len > 0)
     }
   	else 
 		{
+			//if used sendfile we need to do this because we didn't call
+			//lower level functions like 'STREAMReadCharsToBuffer' that would
+			//update these
 			In->BytesRead+=result;
 			Out->BytesWritten+=result;
 		}
@@ -1409,40 +1407,41 @@ while (len > 0)
     {
       STREAMFlush(Out);
       sleep(0);
+      break;
       val=Out->BuffSize - Out->OutEnd;
     }
 
-    //if outbuff smaller than len, then shrink len
-    if (len > val) len=val;
+    result=0;
 
-		//only read if we don't already have some in inbuff
-    if ((In->InEnd - In->InStart)==0) result=STREAMReadCharsToBuffer(In);
-    if (result==STREAM_CLOSED) STREAMFlush(Out);
 		
-    val=In->InEnd - In->InStart;
-    if (len > val) len=val;
-    if (len <0) len=0;
-    if ((len==0) && (Out->OutEnd <= 0))
-		{
-			if ((result==STREAM_CLOSED) && (bytes_transferred==0)) return(STREAM_CLOSED);
-		 	break;
-		}
+	val=In->InEnd - In->InStart;
+	//only read if we don't already have some in inbuff
+	if (val < 1)
+	{
+		result=STREAMReadCharsToBuffer(In);
+		val=In->InEnd - In->InStart;
+	}
 
-    result=STREAMWriteBytes(Out,In->InputBuff+In->InStart,len);
-    if (result > 0)
-		{
-			In->InStart+=result;
-			In->BytesRead+=result;
-			Out->BytesWritten+=result;
-		}
-  }
-	STREAMFlush(Out);
-  if (result > 0) bytes_transferred+=result;
-  else if (result ==STREAM_CLOSED)
-  {
-    if (bytes_transferred==0) bytes_transferred=result;
-    break;
-  }
+	if (len > val) len=val;
+
+	//nothing to write!
+	if (len < 1)
+	{
+		//nothing in either buffer! Stream empty. Is it closed?
+		if ((Out->OutEnd==0) && (result==STREAM_CLOSED)) break;
+		len=0;
+	}
+
+	result=STREAMWriteBytes(Out,In->InputBuff+In->InStart,len);
+
+	if (result > 0)
+	{
+  In->InStart+=result;
+  bytes_transferred+=result;
+	}
+
+	}
+
 
 if (! (Flags & SENDFILE_LOOP)) break;
 
@@ -1450,6 +1449,7 @@ if (Max==0) len=BUFSIZ;
 else len=(long) (Max-bytes_transferred);
 }
 
+if ((result==STREAM_CLOSED) && (bytes_transferred==0) ) return(STREAM_CLOSED);
 return(bytes_transferred);
 }
 
