@@ -189,13 +189,16 @@ if (Settings.DirListFlags & DIR_SHOW_VPATHS)
 
 for (i=0; i < Glob.gl_pathc; i++)
 {
-  stat(Glob.gl_pathv[i],&Stat);
   Tempstr=MCopyStr(Tempstr,Dir,GetBasename(Glob.gl_pathv[i]),NULL);
 	URL=FormatURL(URL,Session,Tempstr);
+
+  if (stat(Glob.gl_pathv[i],&Stat) > -1)
+	{
   if (S_ISDIR(Stat.st_mode)) File=PathItemCreate(PATHTYPE_DIR,URL,Glob.gl_pathv[i]);
   else File=PathItemCreate(PATHTYPE_FILE,URL,Glob.gl_pathv[i]);
   File->Mtime=Stat.st_mtime;
   File->Size=Stat.st_size;
+	}
   Files[fcount]=File;
 	fcount++;
 }
@@ -614,8 +617,11 @@ for (i=0; i < NoOfFiles; i++)
 		//Examine file for Artist/title information
 		Vars=ListCreate();
 		F=STREAMOpenFile(Files[i]->Path, SF_RDONLY);
-		MediaReadDetails(F, Vars);
-		STREAMClose(F);
+		if (F) 
+		{
+			MediaReadDetails(F, Vars);
+			STREAMClose(F);
+		}
 		ptr=GetVar(Vars, "Media-title");
 		if (StrLen(ptr))
 		{
