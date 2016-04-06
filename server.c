@@ -1843,7 +1843,7 @@ switch (Session->MethodID)
 }
 }
 
-LogToFile(Settings.LogPath,"TRANSACTION COMPLETE: %s %s for %s@%s (%s) falgs=%d",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP, Session->Flags);
+LogToFile(Settings.LogPath,"TRANSACTION COMPLETE: %s %s for %s@%s (%s)",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP);
 LogFileFlushAll(TRUE);
 
 STREAMFlush(Session->S);

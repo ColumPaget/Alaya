@@ -258,6 +258,8 @@ int result=FALSE;
 			case PATHTYPE_CGI:
 			LogToFile(Settings.LogPath,"CGI EXEC REQUEST: Script='%s' Path='%s'",GetBasename(Session->Path), PI->Path);
 			ChrootProcessRequest(S, VPathSession, "EXEC", GetBasename(VPathSession->Path), PI->Path);
+			//Don't reuse this session after CGI. CGI program will not send a 'Content-Length'
+	    Session->Flags &= ~SESSION_REUSE;
 			break;
 
 			case PATHTYPE_EXTFILE:

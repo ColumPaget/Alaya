@@ -232,6 +232,7 @@ char *Tempstr=NULL, *ptr;
 	SetEnvironmentVariable("REQUEST_URI",Session->URL);
 	SetEnvironmentVariable("SERVER_PROTOCOL","HTTP/1.1");
 	SetEnvironmentVariable("REDIRECT_STATUS","200");
+	unsetenv("TZ");
 	if (StrLen(Session->Cipher)) SetEnvironmentVariable("SSL",Session->Cipher);
 
 DestroyString(Tempstr);
