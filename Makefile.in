@@ -83,3 +83,7 @@ install:
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)
 	$(INSTALL) $(EXE) $(DESTDIR)$(bindir)
 	$(INSTALL) alaya.conf $(DESTDIR)$(sysconfdir)
+
+
+test: libUseful.so
+	-echo "No tests written yet"
