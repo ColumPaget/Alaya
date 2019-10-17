@@ -1,29 +1,47 @@
-AUTHOR:
+[![Build Status](https://travis-ci.com/ColumPaget/Alaya.svg?branch=master)](https://travis-ci.com/ColumPaget/Alaya)
+
+
+SYNOPSIS
+========
+
+Alaya is a chrooting webserver with basic webdav extensions. It can serve both http and https and is intended to provide a simple means for people to share directories with webdav. Although it chroots it supports running CGI programs outside of the chroot via a trusted-path method. Alaya aims at ease of use, so all options can be configured via command-line args, though a config file is also supported.
+
+
+
+
+AUTHOR
+======
+
 Alaya and libUseful are (C) 2011 Colum Paget. They are released under the GPL so you may do anything with them that the GPL allows.
 
-	Email: colums.projects@gmail.com
-	Blog: http://idratherhack.blogspot.com 
+Email: colums.projects@gmail.com
 
 
-DISCLAIMER:
-	This is free software. It comes with no guarentees and I take no responsiblity if it makes your computer explode or opens a portal to the demon dimensions, or does (or doesn't do) anything.
+DISCLAIMER
+==========
+
+This is free software. It comes with no guarentees and I take no responsiblity if it makes your computer explode or opens a portal to the demon dimensions, or does (or doesn't do) anything.
 
 
-CREDITS:
-	Thanks to Gregor Heuer and  Maurice R Volaski for bug reports. 
+CREDITS
+=======
+
+Thanks to Gregor Heuer and  Maurice R Volaski for bug reports. 
 
 
 
 CLIENT ISSUES
-	You may want to read the CLIENTPROGRAMS file for information on the current state of webdav client support with alaya. If you've used alaya with a particular client program, please send an email to colums.projects@gmail.com to let me know.
+=============
 
-
-SYNOPSIS:
-	Alaya is a chrooting webserver with basic webdav extensions. It can serve both http and https and is intended to provide a simple means for people to share directories with webdav. Although it chroots it supports running CGI programs outside of the chroot via a trusted-path method. Alaya aims at ease of use, so all options can be configured via command-line args, though a config file is also supported.
+You may want to read the CLIENTPROGRAMS file for information on the current state of webdav client support with alaya. If you've used alaya with a particular client program, please send an email to colums.projects@gmail.com to let me know.
 
 
 
-Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-sslv <version>] [-key <path>] [-cert <path>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>]
+USAGE
+=====
+
+```
+alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-sslv <version>] [-key <path>] [-cert <path>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>]
 
 	-v:		Verbose logging.
 	-v -v:		Even more verbose logging.
@@ -33,7 +51,7 @@ Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>
 	-f:		Path to config file, defaults to /etc/alaya.conf, but alaya can be configured by command-line args only.
 	-O:		Open, don't require authentication.
 	-h:		'ChHome mode', switch to users home dir and chroot.
-	-i:		Set interface listen on, allows running separate servers on the same port on different interfaces/network cards. For IPv4 either the interface name or address can be used (i.e. -i eth0 or -i 192.168.8.44) for IPv6 the IPv6 address must be used, (e.g. -i fe80::201:7ff6:ca5a:226b%wlan0)
+	-i:		Set interface listen on, allows running separate servers on the same port on different interfaces/network cards. For IPv4 either the interface name or address can be used (i.e. -i eth0 or -i 192.168.8.44) for IPv6 the IPv6 address must be used, (e.g. -i fe80::201:7ff6:ca5a:226b%wlan0). For unix sockets the 'address' (which is the file path) must start with '/'.
 	-l:		Path to log file, default is to use 'syslog' instead.
 	-m:		HTTP Methods (GET, PUT, DELETE, PROPFIND) that are allowed.
 Comma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for readonly DAV.
@@ -57,41 +75,58 @@ Comma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for reado
 	-realm:		Realm for HTTP Authentication
 	-cache:		Takes an argument in seconds which is the max-age recommended for browser caching. Setting this to zero will turn off caching in the browser. Default is 10 secs.
 	-compress:		Compress documents and responses. This can have three values, 'yes', 'no' or 'partial'. 'Partial' means alaya will compress directory listings and other internally genrated pages, but not file downloads.
+```
 
 
-User Setup for Alaya Authentication
-	Alaya can use PAM, /etc/shadow or /etc/passwd to authenticate, but has its own password file that offers extra features, or is useful to create users who can only use Alaya. Users in the Alaya password file are mapped to a 'real' user on the system (usually 'guest' or 'nobody'). The Alaya password file can be setup through the alaya commandline.
+USER SETUP FOR ALAYA NATIVE AUTHENTICATION
+==========================================
 
- Add User: alaya -user add [-a <auth path>] [-e <password encryption type>]  [-h <user home directory>] <Username> <Password> <Setting> <Setting> <Setting>
+Alaya can use PAM, /etc/shadow or /etc/passwd to authenticate, but has its own password file that offers extra features, or is useful to create users who can only use Alaya. Users in the Alaya password file are mapped to a 'real' user on the system (usually 'guest' or 'nobody'). The Alaya password file can be setup through the alaya commandline.
+
+Add User
+--------
+
+```
+	alaya -user add [-a <auth path>] [-e <password encryption type>]  [-h <user home directory>] <Username> <Password> <Setting> <Setting> <Setting>
 
 	-a:		Specify the authentication file for 'built in' authentication.
 	-h:		Specify home directory of new user.
 	-u:		Specify 'real user' that this user maps to.
 	-e:		Specify password encryption type (sha1, sha512, sha256, md5, null, or plain).
-				Config file type settings (like 'ChHome' or 'ChRoot=/var/shared' or 'HttpMethods=GET,PUT,PROPFIND' or 'Path=cgi,/cgi-bin/,/usr/share/cgi' can be added so that these settings are specific to a user
+```
 
-	e.g.
- 
-	Add user with home directory /home/Guest and a number of settings:
+Config file type settings (like 'ChHome' or 'ChRoot=/var/shared' or 'HttpMethods=GET,PUT,PROPFIND' or 'Path=cgi,/cgi-bin/,/usr/share/cgi' can be added so that these settings are specific to a user
 
-		alaya -user add Guest Password -a /etc/FileServices.auth -e sha1 -h /home/Guest 'Path=cgi,/cgi-bin/,/usr/share/cgi' 'Path=files,/docs/,/usr/share/docs' ChHome 'SSLClientCertificate=required'
+Add user with home directory /home/Guest and a number of settings
+------------------------------------------------------------------
 
-	./alaya -user add test testing123 -h /home/test -e sha1 SSLClientCertificate=required
+```
+	alaya -user add Guest Password -a /etc/FileServices.auth -e sha1 -h /home/Guest 'Path=cgi,/cgi-bin/,/usr/share/cgi' 'Path=files,/docs/,/usr/share/docs' ChHome 'SSLClientCertificate=required'
 
- Delete User: 
+	alaya -user add test testing123 -h /home/test -e sha1 SSLClientCertificate=required
+```
 
-		alaya -user del [-a <auth path>] <Username>
+Delete User
+-----------
 
- List Users : 
+```
+	alaya -user del [-a <auth path>] <Username>
+```
 
-		alaya -user list
+List Users
+----------
+
+```
+	alaya -user list
+```
 
 
 Note that using 'SSLClientCertificate' in user entries in the authentication file requries 'SSLClientCertificate=ask' to be set in the main config file. This is so that alaya will ask for a certificate in the connection setup stage, BEFORE it gets to authentication. Without this entry it will be too late to ask for a certificate when we reach the authentication stage.
 
 
 
-CONFIG FILE:
+CONFIG FILE
+============
 
 Alaya is also configurable via a config-file (defaults to /etc/alaya.conf) 
 
@@ -99,7 +134,7 @@ There should be an example config file in the source distribution. It's worth lo
 
 Config file entries are:
 
-
+```
 Chroot=<dir>			Specifies directory to serve requests out of
 ChHome						Serve requests out of users home directory
 AllowUsers=<list>			Only allow these users access.
@@ -138,10 +173,11 @@ MaxMemory=<max bytes>			Maximum amount of memory per alaya process. A suffix can
 MaxStack=<max bytes>			Maximum Stack Size. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
 PackFormats=<list>	List of 'pack formats' to offer in the 'download as packed' item on the directory page.
 WebsocketHandler:<path>:<protocol>=<script path>   Specify a program that handles websockets requests to a particular path and protocol.
-
+```
 
 
 HTTPS ENCRYPTION
+================
 
 HTTPS can be turned on (if compiled in) by using the -key and -cert command-line options to indictate where the SSL key and certificate files can be found.
 
@@ -151,14 +187,16 @@ The optional '-ciphers' command-line-argument and the 'SSLCiphers' config file e
 
 The optional '-sslv' command-line-argument and the 'SSLVersion' config file entry can be used to set the minimum SSL version to use. This can be one of:
 
+```
 ssl			sslv3 and above (so sslv3 + any tls)
 tls			any tls
 tls1.1	tls1.1 and above
 tls1.2	tls1.2 and above
-
+```
 
 
 PERFECT FORWARD SECRECY
+=======================
 
 This is a complex topic. A better discussion than I can provide is to be found here: http://vincent.bernat.im/en/blog/2011-ssl-perfect-forward-secrecy.html
 
@@ -168,13 +206,16 @@ Two types of PFS cipher are supported, those based on Eliptic Curves, and those 
 
 An alternative scheme to Eliptic Curves is Diffie Helmann Key Exchange. Unfortunately this has a considerably performance-hit and  requires the pre-generation of a file of random numbers, the 'DHParams' file. This file can be generated with the openssl command-line tool, with the command:
 
+```
 openssl dhparam -out dhparams.pem 1024
+```
 
 The path to the dhparams.pem file should then be provided to alaya with the -dhparams command-line-argument, or with the SSLDHParams config file entry.
 
 
 
 IPv6
+====
 
 Currently IPv6 is only supported for server-side, alaya will not proxy for IPv6 hosts. If specifying that an interface should be bound to in IPv6 mode the IPv6 address must be used (not the interface name), meaning that IPv4 will not be served (run without being bound to an address, alaya can service both IPv6 and IPv4 connections). If the IPv6 address being bound to is a link-local address then an interface identifier must be supplied (e.g. fe80::201:7ff6:ca5a:226b%eth0  Note the '%eth0').
 
@@ -182,46 +223,60 @@ Currently IPv6 is only supported for server-side, alaya will not proxy for IPv6 
 
 
 AUTHENTICATION
+==============
 
 Alaya supports authentication as 'real users' via old style '/etc/passwd', newer '/etc/shadow' or via Pluggable Authentication Modules (PAM). However, alaya also supports it's own 'native' authentication using it's own password file (defaults to /etc/alaya.auth). The native authentication method allows some of the config settings to be set against an individual user. This can be used to limit the HTTP methods a given user can use, or to limit CGI access to certain users, etc, etc. Finally alaya has 'access token' and 'access cookie' authentication methods to handle special cases. Access tokens allow access to individual files through use of a URL that includes an access key. Access Cookies help in situations where clients don't always send authentication details.
 
 
 
 NATIVE AUTHENTICATION
+=====================
 
 If alaya authenticates using 'native' authentication, then the users are 'virtual', they don't exist as 'real' users on the system, and so they really run as a default user and default group (defaults to 'nobody' or 'wwwrun' if such an account exists). This default user and default group can be set in the config file, or else a suitable default is found. The 'real user' and 'real group' can also be set on a user-by-user basis using a setup like:
 
+```
 	alaya -user add bill bills-password DefaultUser=nobody
+```
 
 If you want 'bill' to actually be the system-user 'bill', but have a different password for alaya, then you can configure him/her/it as:
 
+```
 	alaya -user add bill bills-alaya-password DefaultUser=bill
+```
 
 Alaya supports multiple hashing methods for passwords stored in the native file. The default is sha256. Available types are:
 
+```
 	md5, sha1, sha256, sha512, htdigest-md5, plain, null
+```
 
 You can set up a user with a specific type by:
 
+```
 	alaya -user add bill -e sha1 bills-password
+```
 
 The 'plain' encryption type is plain-text, which must be used if using HTTP Digest Authentication. The 'null' encryption type allows someone to log in with a blank password.
 
 Many settings that can be put in the config-file can also be booked against a specific user. So:
 
+```
 	alaya -user add bill bills-password DefaultUser=nobody DefaultGroup=users ChRoot=/tmp HTTPMethods=GET
+```
 
 would map the virtual user 'bill' to the real user 'nobody', in group 'users', and on login they'll be chrooted to '/tmp'. They will only be allowed to use the HTTP GET method.
 
 	
 	
 SYSTEM AUTHENTICATION
+=====================
 
 If alaya authenticates using the /etc/passwd, /etc/shadow or PAM methods, then the user will be logged in as the REAL system user that was found in /etc/passwd. If the 'ChHome' setting is active, then they will be chrooted into their home directory.
 
 
 
 ACCESS-TOKEN AUTHENTICATION
+===========================
 
 Alaya supports a special authentication type 'accesstoken'. This is used in m3u playlists generated by the interactive directory listings when the 'Media' flag is active (see "DIRECTORY LISTINGS" below). A unique hash is created for each file in the playlist, against the ip-address that the user is coming from. As of version 1.4 the hash includes a random secret that is gathered when alaya starts up (thus, if you restart alaya, all access tokens given out by the previous alaya process will become invalid). This random value has been added to prevent an attacker 'guessing' the access token for a file. 
 
@@ -234,12 +289,14 @@ An access token URL can also be generated for an arbitary file using the 'Access
 
 
 COOKIE AUTHENTICATION
+=====================
 
 Alaya supports authentication via 'session cookies'. Firstly the user must log on with some other method, and then alaya supplies then with an HTTP cookie that works similarly to an access-token (as described above). This is mostly used so that the Safari webbrowser can use the websockets feature of alaya, because Safari does not send authentication details when upgrading a connection from HTTP to websockets. However Safari does send cookies, so a session cookie allows it to authenticate the websockets connection.
 
 
 
 DIGEST AUTHENTICATION
+=====================
 
 Alaya supports HTTP Digest Authentication. This requires the user to be set up with a password type of either htdigest-md5 or plain in the NATIVE authentication file. This means that the password will be stored in the native file either md5-hashed, or in plain text. htdigest-md5 is preferred to plain because the password is stored md5-hashed. Both plain and htdigest-md5 entries can be used to authenticate clients supplying either 'digest authentication' credentials, or 'basic authentication' (plaintext) credentials.
 
@@ -249,15 +306,19 @@ Furthermore, digest authentication changes how the server and client interact, a
 
 To set up a user to use Digest Authentication, use:
 
+```
 alaya -user add -e htdigest-md5 bill bills-alaya-password
+```
 
 or
 
+```
 alaya -user add -e plain bill bills-alaya-password
-
+```
 
 
 CLIENT CERTIFICATE AUTHENTICATION
+=================================
 
 Alaya can use client certificates for authentication. 
 
@@ -280,52 +341,66 @@ Unfortunately Client Certificate Authentication does not play well with Logout V
 
 
 DIRECTORY LISTINGS
+==================
 
 Alaya supports a number of types of directory listing. These are set using the 'DirListType' config option. Available types are:
 
-None		Refuse to show directories, only allow downloading of files
-Basic		Just list directory/file names
-Fancy		A much fancier listing of directory/file names, sizes, types, modified times, and other information
-Interactive	This type provides buttons that allow users to delete, rename or upload files.
-Full		Turn on everything except IndexPages
+```
+None					Refuse to show directories, only allow downloading of files
+Basic					Just list directory/file names
+Fancy					A much fancier listing of directory/file names, sizes, types, modified times, and other information
+Interactive		This type provides buttons that allow users to delete, rename or upload files.
+Full					Turn on everything except IndexPages
+```
 
 In addition to the type of listing, the DirListType config option accepts a number of comma-seperated modifiers. These are:
 
+```
 IndexPages     Search for an index.html file in a directory, and show that instead of the directory
 Media          If a directory contains media files, then offer the option to download a .m3u playlist of them.
                This can then be  passed to a media playing app like mplayer, or some such.
 ShowVPaths	   Show VPaths as though they were subdirectories in the users top-level directory
 TarDownloads   Offer downloads of entire directories as tarballs
 MimeIcons      Use icons for filetypes, instead of text description of mimetype. See 'MIMEICON VPATHS' below
+```
 
 Examples:
+
+```
 	DirListType=none,IndexPages   Don't allow access to directory listings, but show index.html pages where available.
 
 	DirListType=Fancy,Media      Show 'fancy' directory listings, and offer .m3u playlists in directories with media files.
-
-
+```
 
 PACK FORMATS
+============
 
 If 'interactive' is set as the directory listing type, or 'TarDownloads' is selected as an option, then directory listings page offers the option of 'pack and send' for the directory. This allows sending either the entire directory contents, or selected items, in some archive format. The 'PackFormats' settings allows specifying available formats and the commands to run to generate them. e.g.
 
+```
 PackFormats=tar:internal,zip:zip -,tbz:tar -jcO,txz:tar -JcO
+```
 
 'tar:internal' is an internal tar function that doesn't require an external program. All other variants have the form:
 
+```
  <archive type>:<archive command>
+```
 
 A list of files to be archived is appended to the command. The command must send its archive data to standard out.
 
 
 
 CHROOTING
+=========
 
 Simply running alaya in a directory without a config file or command-line args will cause it to chroot into that directory, and serve that directories contents over HTTP.
 
 The -r flag can be used to specify the 'root' directory instead, e.g.
 
+```
 alaya -r /usr/share/httpd
+```
 
 This will cause alaya to chroot into /usr/share/httpd and serve out of there.
 
@@ -335,19 +410,62 @@ It will be noted that for 'chhome' to work some data is first read from the clie
 
 
 
-VPATHS: ITEMS OUTSIDE OF CHROOT
+VPATHS
+======
+
+VPaths are URLs that map to some special behavior. VPaths can be used to indicate a directory contains CGI scripts that can be run, to mark items outside of a chroot jail to be made available within the jail, to indicate that some directories are accessible without authentication, to proxy a URL to another location, and other uses.
+
+VPaths are configured with the format:
+
+```
+Path=<type>,<URL>,<Path>,<arguments>
+```
+
+where 'URL' is not normally a full url, but a part of a URL under the server root. For example:
+
+```
+Path=cgi,/cgi-bin/,/usr/share/cgi-progs
+```
+
+will map any url like:
+
+```
+	http://myhost/cgi-bin/myProg.cgi
+```
+
+To a file called '/usr/share/cgi-progs/myProg.cgi' and run it if it exists.
+
+
+VPATHS: 'Local' VPaths and permissions on directories
+-----------------------------------------------------
+
+'local' VPaths currently have only one use: they allow a directory to be made accessible without authentication. This differs from chroot paths (see below) because those make a directory available to a user after authentication. 'local' vpaths are used to make a directory available to anyone, even if most of the rest of the server requires authentication. This is particularly useful for automated certificate generation via "let's encrypt". "Let's encrypt" needs access to a directory called '/.well-known/acme-challenge' under the webroot. This is used to pass information to the "let's encrypt" service, but there's no means of providing authentication details to that service. Thus we can declare a VPath like:
+
+```
+Path=local,/.well-known/,auth=open
+```
+
+With the 'auth=open' argument to make this path available without authentication.
+
+
+VPATHS: Items outside of chroot
+-------------------------------
 
 Sometimes there is a requirement to chroot users into, say, their home directories, but make certain shared directories that are outside fo the chroot available to them. This can be achieved using the 'VPath' system. A VPath (Virtual Path) is a directory that a user can access through an 'alias' URL, even if it's outside of any chroot they're jailed in.
 
 A VPath is set up in either the main config file, or else within a user's entry in the native authentication file. For example, this line in the config file:
 
+```
 Path=files,/Docs/,/usr/local/share/documents
+```
 
 Would create a vpath accessible by all users. They would see a directory called 'Docs' in their root directory, and accessing it would grant them access to /usr/local/share/documents. They'll be able to access /usr/local/share/documents even if they are chrooted and it is outside of their chroot jail.
 
 If an entry is placed in a user's authentication file entry, like this:
 
+```
 Guest:md5:5a041e5ac20634d4daa01b073d0d65b7:nobody:/home/Guest/:Path=files,/Music/,/home/Music
+```
 
 Then only that user will see the 'Music' VPath.
 
@@ -355,7 +473,9 @@ If the 'ShowVPaths' argument is given to the DirListType config file argument, t
 
 VPaths can contain multiple directories, as in
 
+```
 Path=files,/Docs/,/usr/local/share/documents-1:/usr/local/share/documents-2
+```
 
 So that an item like
 
@@ -372,109 +492,107 @@ user3-home
 
 and our html files, including the root 'index.html' for the site are in 'htdocs' we can specify a 'root' VPath like this:
 
+```
 Path=files,/,htdocs/
+```
 
 Thus, when the user asks for any file in '/' '/htdocs' will be searched. If 'IndexFiles' is enabled in the config file, then 'htdocs/' will be searched for an index.html file.
 
 A file vpath can take a number of extra arguments. Like this:
 
+```
 Path=files,/Docs/,/usr/local/share/documents,cache=3600,user=jane,group=documents,uploads=true,compress=false
+```
 
 These arguments effect server behavior in this Path:
 
+```
 user=<username>    Specifies the user that the Path is accessed as.
 group=<groupname>  Specifies the group that the Path is accessed as.
 cache=<seconds>    The number of seconds that items under this path can be cached for.
 upload=<Y/n>       Are items allowed to be uploaded to this path?
 uploads=<Y/n>      Are items allowed to be uploaded to this path?
 compress=<Y/n>     Should the server use compression (TransferEncoding: gzip) when sending documents from this path?
+```
 
 
+VPATHS: Proxy URLs
+------------------
 
-MIMEICON VPATHS
+From Alaya 1.0.10 proxy VPaths are supported. These allow a URL to be redirected to some other resource. For example:
 
-Alaya supports mime icons in file listings via a special VPATH. e.g.:
-
-Path=MimeIcons,/mimeicons,/home/app-themes/icons/Free-file-icons-master/32px/$(FileExtn).png,/home/app-themes/icons/mediatype-icons/gnome-mime-$(mimeclass)-$(mimesub).png,/home/app-themes/icons/nuvola/32x32/mimetypes/unknown.png
-
-This creates a URL which alaya internally uses to find icons for filetypes. A comma-separated list of file paths is searched until a match is found. Placeholders in the format '$(variable name)' are substituted to generate a file path. Available variables are:
-
-$(FileExtn)		gets replaced with the file extension of the file we are seeking a mime icon for. 
-$(MimeType)		gets replaced with the full mime type (e.g. 'image/jpeg'). 
-$(MimeClass)	gets replaced with the mime class of the file we are seeking a mime icon for (so, 'audio', 'video', 'image' or 'application'). 
-$(MimeSub)		gets replaced with the mime subtype of the file we are seeking a mime icon for (so, 'jpeg', 'x-shockwave-flash', 'pdf', 'text', 'html' etc, etc). 
-$(FileType)		currently only used for directories/folders, where it is set to 'folder'
-
-In order to handle unknown file types the last entry should have no variable placeholders, so that it always matches, and is a path to the 'default' icon.
-
-Directories/folders have the MimeType variable set to 'inode/directory', and the FileType variable set to 'folder'
-
-In order for mime icons to work you must also see the 'MimeIcons' property in the 'DirListType' config item.
-
-'Mimeicon' VPaths can also take some of the arguments supported by 'Path' VPaths (see above). The 'cache' argument is useful for specifying the number of Supported arguments are
-
-user=<username>    Specifies the user that the Path is accessed as.
-group=<groupname>  Specifies the group that the Path is accessed as.
-
-
-
-PROXY VPATHS
-
-Alaya 1.0.10 supports a new type of VPath, the 'proxy VPath'. These are set up with the form:
-
+```
 Path=proxy,/Portal,http://otherhost:port/Dir/
+```
 
 This maps a path to another URL. All requests sent to alaya that are for paths below /Portal will be proxy-forwarded to the Path '/Dir' on host 'otherhost' at port 'port'. The current authentication
 
 'Proxy' VPaths can take some arguments. Supported arguments are
 
+```
 user=<username>    Specifies the user that the Path is accessed as.
 pass=<password>    Specifies the password that the Path is accessed with.
 group=<groupname>  Specifies the group that the Path is accessed as.
+```
 
+e.g.
 
+```
+Path=proxy,/MyHost,http://myhost:port/Dir/,user=me,pass=secret
+```
 
+VPATHS: Logging out of HTTP sessions
+------------------------------------
 
-LOGOUT VPATHS (Logging out of HTTP sessions)
-
-Alaya uses a special type of VPath, the 'Logout' vpath, to allow users to 'logout' and reenter HTTP authentication. Basically this redirects the client to a URL that will insist that the client re-authenticates, even if the client presents  valid authentication credentials.
+Alaya uses a special type of VPath, the 'Logout' vpath, to allow users to 'logout' and reenter HTTP authentication. Basically this redirects the client to a URL that will insist that the client re-authenticates, even if the client presents valid authentication credentials.
 
 Configure this with:
 
+```
 Path=Logout,/Logout
+```
 
 This will mean that whenever the user requests to the imaginary document '/Logout' they will be asked to enter new login credentials.
 
 
-
-
-CGI VPATHS
+VPATHS: CGI program directories
+-------------------------------
 
 At current CGI programs cannot be run within the served directory tree (which is chrooted). The main reason for this is that it would allow users to upload their own .cgi style programs and run them on the server. CGI programs can be run from a trusted VPath outside of the chroot, specified either with the -cgi command line argument, or by creating a VPath in the config file.
 
 For example, this entry in the config file
 
+```
 Path=cgi,/cgi/,/usr/share/cgi
+```
 
 Would create a cgi-path under the alias '/cgi/' that allowed programs in /usr/share/cgi to be run. Thus urls of the form
 
+```
 http://servername/cgi/myscript.cgi
+```
 
 Will be map to /usr/share/cgi, where the appropriate program should be found and run.
 
 The -cgi command line option creates a VPath with the alias of /cgi-bin/. thus
 
+```
 alaya -cgi /usr/share/cgi
+```
 
 Would cause urls of the form
 
+```
 	http://servername/cgi-bin/myscript.cgi
+```
 
-to map to /usr/share/cgi
+to map to `/usr/share/cgi`
 
 Paths can contain multiple directories separated by colons, these directories will be searched till a matching file is found. Thus
 
+```
 	Path=cgi,/cgi-bin/,/usr/share/cgi:/usr/local/cgi
+```
 
 would cause both /usr/share/cgi and /usr/local/cgi to be searched when trying to map /cgi-bin/ in a url.
 
@@ -485,43 +603,91 @@ ALAYA WILL NOT RUN CGI PROGRAMS AS ROOT. If you do not specify a 'DefaultUser' o
 
 You can take cryptographic hashes of your cgi scripts with md5sum, shasum, sha256sum or sha512sum. Redirect the output to a file, and specify that file with the 'ScriptHashFile' config argument like so:
 
+```
 ScriptHashFile=/etc/scripts.hash
+```
 
 Alaya will then use these hashes to check the integrity of any cgi program before it is run, and will refuse to run those whose hashes do not match the ones in the file.
 
 
 If you have scripts that lack a #! header, or if you want to force the use of a specific interpreter for you scripts, there is the 'ScriptHandler' config item:
 
+```
 ScriptHandler:pl=/usr/bin/perl 
 ScriptHandler:py=/usr/bin/python
+```
 
 These two examples allow you to specify the program used to run a perl or python script. The file-extension of the script is used to match the appropriate entry. The following entry:
 
+```
 ScriptHandler:*=/usr/local/bin/ScriptManager.exe
+```
 
 Would use the program '/usr/local/bin/ScriptManager.exe' as the interpreter for all scripts.
 
 'CGI' VPaths can also take some of the arguments supported by 'Path' VPaths (see above). Supported arguments are
 
+```
 user=<username>    Specifies the user that the Path is accessed as.
 group=<groupname>  Specifies the group that the Path is accessed as.
 compress=<Y/n>     Should the server use compression (TransferEncoding: gzip) when sending documents from this path?
+```
 
+
+
+VPATHS: Mimeicons
+-----------------
+
+Alaya supports mime icons in file listings via a special VPATH. e.g.:
+
+```
+Path=MimeIcons,/mimeicons,/home/app-themes/icons/Free-file-icons-master/32px/$(FileExtn).png,/home/app-themes/icons/mediatype-icons/gnome-mime-$(mimeclass)-$(mimesub).png,/home/app-themes/icons/nuvola/32x32/mimetypes/unknown.png
+```
+
+This creates a URL which alaya internally uses to find icons for filetypes. A comma-separated list of file paths is searched until a match is found. Placeholders in the format '$(variable name)' are substituted to generate a file path. Available variables are:
+
+```
+$(FileExtn)		gets replaced with the file extension of the file we are seeking a mime icon for. 
+$(MimeType)		gets replaced with the full mime type (e.g. 'image/jpeg'). 
+$(MimeClass)	gets replaced with the mime class of the file we are seeking a mime icon for (so, 'audio', 'video', 'image' or 'application'). 
+$(MimeSub)		gets replaced with the mime subtype of the file we are seeking a mime icon for (so, 'jpeg', 'x-shockwave-flash', 'pdf', 'text', 'html' etc, etc). 
+$(FileType)		currently only used for directories/folders, where it is set to 'folder'
+```
+
+In order to handle unknown file types the last entry should have no variable placeholders, so that it always matches, and is a path to the 'default' icon.
+
+Directories/folders have the MimeType variable set to 'inode/directory', and the FileType variable set to 'folder'
+
+In order for mime icons to work you must also see the 'MimeIcons' property in the 'DirListType' config item.
+
+'Mimeicon' VPaths can also take some of the arguments supported by 'Path' VPaths (see above). The 'cache' argument is useful for specifying the number of Supported arguments are
+
+```
+user=<username>    Specifies the user that the Path is accessed as.
+group=<groupname>  Specifies the group that the Path is accessed as.
+```
 
 
 WEBSOCKETS
+==========
 
 Alaya supports websockets. These are persistent connections that are more like a standard bidirectional TCP link. Websockets are booked against a URL and a 'protocol'. The URL doesn't need to exist as any kind of document, and the protocol is just a string selected to represent a particular websocket service. Websockets are configured in the config file as:
 
+```
  WebsocketHandler:<path>:<protocol>=<script path>
+```
 
 So, if you had a perl script 'chat.pl' that implements a chat protocol that exists under the /user URL you might write:
 
+```
  WebsocketHandler:/user:chat=/usr/local/bin/chat.pl
+```
 
 The <path> option can be an fnmatch wildcard pattern, so you can make your chat program available under any URL via:
 
+```
  WebsocketHandler:*:chat=/usr/local/bin/chat.pl
+```
 
 The scripts that provide the services over websockets simply write to stdout and read from stdin. Thus they behave similarly to 'inetd' programs, or indeed to command-line programs.
 
@@ -530,53 +696,68 @@ For websocket programs Alaya provides the standard CGI environment variables lik
 
 
 SETTINGS FOR FILE TYPES
+=======================
 
 Some settings can be changed on a per file basis using the 'FileType' command:
 
+```
 FileType=*.jpg,cache=3600
+```
 
 Currently supported settings are:
 
+```
 cache=<seconds>    The number of seconds that items under this path can be cached for.
 compress=<Y/n>     Should the server use compression (TransferEncoding: gzip) when sending documents from this path?
-
+```
 
 
 
 
 PROXY SUPPORT
+=============
 
 Alaya has very rudimentary proxy support. The CONNECT method is supported, as are GET requests that specify a full URL rather than a file path. I find this is enough for me to use alaya to get to internet radio stations from behind corporate firewalls.
 
 These proxy functions are not enabled by default, you'll have to enable them by using the '-m' command line arg or 'HttpMethods' config file entry. For example:
 
+```
 	alaya -m CONNECT,RGET
+```
 
 This only allows Alaya to work as a proxy, not as a webdav server. 'RGET' stands for 'REMOTE GET', it's the GET method with a full URL. Remote POST is not yet supported, but probably will be in a future release.
 
 You could also use
 
+```
 	alaya -m PROXY
+```
 
 as 'PROXY' expands to CONNECT,RGET
 
 If you want to allow remote GETS but not CONNECT then 
 
+```
 	alaya -m RGET
+```
 
 If you want to allow proxy server support and webdav, then
 
+```
 	alaya -m DAV,PROXY
+```
 
 'DAV' expands to all the supported HTTP methods except the proxy ones, so these two together is everything active.
 
 All this also works with the 'HttpMethods' config-file entry, so
 
+```
 HttpMethods=DAV,PROXY
-
+```
 
 
 COMPRESSION
+===========
 
 Alaya supports gzip compression of both internally generated pages (like directory listings) and downloaded documents. This can be turned on and off with the command-line argument -compress or with the config file value 'Compression='. However, some clients (notably links) get confused when downloading a gzipped file and save it on disk as a gzipped file, but without any .gz suffix to indicate this. This can be very confusing for the user. Hence alaya supports 'partial' comprssion ('-compress partial' and 'Compression=partial') which only compresses internally generated pages like directory listings, which are normally displayed by the browser, not downloaded. Partial mode should speed up transfer of large directory listings, while downloaded documents will be transferred uncompressed.
 
@@ -585,6 +766,7 @@ Compression obviously has a 'cost' on the server-side, so if serving many users 
 
 
 CACHING
+=======
 
 By default from version 1.3.2 alaya supports browser caching, and will tell browsers to cache files for 10 seconds. This is particularly useful for mime-type icons, as the same icon may appear many times in a directory listing.
 
@@ -592,16 +774,20 @@ The amount of time that an item can be cached for can be changed using the '-cac
 
 Cache time can be set on a file-extension basis with the file-type command, like so:
 
+```
 FileType=*.jpg,cache=3600
+```
 
 Similarly cache time can be set for file VPaths like so:
 
+```
 Path=files,/Docs/,/usr/local/share/documents,cache=3600
-
+```
 
 
 
 EVENTS
+======
 
 Alaya supports an event structure that allows taking certain actions or running scripts in response to the HTTP method, the file Path asked for, client IPs, client headers, usernames, 'bad' urls, or particular response codes.
 
@@ -611,10 +797,13 @@ Some example config-file entries for events:
 
 The 'Event' entry in the config file has the format
 
+```
 Event=<type>:<matches>:<action>
+```
 
 where <type> is one of:
 
+```
 	Method      Match the HTTP method
 	Path        Match the path of the file asked for
 	User        Match the username supplied in authentication
@@ -622,23 +811,29 @@ where <type> is one of:
 	Header      Match a particular header supplied by the client
 	Response    Match a response code
 	BadURL			Match any URL that breaks alaya's inbuilt 'valid url' rules
+```
 
 and <matches> is a comma-separated list of things that the rule matches. Shell/fnmatch wildcards are allowed in these lists.
 
 <actions> is a comma-separated list of action types. These can be:
 
+```
   ignore:    ignore this event (used to rule out some things that will match a later event)
 	syslog:    send a message to syslog about this event
 	deny:      refuse access to the requested url
+```
 
 any other entry is treated as a script to run. The script will be passed 3 arguments, client IP, URL and a 'comment' that describes the data that the match happened against. However, other arguments can be inserted before these by specifiying a script with initial arguments. So, for instance:
 
+```
 	Event=Header:*() {*:deny,/usr/local/sbin/BlockHTTPHacker.sh ShellShock
+```
 
 Will run the script '/usr/local/sbin/BlockHTTPHacker.sh' with argument 1 being 'ShellShock', argument 2 being the client IP, argument 3 being the URL asked for, and argument 4 being details of what was matched (in these case the particular client header that had the shellshock code).
 
 examples:
 
+```
 Event=Path:*/setup.php,*/xmlrpc.php,/vtigercrm/,/cgi-bin/php*,/sql*,/manager/html,/mysql*,/HNAP1/:/usr/local/sbin/BlockHTTPHacker.sh
 Event=Method:PUT:/usr/local/sbin/AlayaFilePut.sh
 Event=User:fred:syslog,/usr/local/sbin/Flintstone.sh
@@ -647,5 +842,5 @@ Event=BadURL::deny,syslog
 Event=Header:*() {*:deny,/usr/local/sbin/BlockHTTPHacker.sh ShellShock
 Event=Path:/favicon.ico:ignore
 Event=ResponseCode:404:/usr/local/sbin/HTTPError.sh "nonexistent path"
-
+```
 
