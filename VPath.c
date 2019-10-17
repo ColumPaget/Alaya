@@ -13,16 +13,18 @@ of chroot. Finally some values, like cache time, can be set on a VPath.
 
 
 #include "VPath.h"
+#include "ChrootHelper.h"
+#include "UserAdminScreen.h"
 #include "server.h"
 
 void VPathParse(ListNode *List, const char *PathType, const char *Data)
 {
-const char *PathTypes[]={"Files","Cgi","Websocket","Stream","Logout","Proxy","MimeIcons","FileType",NULL};
+const char *PathTypes[]={"", "Local", "Files","Cgi","Websocket","Stream","Logout","Proxy","Redirect","Calendar","MimeIcons","FileType","UserAdmin",NULL};
 char *URL=NULL, *Path=NULL, *Tempstr=NULL;
 char *User=NULL, *Group=NULL, *Password=NULL;
 const char *ptr;
 TPathItem *PI=NULL;
-int Type, Flags=0;
+int Type, Flags=PATHITEM_READONLY;
 unsigned int CacheTime=0;
 
 Type=MatchTokenFromList(PathType,PathTypes,0);
@@ -45,17 +47,18 @@ if (Type > -1)
   else if (strncasecmp(Tempstr,"passwd=",7)==0) Password=CopyStr(Password, Tempstr+7);
   else if (strncasecmp(Tempstr,"password=",9)==0) Password=CopyStr(Password, Tempstr+9);
   else if (strncasecmp(Tempstr,"group=",6)==0) Group=CopyStr(Group, Tempstr+6);
-  else if ( (strncasecmp(Tempstr,"exec=",5)==0) && YesNoTrueFalse(Tempstr+5)) Flags |= PATHITEM_EXEC;
-  else if ( (strncasecmp(Tempstr,"upload=",7)==0) && YesNoTrueFalse(Tempstr+7)) Flags |= PATHITEM_UPLOAD;
-  else if ( (strncasecmp(Tempstr,"uploads=",8)==0) && YesNoTrueFalse(Tempstr+8)) Flags |= PATHITEM_UPLOAD;
+  else if (strcasecmp(Tempstr,"auth=open")==0) Flags |= PATHITEM_NOAUTH;
+  else if ( (strncasecmp(Tempstr,"exec=",5)==0) && strtobool(Tempstr+5)) Flags |= PATHITEM_EXEC;
+  else if ( (strncasecmp(Tempstr,"upload=",7)==0) && strtobool(Tempstr+7))  Flags &= ~PATHITEM_READONLY;
+  else if ( (strncasecmp(Tempstr,"uploads=",8)==0) && strtobool(Tempstr+8)) Flags &= ~PATHITEM_READONLY;
   else if (strncasecmp(Tempstr,"compress=",9)==0)
   {
-    if (YesNoTrueFalse(Tempstr+9)) Flags |= PATHITEM_COMPRESS;
+    if (strtobool(Tempstr+9)) Flags |= PATHITEM_COMPRESS;
     else Flags |= PATHITEM_NO_COMPRESS;
   }
   else
   {
-    if (StrLen(Path)) Path=MCatStr(Path, ":", Tempstr,NULL);
+    if (StrValid(Path)) Path=MCatStr(Path, ":", Tempstr,NULL);
     else Path=CopyStr(Path, Tempstr);
   }
   ptr=GetToken(ptr,",",&Tempstr,0);
@@ -82,12 +85,12 @@ if (Type > -1)
 else LogToFile(Settings.LogPath,"ERROR: Unknown Path type '%s' in Config File",Tempstr);
 
 
-DestroyString(Tempstr);
-DestroyString(Password);
-DestroyString(Group);
-DestroyString(User);
-DestroyString(Path);
-DestroyString(URL);
+Destroy(Tempstr);
+Destroy(Password);
+Destroy(Group);
+Destroy(User);
+Destroy(Path);
+Destroy(URL);
 }
 
 
@@ -95,7 +98,7 @@ DestroyString(URL);
 TPathItem *VPathFind(int Type, char *Match)
 {
 TPathItem *VPath=NULL, *Default=NULL;
-ListNode *Curr;
+ListNode *Curr, *Best=NULL;
 
 Curr=ListGetNext(Settings.VPaths);
 while (Curr)
@@ -109,21 +112,26 @@ while (Curr)
 	default:
 	if (StrLen(Curr->Tag) < 2) Default=VPath;
 	if (
-			StrLen(Match) && (strncmp(Match, Curr->Tag, StrLen(Curr->Tag))==0)
-		) return(VPath);
+			StrValid(Match) && (strncmp(Match, Curr->Tag, StrLen(Curr->Tag))==0)
+		)
+		{
+			if ((! Best) || (StrLen(Curr->Tag) > StrLen(Best->Tag))) Best=Curr;
+		}
 	break;
 	}
 	Curr=ListGetNext(Curr);
 }
 
+if (Best) return((TPathItem *) Best->Item);
 return(Default);
 }
 
 
-char *HTTPServerSubstituteArgs(char *RetStr, const char *Template, HTTPSession *Session)
+static char *VPathSubstituteArgs(char *RetStr, const char *Template, HTTPSession *Session)
 {
 ListNode *Vars;
-char *Name=NULL, *Value=NULL, *ptr;
+char *Name=NULL, *Value=NULL;
+const char *ptr;
 
 
 Vars=ListCreate();
@@ -136,23 +144,24 @@ ptr=GetNameValuePair(ptr,"&","=",&Name,&Value);
 
 RetStr=SubstituteVarsInString(RetStr, Template, Vars, 0);
 
-ListDestroy(Vars, DestroyString);
-DestroyString(Name);
-DestroyString(Value);
+ListDestroy(Vars, Destroy);
+Destroy(Name);
+Destroy(Value);
 
 
 return(RetStr);
 }
 
 
-void VPathHandleFilePath(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendData)
+static int VPathHandleFilePath(STREAM *S, HTTPSession *Session, TPathItem *VPath, int SendData)
 {
-char *Tempstr=NULL, *ptr;
+char *Tempstr=NULL;
 char *LocalPath=NULL, *ExternalPath=NULL, *DocName=NULL;
+const char *ptr;
+int result=FALSE, Flags=0;
 
 //Document name here is whatever part of the Path is *beyond* the VPath component
-DocName=HTTPServerSubstituteArgs(DocName, Session->Path+StrLen(VPath->URL), Session);
-
+DocName=VPathSubstituteArgs(DocName, Session->Path + StrLen(VPath->URL), Session);
 
 ptr=GetToken(VPath->Path,":",&Tempstr,0);
 while (ptr)
@@ -160,21 +169,27 @@ while (ptr)
 	if (*Tempstr=='/') ExternalPath=MCatStr(ExternalPath,Tempstr,":",NULL);
 	else 
 	{
-		if (StrLen(Tempstr)==0) LocalPath=CatStr(LocalPath,"/:");
+		if (! StrValid(Tempstr)) LocalPath=CatStr(LocalPath,"/:");
 		else LocalPath=MCatStr(LocalPath,Tempstr,":",NULL);
 	}
 	ptr=GetToken(ptr,":",&Tempstr,0);
 }
 
 Tempstr=CopyStr(Tempstr,"");
-if (StrLen(LocalPath)) Tempstr=FindFileInPath(Tempstr,DocName,LocalPath);
+if (StrValid(LocalPath)) Tempstr=FindFileInPath(Tempstr,DocName,LocalPath);
 
-if (StrLen(Tempstr)) HTTPServerSendDocument(S, Session, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
-else if (StrLen(ExternalPath))
+if (StrValid(Tempstr)) 
+{
+	Flags = HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE;
+  if (VPath->Flags & PATHITEM_READONLY) Flags |= DIR_READONLY;
+	HTTPServerSendDocument(S, Session, Tempstr, Flags);
+	result=TRUE;
+}
+else if (StrValid(ExternalPath))
 {
 	if (strcmp(Session->Method,"POST")==0)
 	{
-		if (VPath->Flags & PATHITEM_UPLOAD)
+		if (! (VPath->Flags & PATHITEM_READONLY))
 		{
 		LogToFile(Settings.LogPath,"%s@%s (%s) uploading to %s in VPATH %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
 		ChrootProcessRequest(S, Session, "POST", DocName, ExternalPath);
@@ -187,22 +202,25 @@ else if (StrLen(ExternalPath))
 	}
 	else
 	{
-	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
-	ChrootProcessRequest(S, Session, "GETF", DocName, ExternalPath);
+		LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
+		ChrootProcessRequest(S, Session, "GETF", DocName, ExternalPath);
 	}
+	result=TRUE;
 }
 //This will send '404'
-else HTTPServerSendDocument(S, Session, DocName, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
+//else HTTPServerSendDocument(S, Session, DocName, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 
-DestroyString(DocName);
-DestroyString(Tempstr);
-DestroyString(LocalPath);
-DestroyString(ExternalPath);
+Destroy(DocName);
+Destroy(Tempstr);
+Destroy(LocalPath);
+Destroy(ExternalPath);
+
+return(result);
 }
 
 
 
-void VPathMimeIcons(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendData)
+static void VPathMimeIcons(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendData)
 {
 	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,"",VPath->Path);
 	if (VPath->CacheTime) Session->CacheTime=VPath->CacheTime;
@@ -217,42 +235,28 @@ void VPathMimeIcons(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendDa
 //are allowed access from outside chroot
 int VPathProcess(STREAM *S, HTTPSession *Session, int Flags)
 {
-ListNode *Curr=NULL, *Default=NULL;
 TPathItem *PI=NULL;
 char *Path=NULL, *Tempstr=NULL, *ptr;
 HTTPSession *VPathSession=NULL;
 int result=FALSE;
 
-	
-	Curr=ListGetNext(Settings.VPaths);
-	while (Curr)
-	{
-		if (StrLen(Curr->Tag) < 2) Default=Curr;
-		else if (strncmp(Session->Path,Curr->Tag,StrLen(Curr->Tag))==0) break;
-		Curr=ListGetNext(Curr);
-	}
+	PI=VPathFind(PATHTYPE_NONE, Session->Path);
+	if (! PI) return(FALSE);
 
-	//If Curr is set then we found a VPath
-	if (! Curr) Curr=Default;
+	VPathSession=HTTPSessionClone(Session);
+	result=TRUE;
 
-	if (! Curr) return(FALSE);
-
-	if (Curr)
-	{
-		VPathSession=HTTPSessionClone(Session);
-		PI=(TPathItem *) Curr->Item;
-		result=TRUE;
 
 		//Some things are configureable on a VPath basis. Set those up.
 		if (PI->CacheTime) VPathSession->CacheTime=PI->CacheTime;
-		if (StrLen(PI->User)) VPathSession->RealUser=CopyStr(VPathSession->RealUser, PI->User);
-		if (StrLen(PI->Group)) VPathSession->Group=CopyStr(VPathSession->Group, PI->Group);
+		if (StrValid(PI->User)) VPathSession->RealUser=CopyStr(VPathSession->RealUser, PI->User);
+		if (StrValid(PI->Group)) VPathSession->Group=CopyStr(VPathSession->Group, PI->Group);
 		VPathSession->Flags &= ~SESSION_UPLOAD;
-		if (PI->Flags & PATHITEM_UPLOAD) VPathSession->Flags |= SESSION_UPLOAD;
+		if (! (PI->Flags & PATHITEM_READONLY)) VPathSession->Flags |= SESSION_UPLOAD;
 	
 
 //		if (Flags & HEADERS_POST) HTTPServerHandlePost(S,Session,PI->Type);
-		LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s] %d",PI->Type,Curr->Tag,PI->Path,VPathSession->Flags & SESSION_UPLOAD);
+		LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s] %d",PI->Type,Session->Path,PI->Path,VPathSession->Flags & SESSION_UPLOAD);
 		switch (PI->Type)
 		{
 			case PATHTYPE_CGI:
@@ -263,7 +267,7 @@ int result=FALSE;
 			break;
 
 			case PATHTYPE_EXTFILE:
-			VPathHandleFilePath(S,VPathSession,PI,Flags);
+			result=VPathHandleFilePath(S,VPathSession,PI,Flags);
 			break;
 
 			case PATHTYPE_STREAM:
@@ -279,15 +283,19 @@ int result=FALSE;
 			HTTPServerSendResponse(S, VPathSession, "302", "", Path);
 			break;
 
+			case PATHTYPE_REDIRECT:
+			HTTPServerSendResponse(S, VPathSession, "302", "", PI->Path);
+			break;
+
 			case PATHTYPE_URL:
 			ChrootProcessRequest(S, VPathSession, "PROXY", PI->Path, "");
 			break;
 
 			case PATHTYPE_PROXY:
-			if (StrLen(VPathSession->UserName)) 
+			if (StrValid(VPathSession->UserName)) 
 			{
 				//We don't normally copy Password into VPATH, so we need to get it from 'Session'
-				if (StrLen(PI->Password)) VPathSession->Password=CopyStr(VPathSession->Password, Session->Password);
+				if (StrValid(PI->Password)) VPathSession->Password=CopyStr(VPathSession->Password, Session->Password);
 				else VPathSession->Password=CopyStr(VPathSession->Password, Session->Password);
 				Path=MCopyStr(Path,VPathSession->UserName,":",VPathSession->Password,NULL);
 				Tempstr=EncodeBytes(Tempstr, Path, StrLen(Path), ENCODE_BASE64);
@@ -301,6 +309,11 @@ int result=FALSE;
 			VPathMimeIcons(S,VPathSession, PI, Flags);
 			break;
 
+			case PATHTYPE_USERADMIN:
+			//	if (Settings.AuthFlags & FLAG_AUTH_ADMIN) 
+			UserAdminScreenDisplay(S, VPathSession);
+			break;
+
 			default:
 				//We didn't find a VPATH to handle this, so return false
 			 result=FALSE;
@@ -308,11 +321,10 @@ int result=FALSE;
 		}
 
 //		HTTPSessionDestroy(VPathSession);
-	}
 
 
-DestroyString(Tempstr);
-DestroyString(Path);
+Destroy(Tempstr);
+Destroy(Path);
 
 return(result);
 }

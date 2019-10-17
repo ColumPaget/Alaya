@@ -23,7 +23,7 @@ if (ParentProcessPipe)
 else LogToFile(Settings.LogPath,Msg);
 
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
@@ -44,13 +44,14 @@ for (ptr=Data; *ptr !='\0'; ptr++)
 //Sanitize is more than 'Clean', it clears out any HTML string
 char *SanitizeStr(char *Buffer, char *Data)
 {
-char *TagNamespace=NULL, *TagType=NULL, *TagData=NULL, *ptr;
+char *TagNamespace=NULL, *TagType=NULL, *TagData=NULL;
 char *RetStr=NULL, *Tempstr=NULL;
+const char *ptr;
 
 ptr=XMLGetTag(Data, &TagNamespace, &TagType, &TagData);
 while (ptr)
 {
-	if (StrLen(TagType)==0) Tempstr=CatStr(Tempstr,TagData);
+	if (! StrValid(TagType)) Tempstr=CatStr(Tempstr,TagData);
 	else
 	{
 		if (
@@ -58,9 +59,9 @@ while (ptr)
 				((*TagType=='/') && ListFindNamedItem(Settings.SanitizeArgumentsAllowedTags,TagType+1))
 			)
 		{
-			if (StrLen(TagNamespace)) Tempstr=MCatStr(Tempstr,"<",TagNamespace,":",TagType,NULL);
+			if (StrValid(TagNamespace)) Tempstr=MCatStr(Tempstr,"<",TagNamespace,":",TagType,NULL);
 			else Tempstr=MCatStr(Tempstr,"<",TagType,NULL);
-			if (StrLen(TagData)) Tempstr=MCatStr(Tempstr," ",TagData,NULL);
+			if (StrValid(TagData)) Tempstr=MCatStr(Tempstr," ",TagData,NULL);
 			Tempstr=CatStr(Tempstr,">");
 		}
 	}
@@ -71,10 +72,10 @@ ptr=XMLGetTag(ptr, &TagNamespace, &TagType, &TagData);
 
 RetStr=HTTPQuote(Buffer,Tempstr);
 
-DestroyString(TagNamespace);
-DestroyString(Tempstr);
-DestroyString(TagType);
-DestroyString(TagData);
+Destroy(TagNamespace);
+Destroy(Tempstr);
+Destroy(TagType);
+Destroy(TagData);
 
 
 return(RetStr);
@@ -83,7 +84,8 @@ return(RetStr);
 
 char *SanitizeQueryString(char *Buffer, char *Data)
 {
-char *Name=NULL, *Value=NULL, *Token=NULL, *ptr;
+char *Name=NULL, *Value=NULL, *Token=NULL;
+const char *ptr;
 char *RetStr=NULL;
 
 RetStr=CopyStr(Buffer,"");
@@ -101,9 +103,9 @@ while (ptr)
 
 
 
-DestroyString(Name);
-DestroyString(Value);
-DestroyString(Token);
+Destroy(Name);
+Destroy(Value);
+Destroy(Token);
 
 return(RetStr);
 }
@@ -132,15 +134,16 @@ for (i=0; ForbiddenStrings[i] !=NULL; i++)
 if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"SET ENV: %s=%s",Name,Tempstr);
 setenv(Name, Tempstr, TRUE);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
 
-HTTPSession *ParseSessionInfo(char *Data)
+HTTPSession *ParseSessionInfo(const char *Data)
 {
 HTTPSession *Response=NULL;
-char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
+char *Name=NULL, *Value=NULL, *Tempstr=NULL;
+const char *ptr;
 
 	Response=HTTPSessionCreate();
 	Response->ContentType=CopyStr(Response->ContentType,"");
@@ -157,27 +160,29 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 	ptr=GetNameValuePair(Data," ","=",&Name,&Tempstr);
 	while (ptr)
 	{
-		Value=DeQuoteStr(Value,Tempstr);
+		Value=UnQuoteStr(Value,Tempstr);
 
 
 		if (strcmp(Name,"User")==0) Response->UserName=CopyStr(Response->UserName,Value);
+		else if (strcmp(Name,"Password")==0) Response->Password=CopyStr(Response->Password,Value);
 		else if (strcmp(Name,"RealUser")==0) Response->RealUser=CopyStr(Response->RealUser,Value);
+		else if (strcmp(Name,"HomeDir")==0) Response->HomeDir=CopyStr(Response->HomeDir,Value);
 		else if (strcmp(Name,"Group")==0) Response->Group=CopyStr(Response->Group,Value);
 		else if (strcmp(Name,"Host")==0) Response->Host=CopyStr(Response->Host,Value);
 		else if (strcmp(Name,"UserAgent")==0) Response->UserAgent=CopyStr(Response->UserAgent,Value);
 		else if (strcmp(Name,"Method")==0) Response->Method=CopyStr(Response->Method,Value);
 		else if (strcmp(Name,"ContentType")==0) HTTPServerParsePostContentType(Response, Value);
-		else if (strcmp(Name,"SearchPath")==0) Response->SearchPath=DeQuoteStr(Response->SearchPath,Value);
-		else if (strcmp(Name,"Path")==0) Response->Path=DeQuoteStr(Response->Path,Value);
-		else if (strcmp(Name,"URL")==0) Response->URL=DeQuoteStr(Response->URL,Value);
+		else if (strcmp(Name,"SearchPath")==0) Response->SearchPath=UnQuoteStr(Response->SearchPath,Value);
+		else if (strcmp(Name,"Path")==0) Response->Path=UnQuoteStr(Response->Path,Value);
+		else if (strcmp(Name,"URL")==0) Response->URL=UnQuoteStr(Response->URL,Value);
 		else if (strcmp(Name,"Arguments")==0) Response->Arguments=SanitizeQueryString(Response->Arguments,Value);
 		else if (strcmp(Name,"ServerName")==0) Response->ServerName=CopyStr(Response->ServerName,Value);
 		else if (strcmp(Name,"ServerPort")==0) Response->ServerPort=atoi(Value);
 		else if (strcmp(Name,"ClientIP")==0) Response->ClientIP=CopyStr(Response->ClientIP,Value);
 		else if (strcmp(Name,"ClientMAC")==0) Response->ClientMAC=CopyStr(Response->ClientMAC,Value);
 		else if (strcmp(Name,"ContentLength")==0) Response->ContentSize=atoi(Value);
-		else if (strcmp(Name,"StartDir")==0) Response->StartDir=DeQuoteStr(Response->StartDir,Value);
-		else if (strcmp(Name,"ClientReferrer")==0) Response->ClientReferrer=DeQuoteStr(Response->ClientReferrer,Value);
+		else if (strcmp(Name,"StartDir")==0) Response->StartDir=UnQuoteStr(Response->StartDir,Value);
+		else if (strcmp(Name,"ClientReferrer")==0) Response->ClientReferrer=UnQuoteStr(Response->ClientReferrer,Value);
 		else if (strcmp(Name,"RemoteAuthenticate")==0) Response->RemoteAuthenticate=CopyStr(Response->RemoteAuthenticate,Value);
 		else if (strcmp(Name,"Cipher")==0) Response->Cipher=CopyStr(Response->Cipher,Value);
 		else if (strcmp(Name,"Cookies")==0) Response->Cookies=CopyStr(Response->Cookies,Value);
@@ -185,15 +190,17 @@ char *Name=NULL, *Value=NULL, *Tempstr=NULL, *ptr;
 		else if (strcmp(Name,"Upload")==0) Response->Flags |= SESSION_UPLOAD;
 		else if (strcmp(Name,"AuthCookie")==0) Response->AuthFlags |= FLAG_AUTH_HASCOOKIE;
 		else if (strcmp(Name,"Cache")==0) Response->CacheTime=atoi(Value);
+		else if (strcmp(Name,"Admin")==0) Response->UserSettings=MCatStr(Response->UserSettings, Name, "='",Value,"' ",NULL);
+		else if (strcmp(Name,"HttpMethods")==0) Response->UserSettings=MCatStr(Response->UserSettings, Name, "='",Value,"' ",NULL);
 
 		ptr=GetNameValuePair(ptr," ","=",&Name,&Tempstr);
 	}
 
 
 
-DestroyString(Name);
-DestroyString(Value);
-DestroyString(Tempstr);
+Destroy(Name);
+Destroy(Value);
+Destroy(Tempstr);
 
 return(Response);
 }
@@ -215,7 +222,7 @@ char *Tempstr=NULL, *ptr;
 	SetEnvironmentVariable("CONTENT_LENGTH",Tempstr);
 
 	Tempstr=CopyStr(Tempstr, Session->ContentType);
-	if (StrLen(Session->ContentBoundary)) Tempstr=MCatStr(Tempstr, "; boundary=", Session->ContentBoundary, NULL);
+	if (StrValid(Session->ContentBoundary)) Tempstr=MCatStr(Tempstr, "; boundary=", Session->ContentBoundary, NULL);
 	SetEnvironmentVariable("CONTENT_TYPE",Tempstr);
 
 	ptr=strrchr(Session->Path,'/');
@@ -233,25 +240,26 @@ char *Tempstr=NULL, *ptr;
 	SetEnvironmentVariable("SERVER_PROTOCOL","HTTP/1.1");
 	SetEnvironmentVariable("REDIRECT_STATUS","200");
 	unsetenv("TZ");
-	if (StrLen(Session->Cipher)) SetEnvironmentVariable("SSL",Session->Cipher);
+	if (StrValid(Session->Cipher)) SetEnvironmentVariable("SSL",Session->Cipher);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
 
 
-int CheckScriptIntegrity(char *ScriptPath)
+int CheckScriptIntegrity(const char *ScriptPath)
 {
 STREAM *S;
-char *Tempstr=NULL, *Token=NULL, *Hash=NULL, *FileHash=NULL, *ptr;
+char *Tempstr=NULL, *Token=NULL, *Hash=NULL, *FileHash=NULL;
+const char  *ptr;
 int result, len;
 
 if (! ScriptPath) return(FALSE);
 if (! (Settings.Flags & FLAG_CHECK_SCRIPTS)) return(TRUE);
 
 
-S=STREAMOpenFile(Settings.ScriptHashFile,SF_RDONLY);
+S=STREAMFileOpen(Settings.ScriptHashFile,SF_RDONLY);
 if (S)
 {
 	Tempstr=STREAMReadLine(Tempstr,S);
@@ -292,24 +300,24 @@ STREAMClose(S);
 }
 
 
-if (StrLen(FileHash) && StrLen(Hash) && (strcmp(FileHash,Hash)==0) ) result=TRUE;
+if (StrValid(FileHash) && StrValid(Hash) && (strcmp(FileHash,Hash)==0) ) result=TRUE;
 else 
 {
 	LogToFile(Settings.LogPath,"ERROR: Not running script '%s'. Script failed integrity check.",ScriptPath);
 	result=FALSE;
 }
 
-DestroyString(FileHash);
-DestroyString(Tempstr);
-DestroyString(Token);
-DestroyString(Hash);
+Destroy(FileHash);
+Destroy(Tempstr);
+Destroy(Token);
+Destroy(Hash);
 
 return(result);
 }
 
 
 
-pid_t HandleWebsocketExecRequest(STREAM *ClientCon, char *Data)
+pid_t HandleWebsocketExecRequest(STREAM *ClientCon, const char *Data)
 {
 char *Tempstr=NULL, *Name=NULL, *Value=NULL;
 char *ScriptPath=NULL;
@@ -376,7 +384,7 @@ HTTPSession *Response;
 				//Only do this late! Otherwise logging won't work.
 				for (i=3; i < 1000; i++) close(i);
 
-				if (StrLen(Tempstr)) execl(Tempstr, Tempstr, ScriptPath,NULL);
+				if (StrValid(Tempstr)) execl(Tempstr, Tempstr, ScriptPath,NULL);
 				else execl(ScriptPath,ScriptPath,NULL);
 
 				//Logging won't work after we've closed all the file descriptors!
@@ -393,10 +401,10 @@ HTTPSession *Response;
 
 
 HTTPSessionDestroy(Response);
-DestroyString(ScriptPath);
-DestroyString(Tempstr);
-DestroyString(Name);
-DestroyString(Value);
+Destroy(ScriptPath);
+Destroy(Tempstr);
+Destroy(Name);
+Destroy(Value);
 
 
 //Always return STREAM_CLOSED, so that pipe gets closed regardless of exit status of 
@@ -406,7 +414,7 @@ return(STREAM_CLOSED);
 
 
 
-pid_t HandleCGIExecRequest(STREAM *ClientCon, char *Data)
+pid_t HandleCGIExecRequest(STREAM *ClientCon, const char *Data)
 {
 char *Tempstr=NULL, *Name=NULL, *Value=NULL;
 char *ScriptPath=NULL;
@@ -460,10 +468,10 @@ HTTPSession *Response;
 
 
 HTTPSessionDestroy(Response);
-DestroyString(ScriptPath);
-DestroyString(Tempstr);
-DestroyString(Name);
-DestroyString(Value);
+Destroy(ScriptPath);
+Destroy(Tempstr);
+Destroy(Name);
+Destroy(Value);
 
 
 //Always return STREAM_CLOSED, so that pipe gets closed regardless of exit status of 
@@ -473,7 +481,7 @@ return(STREAM_CLOSED);
 
 
 
-pid_t HandleGetFileRequest(STREAM *ClientCon, char *Data)
+pid_t HandleGetFileRequest(STREAM *ClientCon, const char *Data)
 {
 HTTPSession *Response;
 char *Tempstr=NULL;
@@ -507,13 +515,13 @@ if (pid==0)
 	_exit(0);
 }
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 
 return(pid);
 }
 
 
-pid_t HandlePostFileRequest(STREAM *ClientCon, char *Data)
+pid_t HandlePostFileRequest(STREAM *ClientCon, const char *Data)
 {
 HTTPSession *Response;
 STREAM *S;
@@ -552,7 +560,7 @@ if (pid==0)
 }
 else ClientCon->State |= SS_EMBARGOED;
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 
 return(pid);
 }
@@ -560,10 +568,11 @@ return(pid);
 
 
 
-pid_t HandleIconRequest(STREAM *ClientCon, char *Data)
+pid_t HandleIconRequest(STREAM *ClientCon, const char *Data)
 {
 HTTPSession *Response;
-char *Name=NULL, *Value=NULL, *ptr, *tptr;
+char *Name=NULL, *Value=NULL;
+const char *ptr, *tptr;
 char *Tempstr=NULL;
 ListNode *Vars;
 pid_t pid;
@@ -617,9 +626,9 @@ while (ptr)
 	_exit(1);
 }
 
-DestroyString(Name);
-DestroyString(Value);
-DestroyString(Tempstr);
+Destroy(Name);
+Destroy(Value);
+Destroy(Tempstr);
 
 return(pid);
 }
@@ -629,7 +638,7 @@ return(pid);
 
 
 
-pid_t HandleProxyRequest(STREAM *ClientCon, char *Data)
+pid_t HandleProxyRequest(STREAM *ClientCon, const char *Data)
 {
 HTTPSession *Response;
 char *Tempstr=NULL;
@@ -654,13 +663,13 @@ if (pid==0)
 }
 else ClientCon->State |= SS_EMBARGOED;
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 
 return(pid);
 }
 
 
-pid_t HandleResolveIPRequest(STREAM *ClientCon, char *Data)
+pid_t HandleResolveIPRequest(STREAM *ClientCon, const char *Data)
 {
 char *Tempstr=NULL;
 
@@ -671,15 +680,16 @@ Tempstr=CatStr(Tempstr,"\n");
 
 STREAMWriteLine(Tempstr,ClientCon);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 
 return(0);
 }
 
 
-pid_t HandleChildRegisterRequest(STREAM *S, char *Data)
+pid_t HandleChildRegisterRequest(STREAM *S, const char *Data)
 {
-char *Tempstr=NULL, *Host=NULL, *ptr;
+char *Tempstr=NULL, *Host=NULL;
+const char *ptr;
 int Flags=0;
 time_t LastTime;
 
@@ -721,29 +731,77 @@ else
 
 STREAMFlush(S);
 
-DestroyString(Tempstr);
-DestroyString(Host);
+Destroy(Tempstr);
+Destroy(Host);
 
 return(0);
 }
 
 
+pid_t HandleListUsersRequest(STREAM *S)
+{
+STREAM *F;
+char *Tempstr=NULL;
+
+F=STREAMOpen(Settings.AuthPath, "r");
+if (F)
+{
+Tempstr=STREAMReadLine(Tempstr, F);
+while (Tempstr)
+{
+STREAMWriteLine(Tempstr, S);
+Tempstr=STREAMReadLine(Tempstr, F);
+}
+STREAMClose(F);
+}
+STREAMWriteLine(".\n", S);
+
+STREAMFlush(S);
+DestroyString(Tempstr);
+}
+
+
 pid_t RunEventScript(STREAM *S, const char *Script)
 {
-	if (Spawn(Script,Settings.DefaultUser,"",NULL) ==-1)
+	char *Tempstr=NULL;
+
+	Tempstr=MCopyStr(Tempstr, "user=",Settings.DefaultUser,NULL);
+	if (Spawn(Script,Tempstr) ==-1)
 	{
         LogToFile(Settings.LogPath, "ERROR: Failed to run event script '%s'. Error was: %s",Script, strerror(errno));
 	}
   else LogToFile(Settings.LogPath, "Script: '%s'. Error was: %s",Script, strerror(errno));
 	STREAMWriteLine("okay\n",S);
 
+	Destroy(Tempstr);
+
 return(0);
 }
 
 
+void HandleAddUserRequest(const char *Data)
+{
+HTTPSession *Response;
+
+Response=ParseSessionInfo(Data);
+AuthNativeChange(Settings.AuthPath, Response->UserName, "sha1", Response->Password, Response->HomeDir, Response->RealUser, Response->UserSettings);
+}
+
+
+void HandleDelUserRequest(const char *Data)
+{
+HTTPSession *Response;
+
+Response=ParseSessionInfo(Data);
+AuthNativeChange(Settings.AuthPath, Response->UserName, "delete", "", "", "", "");
+}
+
+
+
 pid_t HandleChildProcessRequest(STREAM *S)
 {
-char *Tempstr=NULL, *Token=NULL, *ptr;
+char *Tempstr=NULL, *Token=NULL;
+const char *ptr;
 pid_t Pid=0;
 
 Tempstr=STREAMReadLine(Tempstr,S);
@@ -762,26 +820,30 @@ else if (strcmp(Token,"LOG")==0)
 	Pid=0;
 }
 else if (strcmp(Token,"GETF")==0) Pid=HandleGetFileRequest(S,ptr);
-else if (strcmp(Token,"POST")==0) Pid=HandlePostFileRequest(S,ptr);
 else if (strcmp(Token,"GETIP")==0) Pid=HandleResolveIPRequest(S,ptr);
 else if (strcmp(Token,"REG")==0) Pid=HandleChildRegisterRequest(S,ptr);
 else if (strcmp(Token,"PROXY")==0) Pid=HandleProxyRequest(S,ptr);
 else if (strcmp(Token,"MIMEICON")==0) Pid=HandleIconRequest(S, ptr);
 else if (strcmp(Token,"EVENT")==0) Pid=RunEventScript(S, ptr);
+else if (strcmp(Token,"LISTUSERS")==0) Pid=HandleListUsersRequest(S);
+else if (strcmp(Token,"USERADD")==0) HandleAddUserRequest(ptr);
+else if (strcmp(Token,"USERDEL")==0) HandleDelUserRequest(ptr);
+else if (strcmp(Token,"POST")==0) Pid=HandlePostFileRequest(S,ptr);
+
 
 STREAMSetValue(S,"HelperType", Token); 
 
 STREAMFlush(S);
 
-DestroyString(Tempstr);
-DestroyString(Token);
+Destroy(Tempstr);
+Destroy(Token);
 
 return(Pid);
 }
 
 
 
-STREAM *ChrootSendRequest(HTTPSession *Session, const char *Type, const char *Path, const char *SearchPath)
+STREAM *ChrootSendRequest(HTTPSession *Session, const char *Type, const char *ExtraArgs)
 {
 char *Tempstr=NULL, *ContentLengthStr=NULL;
 char *Quoted=NULL;
@@ -796,21 +858,15 @@ Tempstr=MCopyStr(Tempstr,Type," Host='",Session->Host, "' ClientIP='",Session->C
 Quoted=QuoteCharsInStr(Quoted,Session->URL,"'&");
 Tempstr=MCatStr(Tempstr, " URL='",Quoted,"'",NULL);
 
-Quoted=QuoteCharsInStr(Quoted,Path,"'&");
-Tempstr=MCatStr(Tempstr, " Path='",Quoted,"'",NULL);
-
-Quoted=QuoteCharsInStr(Quoted,SearchPath,"'&");
-Tempstr=MCatStr(Tempstr, " SearchPath='",Quoted,"'",NULL);
-
 Tempstr=MCatStr(Tempstr," Method=",Session->Method," UserAgent='",Session->UserAgent,"' ContentLength='",ContentLengthStr,"'",NULL);
 
-if (StrLen(Session->ContentBoundary)) Tempstr=MCatStr(Tempstr, " ContentType='",Session->ContentType, "; boundary=",Session->ContentBoundary, "'",NULL);
+if (StrValid(Session->ContentBoundary)) Tempstr=MCatStr(Tempstr, " ContentType='",Session->ContentType, "; boundary=",Session->ContentBoundary, "'",NULL);
 else Tempstr=MCatStr(Tempstr, " ContentType='",Session->ContentType,"'", NULL);
 
 Quoted=FormatStr(Quoted,"%d",Session->ServerPort);
 Tempstr=MCatStr(Tempstr," ServerName=",Session->ServerName," ServerPort=",Quoted,NULL);
-if (StrLen(Session->Cipher)) Tempstr=MCatStr(Tempstr," Cipher='",Session->Cipher,"'",NULL);
-if (StrLen(Session->Cookies)) Tempstr=MCatStr(Tempstr," Cookies='",Session->Cookies,"'",NULL);
+if (StrValid(Session->Cipher)) Tempstr=MCatStr(Tempstr," Cipher='",Session->Cipher,"'",NULL);
+if (StrValid(Session->Cookies)) Tempstr=MCatStr(Tempstr," Cookies='",Session->Cookies,"'",NULL);
 
 Quoted=QuoteCharsInStr(Quoted,Session->StartDir,"'&");
 Tempstr=MCatStr(Tempstr," StartDir='",Quoted,"'",NULL);
@@ -826,13 +882,15 @@ if (Session->CacheTime > 0)
 	Quoted=FormatStr(Quoted," Cache=%d",Session->CacheTime);
 	Tempstr=CatStr(Tempstr,Quoted);
 }
-if (StrLen(Session->UserName)) Tempstr=MCatStr(Tempstr," User='",Session->UserName,"'",NULL);
-if (StrLen(Session->RealUser)) Tempstr=MCatStr(Tempstr," RealUser='",Session->RealUser,"'",NULL);
-if (StrLen(Session->Group)) Tempstr=MCatStr(Tempstr," Group='",Session->Group,"'",NULL);
-if (StrLen(Session->RemoteAuthenticate)) Tempstr=MCatStr(Tempstr," RemoteAuthenticate='",Session->RemoteAuthenticate,"'",NULL);
+if (StrValid(Session->UserName)) Tempstr=MCatStr(Tempstr," User='",Session->UserName,"'",NULL);
+if (StrValid(Session->RealUser)) Tempstr=MCatStr(Tempstr," RealUser='",Session->RealUser,"'",NULL);
+if (StrValid(Session->Group)) Tempstr=MCatStr(Tempstr," Group='",Session->Group,"'",NULL);
+if (StrValid(Session->RemoteAuthenticate)) Tempstr=MCatStr(Tempstr," RemoteAuthenticate='",Session->RemoteAuthenticate,"'",NULL);
 
 Quoted=QuoteCharsInStr(Quoted,Session->Arguments,"'&");
 Tempstr=MCatStr(Tempstr, " Arguments='",Quoted,"'", NULL);
+
+Tempstr=MCatStr(Tempstr, " ", ExtraArgs);
 
 Tempstr=CatStr(Tempstr,"\n");
 
@@ -840,15 +898,30 @@ if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"REQUESTI
 STREAMWriteLine(Tempstr,ParentProcessPipe);
 STREAMFlush(ParentProcessPipe);
 
-DestroyString(Tempstr);
-DestroyString(Quoted);
-DestroyString(ContentLengthStr);
+Destroy(Tempstr);
+Destroy(Quoted);
+Destroy(ContentLengthStr);
 
 return(ParentProcessPipe);
 }
 
 
+STREAM *ChrootSendPathRequest(HTTPSession *Session, const char *Type, const char *Path, const char *SearchPath)
+{
+char *Quoted=NULL, *Tempstr=NULL;
+STREAM *S;
 
+Quoted=QuoteCharsInStr(Quoted,Path,"'&");
+Tempstr=MCatStr(Tempstr, " Path='",Quoted,"'",NULL);
+
+Quoted=QuoteCharsInStr(Quoted,SearchPath,"'&");
+Tempstr=MCatStr(Tempstr, " SearchPath='",Quoted,"'",NULL);
+
+S=ChrootSendRequest(Session, Type, Tempstr);
+DestroyString(Tempstr);
+
+return(S);
+}
 
 int ChrootProcessRequest(STREAM *S, HTTPSession *Session, const char *Type, const char *Path, const char *SearchPath)
 {
@@ -859,13 +932,20 @@ int KeepAlive=FALSE, RetVal=FALSE;
 
 
 LogFileFlushAll(TRUE);
-if (! ChrootSendRequest(Session, Type, Path, SearchPath)) return(FALSE);
+if (! ChrootSendPathRequest(Session, Type, Path, SearchPath)) return(FALSE);
 
 //Wait till process outside of chroot responds to our request, 
 while (STREAMCheckForBytes(ParentProcessPipe)==0) usleep(10000);
 
 //Read 'OKAY' line
 Tempstr=STREAMReadLine(Tempstr, ParentProcessPipe);
+
+//if closed or timed out, then give up
+if (! StrValid(Tempstr))
+{
+	Destroy(Tempstr);
+	return(NULL);
+}
 
 //then send it the post data if there is any.
 if (strcmp(Session->Method,"POST") ==0) 
@@ -888,13 +968,13 @@ STREAMFlush(ParentProcessPipe);
 Headers=CopyStr(Headers,"");
 ResponseLine=STREAMReadLine(ResponseLine,ParentProcessPipe);
 StripTrailingWhitespace(ResponseLine);
-if (StrLen(ResponseLine)) RetVal=TRUE;
+if (StrValid(ResponseLine)) RetVal=TRUE;
 
 Tempstr=STREAMReadLine(Tempstr,ParentProcessPipe);
 while (Tempstr)
 {
 	StripTrailingWhitespace(Tempstr);
-	if (StrLen(Tempstr)==0) break;
+	if (! StrValid(Tempstr)) break;
 	
 	//Handle 'Status' header that changes the 1st Response line
 	if (strncasecmp(Tempstr,"Status:",7)==0) 
@@ -931,7 +1011,8 @@ if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"CGI HEAD
 
 
 //Read remaining data from CGI
-STREAMSendFile(ParentProcessPipe, S, ContentLength,SENDFILE_KERNEL|SENDFILE_LOOP);
+STREAMSetFlushType(S, FLUSH_ALWAYS, 0, 0);
+if ((! KeepAlive) || (ContentLength > 0)) STREAMSendFile(ParentProcessPipe, S, ContentLength,SENDFILE_KERNEL|SENDFILE_LOOP);
 STREAMFlush(S);
 
 
@@ -941,9 +1022,9 @@ if (KeepAlive) Session->Flags |= SESSION_KEEPALIVE | SESSION_REUSE;
 else Session->Flags &= ~(SESSION_KEEPALIVE | SESSION_REUSE);
 
 
-DestroyString(Tempstr);
-DestroyString(Headers);
-DestroyString(ResponseLine);
+Destroy(Tempstr);
+Destroy(Headers);
+Destroy(ResponseLine);
 
 return(RetVal);
 }
@@ -952,7 +1033,8 @@ return(RetVal);
 
 int HTTPServerHandleRegister(HTTPSession *Session, int Flags)
 {
-char *Tempstr=NULL, *Name=NULL, *Value=NULL, *ptr;
+char *Tempstr=NULL, *Name=NULL, *Value=NULL;
+const char *ptr;
 char *FlagChar="";
 int result=FALSE;
 
@@ -981,9 +1063,9 @@ int result=FALSE;
 	Tempstr=STREAMReadLine(Tempstr,ParentProcessPipe);
 	if (strcmp(Tempstr,"okay\n")==0) result=TRUE;
 
-DestroyString(Tempstr);
-DestroyString(Name);
-DestroyString(Value);
+Destroy(Tempstr);
+Destroy(Name);
+Destroy(Value);
 
 return(result);
 }

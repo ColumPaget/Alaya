@@ -1,11 +1,13 @@
 #ifndef ALAYA_COMMON_H
 #define ALAYA_COMMON_H
 
-#include "libUseful-2.3/libUseful.h"
+#include "libUseful/libUseful.h"
 #include "Settings.h"
 #include <glob.h>
 #include <sys/wait.h>
 #include <pwd.h>
+#include <fnmatch.h>
+
 
 
 //Flag values for Session->Flags
@@ -57,13 +59,14 @@
 #define CAPS_LEVEL_CHROOTED 3
 #define CAPS_LEVEL_SESSION  4
 
-typedef enum {PATHTYPE_EXTFILE, PATHTYPE_CGI, PATHTYPE_WEBSOCKET, PATHTYPE_STREAM, PATHTYPE_LOGOUT, PATHTYPE_PROXY, PATHTYPE_MIMEICONS, PATHTYPE_FILETYPE, PATHTYPE_URL, PATHTYPE_FILE, PATHTYPE_DIR} TPathTypes;
+typedef enum {PATHTYPE_NONE, PATHTYPE_LOCAL, PATHTYPE_EXTFILE, PATHTYPE_CGI, PATHTYPE_WEBSOCKET, PATHTYPE_STREAM, PATHTYPE_LOGOUT, PATHTYPE_PROXY, PATHTYPE_REDIRECT, PATHTYPE_CALENDAR, PATHTYPE_MIMEICONS, PATHTYPE_FILETYPE, PATHTYPE_USERADMIN, PATHTYPE_URL, PATHTYPE_FILE, PATHTYPE_DIR} TPathTypes;
 
 
 #define PATHITEM_EXEC 1
-#define PATHITEM_NO_COMPRESS 2
-#define PATHITEM_COMPRESS 4
-#define PATHITEM_UPLOAD 8
+#define PATHITEM_READONLY 2
+#define PATHITEM_NOAUTH 4
+#define PATHITEM_COMPRESS 16
+#define PATHITEM_NO_COMPRESS 32
 
 typedef struct
 {
@@ -142,6 +145,7 @@ void HTTPSessionClear(void *);
 void HTTPSessionDestroy(void *);
 HTTPSession *HTTPSessionClone(HTTPSession *Src);
 HTTPSession *HTTPSessionResponse(HTTPSession *Src);
+char *HTTPSessionGetArg(char *RetStr, HTTPSession *Session, const char *Arg);
 
 void SetTimezoneEnv();
 

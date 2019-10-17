@@ -1,4 +1,4 @@
-#include "libUseful-2.3/libUseful.h"
+#include "libUseful/libUseful.h"
 
 #ifndef ALAYA_SETTINGS_H
 #define ALAYA_SETTINGS_H
@@ -32,7 +32,7 @@
 #define FLAG_AUTH_CERT_ASK 64
 #define FLAG_AUTH_CERT_SUFFICIENT 128
 #define FLAG_AUTH_CERT_REQUIRED 256
-
+#define FLAG_AUTH_ADMIN 512
 
 typedef struct
 {
@@ -42,6 +42,7 @@ char *DefaultUser;
 char *DefaultGroup;
 gid_t DefaultGroupID;
 char *DefaultDir;
+char *AdminUser;
 int DirListFlags;
 char *AllowUsers;
 char *DenyUsers;
@@ -83,7 +84,7 @@ extern TSettings Settings;
 void InitSettings();
 void PostProcessSettings(TSettings *Settings);
 void ReadConfigFile(TSettings *Settings);
-void ParseConfigItem(char *ConfigLine);
+void ParseConfigItem(const char *ConfigLine);
 void ParseConfigItemList(const char *Settings);
 void ParseSettings(int argc, char *argv[], TSettings *Settings);
 

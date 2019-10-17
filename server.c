@@ -6,6 +6,7 @@
 #include "FileDetailsPage.h"
 #include "FileProperties.h"
 #include "ChrootHelper.h"
+#include "websocket.h"
 #include "Events.h"
 #include "ID3.h"
 #include "upload.h"
@@ -13,13 +14,18 @@
 #include "fnmatch.h"
 #include "AccessTokens.h"
 #include "VPath.h"
+#include "xssi.h"
 
-const char *HTTPMethods[]={"HEAD","GET","POST","PUT","DELETE","MKCOL","PROPFIND","PROPPATCH","MOVE","COPY","OPTIONS","CONNECT","LOCK","UNLOCK",NULL};
+const char *HTTPMethods[]={"HEAD","GET","POST","PUT","DELETE","MKCOL","PROPFIND","PROPPATCH","MOVE","COPY","OPTIONS","CONNECT","LOCK","UNLOCK","MKCALENDAR", "REPORT", NULL};
 
 const char *HeaderStrings[]={"Authorization","Proxy-Authorization","Host","Destination","Content-Type","Content-Length","Depth","Overwrite","User-Agent","Cookie","If-Modified-Since","Accept-Encoding","Icy-MetaData","Referer","Connection","Upgrade","Sec-WebSocket-Key","Sec-Websocket-Key1", "Sec-Websocket-Key2","Sec-WebSocket-Protocol","Sec-WebSocket-Version","Origin", NULL};
 
 typedef enum {HEAD_AUTH, HEAD_PROXYAUTH, HEAD_HOST, HEAD_DEST, HEAD_CONTENT_TYPE, HEAD_CONTENT_LENGTH, HEAD_DEPTH, HEAD_OVERWRITE, HEAD_AGENT, HEAD_COOKIE, HEAD_IFMOD_SINCE, HEAD_ACCEPT_ENCODING, HEAD_ICECAST,HEAD_REFERER, HEAD_CONNECTION, HEAD_UPGRADE, HEAD_WEBSOCK_KEY, HEAD_WEBSOCK_KEY1, HEAD_WEBSOCK_KEY2, HEAD_WEBSOCK_PROTOCOL, HEAD_WEBSOCK_VERSION, HEAD_ORIGIN} THeaders;
 
+
+#define DIRTYPE_NORMAL  0
+#define DIRTYPE_CALDAV  1
+#define DIRTYPE_CARDDAV 2
 
 int HTTPServerReadBody(HTTPSession *Session, char **Data)
 {
@@ -48,12 +54,12 @@ else
   }
 }
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 return(bytes_read);
 }
 
 
-int HTTPServerDecideToCompress(HTTPSession *Session, char *Path)
+int HTTPServerDecideToCompress(HTTPSession *Session, const char *Path)
 {
 //If client hasn't asked for it (Accept-Encoding) then don't
 if (! Session) return(FALSE);
@@ -66,18 +72,46 @@ if ((Settings.Flags & FLAG_PARTIAL_COMPRESS) && (! Path)) return(TRUE);
 return(FALSE);
 }
 
-
-
-
-void HTTPServerHandleAuthHeader(HTTPSession *Heads,int HeaderType, char *Type, char *Data)
+int HTTPServerActivateSSL(HTTPSession *Session,ListNode *Keys)
 {
-char *Tempstr=NULL, *Name=NULL, *Value=NULL, *ptr;
+ListNode *Curr;
+int Flags=0;
+
+Curr=ListGetNext(Keys);
+while (Curr)
+{
+STREAMSetValue(Session->S,Curr->Tag,(char *) Curr->Item);
+Curr=ListGetNext(Curr);
+}
+
+Flags |= LU_SSL_PFS;
+//if (Settings.AuthFlags & (FLAG_AUTH_CERT_REQUIRED | FLAG_AUTH_CERT_SUFFICIENT | FLAG_AUTH_CERT_ASK)) Flags |= LU_SSL_VERIFY_PEER;
+
+if (DoSSLServerNegotiation(Session->S,Flags))
+{
+	Session->Flags |= HTTP_SSL;
+	return(TRUE);
+}
+
+
+LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed with %s %s. Error was %s",Session->ClientHost,Session->ClientIP,STREAMGetValue(Session->S,"SSL-Error"));
+return(FALSE);
+}
+
+
+
+
+
+void HTTPServerHandleAuthHeader(HTTPSession *Heads, int HeaderType, const char *Type, const char *Data)
+{
+char *Tempstr=NULL, *Name=NULL, *Value=NULL;
 char *nonce=NULL, *cnonce=NULL, *request_count=NULL, *qop=NULL, *algo=NULL, *uri=NULL;
+const char *ptr;
 int len;
 
 if (strcmp(Type,"Basic")==0)
 {
-	Tempstr=DecodeBase64(Tempstr, &len, Data);
+	len=DecodeBytes(&Tempstr, Data, ENCODE_BASE64);
 	ptr=GetToken(Tempstr,":",&Heads->UserName,0);
 	Heads->Password=CopyStr(Heads->Password,ptr);
 }
@@ -85,10 +119,10 @@ else if (strcmp(Type,"Digest")==0)
 {
 	uri=CopyStr(uri,"");
 	algo=CopyStr(algo,"");
-	ptr=GetNameValuePair(Data,",","=",&Name,&Value);
+	ptr=GetNameValuePair(Data, ",", "=", &Name, &Value);
 	while (ptr)
 	{
-		if (StrLen(Name) && StrLen(Value))
+		if (StrValid(Name) && StrValid(Value))
 		{
 		StripLeadingWhitespace(Name);
 		StripLeadingWhitespace(Value);
@@ -102,31 +136,32 @@ else if (strcmp(Type,"Digest")==0)
 		if (strcmp(Name,"algorithm")==0) algo=CopyStr(algo,Value);
 		}
 		
-	ptr=GetNameValuePair(ptr,",","=",&Name,&Value);
+	ptr=GetNameValuePair(ptr, ",", "=", &Name, &Value);
 	}
 
 // server nonce (nonce), request counter (nc), client nonce (cnonce), quality of protection code (qop) and HA2 result is calculated. The result is the "response" value provided by the client.
 
-if (StrLen(qop)) Heads->AuthDetails=MCopyStr(Heads->AuthDetails,uri,":",algo,":",nonce,":",request_count,":",cnonce,":",qop, NULL);
+if (StrValid(qop)) Heads->AuthDetails=MCopyStr(Heads->AuthDetails,uri,":",algo,":",nonce,":",request_count,":",cnonce,":",qop, NULL);
 else Heads->AuthDetails=CopyStr(Heads->AuthDetails,nonce);
 
 }
 
-DestroyString(qop);
-DestroyString(uri);
-DestroyString(algo);
-DestroyString(Name);
-DestroyString(Value);
-DestroyString(nonce);
-DestroyString(cnonce);
-DestroyString(Tempstr);
-DestroyString(request_count);
+Destroy(qop);
+Destroy(uri);
+Destroy(algo);
+Destroy(Name);
+Destroy(Value);
+Destroy(nonce);
+Destroy(cnonce);
+Destroy(Tempstr);
+Destroy(request_count);
 }
 
 
-void HTTPServerParsePostContentType(HTTPSession *Session, char *Data)
+void HTTPServerParsePostContentType(HTTPSession *Session, const char *Data)
 {
-char *ptr, *Name=NULL, *Value=NULL;
+char *Name=NULL, *Value=NULL;
+const char *ptr;
 
 ptr=GetToken(Data,";",&Session->ContentType,0);
 if (ptr)
@@ -141,20 +176,20 @@ while (ptr)
 }
 }
 
-DestroyString(Name);
-DestroyString(Value);
+Destroy(Name);
+Destroy(Value);
 }
 
 
 //Will only return false if FLAG_SSL_CERT_REQUIRED is set
 int HTTPServerCheckCertificate(HTTPSession *Session, STREAM *S)
 {
-char *ptr;
+const char *ptr;
 int result=TRUE;
 
 	ptr=STREAMGetValue(S,"SSL-Certificate-Verify");
 
-	if (StrLen(ptr) && (strcmp(ptr,"no certificate") !=0)  )
+	if (StrValid(ptr) && (strcmp(ptr,"no certificate") !=0)  )
 	{
 		LogToFile(Settings.LogPath,"AUTH SSL Certificate Provided by '%s@%s'. Subject=%s Issuer=%s",Session->UserName,Session->ClientIP,STREAMGetValue(S,"SSL-Certificate-Subject"), STREAMGetValue(S,"SSL-Certificate-Issuer"));
 
@@ -181,12 +216,14 @@ return(result);
 //This function reads the first line of an HTTP Request, including the Method, URL, and cgi arguments
 void HTTPServerParseCommand(HTTPSession *Session, STREAM *S, char *Command)
 {
-char *Token=NULL, *ptr, *tmp_ptr;
+char *Token=NULL;
+const char *ptr;
+char *tmp_ptr;
 int val;
 
 GetSockDetails(S->in_fd,&Session->ServerName,&Session->ServerPort,&Session->ClientIP,&val);
 GetHostARP(Session->ClientIP, &Token, &Session->ClientMAC);
-if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrLen(Session->ClientIP)) Session->ClientHost=CopyStr(Session->ClientHost,IPStrToHostName(Session->ClientIP));
+if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrValid(Session->ClientIP)) Session->ClientHost=CopyStr(Session->ClientHost,IPStrToHostName(Session->ClientIP));
 
 LogToFile(Settings.LogPath,"");
 //Log first line of the response
@@ -203,7 +240,7 @@ if (Settings.Flags & FLAG_SSL)
 	Session->UserName=CopyStr(Session->UserName,STREAMGetValue(Session->S,"SSL-Certificate-CommonName"));
 	if (Settings.AuthFlags & FLAG_AUTH_CERT_SUFFICIENT)
 	{
-		if (StrLen(Session->UserName)) Session->AuthFlags |= FLAG_AUTH_PRESENT;
+		if (StrValid(Session->UserName)) Session->AuthFlags |= FLAG_AUTH_PRESENT;
 	}
 }
 
@@ -218,7 +255,7 @@ ptr=GetToken(ptr,"\\S",&Token,0);
 
 //Read Protocol (HTTP1.0, HTTP1.1, etc)
 ptr=GetToken(ptr,"\\S",&Session->Protocol,0);
-if (! StrLen(Session->Protocol)) Session->Protocol=CopyStr(Session->Protocol,"HTTP/1.0");
+if (! StrValid(Session->Protocol)) Session->Protocol=CopyStr(Session->Protocol,"HTTP/1.0");
 
 tmp_ptr=Token;
 
@@ -237,7 +274,7 @@ if (tmp_ptr)
 
 //URL with arguments removed is the 'true' URL
 Session->OriginalURL=CopyStr(Session->OriginalURL,Token);
-if (StrLen(Session->OriginalURL)==0) Session->OriginalURL=CopyStr(Session->OriginalURL,"/");
+if (! StrValid(Session->OriginalURL)) Session->OriginalURL=CopyStr(Session->OriginalURL,"/");
 
 if 
 (
@@ -258,13 +295,14 @@ if
 	}
 }
 
-DestroyString(Token);
+Destroy(Token);
 }
 
 
 int HTTPServerReadHeaders(HTTPSession *Session)
 {
-char *Tempstr=NULL, *Token=NULL, *ptr;
+char *Tempstr=NULL, *Token=NULL;
+const char *ptr;
 ListNode *Curr;
 int val;
 
@@ -286,7 +324,7 @@ if (Tempstr)
 	StripLeadingWhitespace(Tempstr);
 }
 
-while (StrLen(Tempstr) )
+while (StrValid(Tempstr) )
 {
 
 	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"<< %s",Tempstr);
@@ -313,7 +351,7 @@ while (StrLen(Tempstr) )
 				Session->RemoteAuthenticate=CopyStr(Session->RemoteAuthenticate,ptr);
 			}
 
-			if (StrLen(Session->UserName)==0)
+			if (! StrValid(Session->UserName))
 			{
 				ptr=GetToken(ptr,"\\S",&Token,0);
 				HTTPServerHandleAuthHeader(Session,val,Token,ptr);
@@ -371,7 +409,7 @@ while (StrLen(Tempstr) )
 	break;
 
 	case HEAD_COOKIE:
-			if (StrLen(Session->Cookies)) Session->Cookies=MCopyStr(Session->Cookies,"; ",ptr,NULL);
+			if (StrValid(Session->Cookies)) Session->Cookies=MCopyStr(Session->Cookies,"; ",ptr,NULL);
 			else Session->Cookies=CopyStr(Session->Cookies,ptr);
 			Session->AuthFlags |= FLAG_AUTH_PRESENT;
 	break;
@@ -401,7 +439,7 @@ while (StrLen(Tempstr) )
 	case HEAD_UPGRADE:
 		if ((strcasecmp(ptr,"Upgrade")==0) && SSLAvailable())
 		{
-			if (! HTTPServerActivateSSL(Session,Settings.SSLKeys)) return;
+			if (! HTTPServerActivateSSL(Session,Settings.SSLKeys)) return(FALSE);
 		} 
 		else if (strcasecmp(ptr,"websocket")==0) Session->MethodID = METHOD_WEBSOCKET;
 	break;
@@ -445,8 +483,8 @@ Session->URL=HTTPUnQuote(Session->URL,Session->OriginalURL);
 if (*Session->URL=='/') Session->Path=CopyStr(Session->Path,Session->URL);
 else Session->Path=MCopyStr(Session->Path,"/",Session->URL,NULL);
 
-DestroyString(Tempstr);
-DestroyString(Token);
+Destroy(Tempstr);
+Destroy(Token);
 
 return(TRUE);
 }
@@ -454,14 +492,14 @@ return(TRUE);
 
 
 
-void HTTPServerSendHeader(STREAM *S, char *Header, char *Value)
+void HTTPServerSendHeader(STREAM *S, const char *Header, const char *Value)
 {
 char *Tempstr=NULL;
 
 Tempstr=MCopyStr(Tempstr,Header,": ",Value,"\r\n",NULL);
 STREAMWriteLine(Tempstr,S);
 if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,">> %s",Tempstr);
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
@@ -555,20 +593,22 @@ else
 		Session->Flags &= ~SESSION_REUSE;
 	}
 
+/*
 	if ((Settings.AuthFlags & FLAG_AUTH_COOKIE) && (Session->Flags & SESSION_AUTHENTICATED) && (! (Session->AuthFlags & FLAG_AUTH_HASCOOKIE)))
 	{
-		if (StrLen(Session->UserName)) 
+		if (StrValid(Session->UserName)) 
 		{
 			Tempstr=MakeAccessCookie(Tempstr, Session);
 			HTTPServerSendHeader(S, "Set-Cookie", Tempstr);
 		}
 	}
+*/
 
 //If we are running a CGI script, then the script will handle all headers relating to content
 if (! (Flags & HEADERS_CGI)) 
 {
 	HTTPServerSendHeader(S, "DAV", "1");
-	if (StrLen(Session->ContentType)) HTTPServerSendHeader(S,"Content-Type",Session->ContentType);
+	if (StrValid(Session->ContentType)) HTTPServerSendHeader(S,"Content-Type",Session->ContentType);
 	else HTTPServerSendHeader(S,"Content-Type","octet/stream");
 
 
@@ -589,11 +629,11 @@ if (! (Flags & HEADERS_CGI))
 }
 
 LogFileFlushAll(TRUE);
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
-void HTTPServerSendResponse(STREAM *S, HTTPSession *Session, char *ResponseLine, char *ContentType, char *Body)
+void HTTPServerSendResponse(STREAM *S, HTTPSession *Session, const char *ResponseLine, const char *ContentType, const char *Body)
 {
 HTTPSession *Response;
 char *Tempstr=NULL;
@@ -622,8 +662,10 @@ if (Session)
 }
 
 Response->ResponseCode=CopyStr(Response->ResponseCode,ResponseLine);
-if (ResponseCode==302) SetVar(Response->Headers,"Location",Body);
+
+if (ResponseCode==302) SetVar(Response->Headers, "Location", Body);
 else Response->ContentSize=StrLen(Body);
+
 Response->ContentType=CopyStr(Response->ContentType,ContentType);
 
 
@@ -650,11 +692,11 @@ STREAMFlush(S);
 ProcessSessionEventTriggers(Response);
 HTTPSessionDestroy(Response);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
-void HTTPServerSendHTML(STREAM *S, HTTPSession *Session, char *Title, char *Body)
+void HTTPServerSendHTML(STREAM *S, HTTPSession *Session, const char *Title, const char *Body)
 {
 char *Tempstr=NULL;
 
@@ -662,7 +704,7 @@ char *Tempstr=NULL;
 Tempstr=FormatStr(Tempstr,"<html><body><h1>%s</h1>%s</body></html>",Title,Body);
 HTTPServerSendResponse(S, Session, Title, "text/html",Tempstr);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
@@ -680,14 +722,14 @@ char *Tempstr=NULL;
 	STREAMWriteBytes(Output,(char *) &len,1);
 	STREAMWriteBytes(Output,Tempstr,len * 16);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
 
 
 
-HTTPSession *FileSendCreateSession(char *Path, HTTPSession *Request, ListNode *Vars, int ICYInterval)
+HTTPSession *FileSendCreateSession(const char *Path, HTTPSession *Request, ListNode *Vars, int ICYInterval)
 {
 	HTTPSession *Session;
 	char *Tempstr=NULL;
@@ -711,7 +753,7 @@ HTTPSession *FileSendCreateSession(char *Path, HTTPSession *Request, ListNode *V
 		Session->Flags |= SESSION_ENCODE_GZIP;
 	}
 
-	DestroyString(Tempstr);
+	Destroy(Tempstr);
 	return(Session);
 }
 
@@ -750,13 +792,13 @@ ListNode *Vars;
 		}	
 	}
 
-ListDestroy(Vars,DestroyString);
-DestroyString(ICYMessage);
-DestroyString(Tempstr);
+ListDestroy(Vars,Destroy);
+Destroy(ICYMessage);
+Destroy(Tempstr);
 }
 
 
-void HTTPServerHandleStream(STREAM *Output, HTTPSession *Session, char *SearchPath, int SendData)
+void HTTPServerHandleStream(STREAM *Output, HTTPSession *Session, const char *SearchPath, int SendData)
 {
 char *Tempstr=NULL;
 HTTPSession *Response;
@@ -779,7 +821,7 @@ LogToFile(Settings.LogPath,"Stream from Dir: %s, %d files",SearchPath,Glob.gl_pa
 
 for (i=0; i < Glob.gl_pathc; i++)
 {
-	S=STREAMOpenFile(Glob.gl_pathv[i],SF_RDONLY);
+	S=STREAMFileOpen(Glob.gl_pathv[i],SF_RDONLY);
 	if (S)
 	{
 		IcecastSendData(S, Output, 4096000);
@@ -788,8 +830,8 @@ for (i=0; i < Glob.gl_pathc; i++)
 }
 
 globfree(&Glob);
-DestroyString(Tempstr);
-ListDestroy(Vars,DestroyString);
+Destroy(Tempstr);
+ListDestroy(Vars,Destroy);
 }
 
 
@@ -810,18 +852,18 @@ while (Curr)
 Curr=ListGetNext(Curr);
 }
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
-void HTTPServerSendFile(STREAM *S, HTTPSession *Session, char *Path, ListNode *Vars, int Flags)
+void HTTPServerSendFile(STREAM *S, HTTPSession *Session, const char *Path, ListNode *Vars, int Flags)
 {
 STREAM *Doc;
 HTTPSession *Response;
 char *Buffer=NULL, *Tempstr=NULL;
 int ICYInterval=4096000;
 
-	Doc=STREAMOpenFile(Path, SF_RDONLY);
+	Doc=STREAMFileOpen(Path, SF_RDONLY);
 	if (! Doc) HTTPServerSendHTML(S, Session, "403 Forbidden","You don't have permission for that.");
 	else
 	{
@@ -833,19 +875,24 @@ int ICYInterval=4096000;
 		Response=FileSendCreateSession(Path, Session, Vars, ICYInterval);
 		MediaReadDetails(Doc,Vars);
 		HTTPServerFormatExtraHeaders(Response,Vars);
+/*
+		if (Flags & HEADERS_XSSI)
+		{
+			Tempstr=STREAMReadDocument(Tempstr, Doc);
+			Buffer=XSSIDocument(Buffer, Tempstr);
+			Response->ContentSize=StrLen(Buffer);
+		}
+*/
 		
 		HTTPServerSendHeaders(S, Response, Flags);
-
-		if (Response->Flags & SESSION_ENCODE_GZIP) 
-		{
-			STREAMAddStandardDataProcessor(S,"compression","gzip","CompressionLevel=1");
-		}
-
 		
+		if (Response->Flags & SESSION_ENCODE_GZIP) STREAMAddStandardDataProcessor(S,"compression","gzip","CompressionLevel=1");
 		if (Flags & HEADERS_SENDFILE)
 		{
-		if (Session->Flags & SESSION_ICECAST) IcecastSendData(Doc, S, ICYInterval);
-		else STREAMSendFile(Doc, S, 0, SENDFILE_KERNEL | SENDFILE_LOOP);
+//      LogToFile(Settings.LogPath,"SF: %d %s", Response->ContentSize, Buffer);
+			if (Session->Flags & SESSION_ICECAST) IcecastSendData(Doc, S, ICYInterval);
+			//else if (Flags & HEADERS_XSSI) STREAMWriteLine(Buffer, S);
+			else STREAMSendFile(Doc, S, 0, SENDFILE_KERNEL | SENDFILE_LOOP);
 		}
 
 
@@ -858,39 +905,45 @@ int ICYInterval=4096000;
 		HTTPSessionDestroy(Response);
 	}
 
-DestroyString(Buffer);
-DestroyString(Tempstr);
+Destroy(Buffer);
+Destroy(Tempstr);
 }
 
 
 
 
 
-void HTTPServerSendDocument(STREAM *S, HTTPSession *Session, char *Path, int Flags)
+void HTTPServerSendDocument(STREAM *S, HTTPSession *Session, const char *Path, int Flags)
 {
 int result;
 ListNode *Vars;
 
+
 	Vars=ListCreate();
 
-	if (StrLen(Path)==0) result=FILE_NOSUCH;
+	if (! StrValid(Path)) result=FILE_NOSUCH;
 	else result=LoadFileRealProperties(Path, TRUE, Vars);
 
 	if (result==FILE_NOSUCH) HTTPServerSendHTML(S, Session, "404 Not Found","Couldn't find that document.");
-	else
+	else 
 	{
 		//Set 'LastModified' so we can use it if the server sends 'If-Modified-Since'
 	  Session->LastModified=atoi(GetVar(Vars,"MTime-secs"));
 
 		//If we are asking for details of a file then we treat that as a directory function
-		if ((result==FILE_DIR) || (strstr(Session->Arguments,"format=")))
+		if ((result & FILE_DIR) || (strstr(Session->Arguments,"format=")))
 		{
-			HTTPServerSendDirectory(S,Session,Path,Vars);
+      LogToFile(Settings.LogPath, "Directory Send: path=%s args=%s", Path, Session->Arguments);
+			DirectorySend(S, Session, Path, Vars, Flags);
 		}
-		else HTTPServerSendFile(S, Session, Path, Vars, Flags);
+		else 
+		{
+			if (result & FILE_EXEC) Flags |= HEADERS_XSSI;
+			HTTPServerSendFile(S, Session, Path, Vars, Flags);
+		}
 	}
 
-ListDestroy(Vars,DestroyString);
+ListDestroy(Vars,Destroy);
 }
 
 
@@ -900,7 +953,7 @@ int HTTPServerExecCGI(STREAM *ClientCon, HTTPSession *Session, const char *Scrip
 char *Tempstr=NULL;
 int i;
 
-      if (StrLen(Session->Group) && (! SwitchGroup(Session->Group)))
+      if (StrValid(Session->Group) && (! SwitchGroup(Session->Group)))
       {
         LogToFile(Settings.LogPath,"WARN: Failed to switch to group '%s' to execute script: %s",Session->Group, ScriptPath);
       }
@@ -932,7 +985,7 @@ int i;
         //Only do this late! Otherwise logging won't work.
         for (i=3; i < 1000; i++) close(i);
 
-        if (StrLen(Tempstr)) execl(Tempstr, Tempstr, ScriptPath,NULL);
+        if (StrValid(Tempstr)) execl(Tempstr, Tempstr, ScriptPath,NULL);
         else execl(ScriptPath,ScriptPath,NULL);
 
         /*If this code gets executed, then 'execl' failed*/
@@ -943,7 +996,7 @@ int i;
     }
 
 	//if we get there then, for whatever reason, our script didn't run
-	DestroyString(Tempstr);
+	Destroy(Tempstr);
 	return(FALSE);
 }
 
@@ -954,11 +1007,12 @@ void HTTPServerHandlePost(STREAM *S, HTTPSession *Session)
 char *Tempstr=NULL;
 int bytes_read=0, result;
 
+	LogToFile(Settings.LogPath,"HANDLE POST: %s",Session->ContentType);
 	if (strcmp(Session->ContentType,"application/x-www-form-urlencoded")==0) HTTPServerReadBody(Session, &Session->Arguments);
 	else if (strncmp(Session->ContentType,"multipart/",10)==0) UploadMultipartPost(S, Session);
 	HTTPServerSendResponse(S, Session, "302", "", Session->URL);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
@@ -971,7 +1025,7 @@ char *Buffer=NULL, *Tempstr=NULL;
 int BuffSize=4096;
 
 
-Doc=STREAMOpenFile(Heads->Path, SF_CREAT | SF_TRUNC | SF_WRONLY);
+Doc=STREAMFileOpen(Heads->Path, SF_CREAT | SF_TRUNC | SF_WRONLY);
 
 if (! Doc) HTTPServerSendHTML(S, Heads, "403 Forbidden","Can't open document for write.");
 else
@@ -988,18 +1042,22 @@ else
 }
 
 
-DestroyString(Tempstr);
-DestroyString(Buffer);
+Destroy(Tempstr);
+Destroy(Buffer);
 }
 
 
 
-void HTTPServerMkDir(STREAM *S,HTTPSession *Heads)
+void HTTPServerMkDir(STREAM *S, HTTPSession *Heads, int DirFlags)
 {
 int result;
 
 result=mkdir(Heads->Path, 0770);
-if (result==0) HTTPServerSendHTML(S, Heads, "201 Created","");
+if (result==0) 
+{
+	HTTPServerSendHTML(S, Heads, "201 Created","");
+	if (DirFlags & DIRTYPE_CALDAV) DavPropsIncr(Heads->Path, "ctag");
+}
 else switch (errno)
 {
 
@@ -1051,7 +1109,7 @@ for (i=0; i < myGlob.gl_pathc; i++)
 
 }
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 globfree(&myGlob);
 result=rmdir(Path);
 
@@ -1129,9 +1187,9 @@ switch (result)
 }
 
 
-DestroyString(Host);
-DestroyString(Tempstr);
-DestroyString(Destination);
+Destroy(Host);
+Destroy(Tempstr);
+Destroy(Destination);
 }
 
 
@@ -1139,7 +1197,8 @@ DestroyString(Destination);
 void HTTPServerMove(STREAM *S,HTTPSession *Heads)
 {
 int result;
-char *Tempstr=NULL, *Host=NULL, *Destination=NULL, *ptr;
+char *Tempstr=NULL, *Host=NULL, *Destination=NULL;
+const char *ptr;
 
 Tempstr=CopyStr(Tempstr,Heads->Destination);
 ptr=Tempstr;
@@ -1175,9 +1234,9 @@ else switch (errno)
 }
 
 
-DestroyString(Host);
-DestroyString(Tempstr);
-DestroyString(Destination);
+Destroy(Host);
+Destroy(Tempstr);
+Destroy(Destination);
 }
 
 void HTTPServerHandleLock(STREAM *S, HTTPSession *ClientHeads)
@@ -1205,15 +1264,15 @@ void HTTPServerOptions(STREAM *S,HTTPSession *ClientHeads)
 char *Tempstr=NULL;
 
 STREAMWriteLine("HTTP/1.1 200 OK\r\n",S);
-Tempstr=CopyStr(Tempstr,GetDateStr("Date: %a, %d %b %Y %H:%M:%S %Z\r\n",NULL));
-STREAMWriteLine(Tempstr,S);
-STREAMWriteLine("Content-Length: 0\r\n",S);
-STREAMWriteLine("Public: OPTIONS, TRACE, GET, HEAD, DELETE, PUT, POST, COPY, MOVE, MKCOL, PROPFIND, PROPPATCH, LOCK, UNLOCK, SEARCH\r\n",S);
-STREAMWriteLine("Allow: OPTIONS, GET, HEAD, DELETE, PUT, POST, COPY, MOVE, MKCOL, PROPFIND, PROPPATCH\r\n",S);
-STREAMWriteLine("DASL:\r\n",S);
-STREAMWriteLine("DAV: 1\r\n",S);
+HTTPServerSendHeader(S, "Date", GetDateStr("Date: %a, %d %b %Y %H:%M:%S %Z",NULL));
+HTTPServerSendHeader(S, "Content-Length", "0");
+HTTPServerSendHeader(S, "Public", "OPTIONS, TRACE, GET, HEAD, DELETE, PUT, POST, COPY, MOVE, MKCOL, PROPFIND, PROPPATCH, LOCK, UNLOCK, SEARCH, MKCALENDAR, REPORT, calendar-access");
+HTTPServerSendHeader(S, "Allow", "OPTIONS, TRACE, GET, HEAD, DELETE, PUT, POST, COPY, MOVE, MKCOL, PROPFIND, PROPPATCH, LOCK, UNLOCK, SEARCH, MKCALENDAR, REPORT, calendar-access");
+HTTPServerSendHeader(S, "DASL", "");
+HTTPServerSendHeader(S, "DAV", "1");
+STREAMWriteLine("\r\n", S);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
@@ -1229,8 +1288,6 @@ char *ChrootDir=NULL, *Tempstr=NULL;
 Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 ChrootDir=CopyStr(ChrootDir,Settings.DefaultDir);
 
-LogToFile(Settings.LogPath,"SETCTX: %d %s home=%s",Session->MethodID,ChrootDir,Session->HomeDir);
-
 if (IsProxyMethod(Session->MethodID))
 {
 	//Do not chroot for proxy commands
@@ -1240,8 +1297,10 @@ else
 	if (Settings.Flags & FLAG_CHHOME) ChrootDir=CopyStr(ChrootDir,Session->HomeDir);
 
 		//if (Settings.Flags & FLAG_LOG_VERBOSE) 
-LogToFile(Settings.LogPath,"ChRoot to: %s home=%s",ChrootDir,Session->HomeDir);
+	LogToFile(Settings.LogPath,"ChRoot to: %s home=%s",ChrootDir,Session->HomeDir);
 
+	if (StrValid(ChrootDir))
+	{
 	if (chdir(ChrootDir) !=0) 
 	{
 		LogToFile(Settings.LogPath,"ERROR: CHDIR FAILED: %d %s %s",getuid(),ChrootDir,strerror(errno));
@@ -1249,8 +1308,18 @@ LogToFile(Settings.LogPath,"ChRoot to: %s home=%s",ChrootDir,Session->HomeDir);
 		LogFileFlushAll(TRUE);
  		_exit(1);
 	}
+
+	Session->StartDir=CopyStr(Session->StartDir,ChrootDir);
+	}
+
+	if (getuid()==0)
+	{
+	if (Settings.Flags & (FLAG_CHHOME | FLAG_CHROOT))
+	{
 	chroot(".");
 	Session->StartDir=CopyStr(Session->StartDir,"/");
+	}
+	}
 }
 
 /*
@@ -1303,8 +1372,8 @@ if (setresuid(Session->RealUserUID,Session->RealUserUID,Session->RealUserUID)!=0
 //drop everything! (In case someting went wrong with setresuid) 
 DropCapabilities(CAPS_LEVEL_SESSION);
 
-DestroyString(Tempstr);
-DestroyString(ChrootDir);
+Destroy(Tempstr);
+Destroy(ChrootDir);
 
 return(TRUE);
 }
@@ -1314,23 +1383,24 @@ return(TRUE);
 
 int HTTPMethodAllowed(HTTPSession *Session) 
 {
-char *Token=NULL, *ptr;
+char *Token=NULL;
+const char *ptr;
 
-if (StrLen(Settings.HttpMethods)==0) return(TRUE);
+if (! StrValid(Settings.HttpMethods)) return(TRUE);
 
 ptr=GetToken(Settings.HttpMethods,",",&Token,0);
 while (ptr)
 {
 if (strcmp(Token,Session->Method)==0) 
 {
-DestroyString(Token);
+Destroy(Token);
 return(TRUE);
 }
 
 ptr=GetToken(ptr,",",&Token,0);
 }
 
-DestroyString(Token);
+Destroy(Token);
 return(FALSE);
 }
 
@@ -1338,6 +1408,7 @@ return(FALSE);
 int HTTPServerAuthenticate(HTTPSession *Session)
 {
 	int result=FALSE;
+	TPathItem *VPath;
 
 	//This handles someone clicking a 'logout' button
 	if (! HTTPServerHandleRegister(Session, LOGIN_CHECK_ALLOWED))
@@ -1357,11 +1428,12 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 		else LogToFile(Settings.LogPath,"AUTH: ERROR: Session Keep-Alive active, but user has changed to %s@%s (%s) %s %s. Refusing authentication",Session->ClientIP,Session->ClientHost,Session->ClientIP,Session->Method,Session->Path);
 	}
 
-
+	//Consider vpath Auhentication
+	VPath=VPathFind(PATHTYPE_LOCAL, Session->Path);
+	if (VPath && (VPath->Flags & PATHITEM_NOAUTH)) Session->Flags |= SESSION_AUTHENTICATED;
 
 	//Consider AccessToken Authentication for this URL!
 	if ((! (Session->Flags & SESSION_AUTHENTICATED)) && (Session->AuthFlags & FLAG_AUTH_ACCESS_TOKEN)) ParseAccessToken(Session);
-
 
 	if (Session->AuthFlags & FLAG_AUTH_PRESENT)
 	{
@@ -1369,10 +1441,9 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 		//after we've completed authentication (e.g. it's taken from a cookie)
 
 		//ANYTHING OTHER THAN TRUE FROM AUTHENTICATE MEANS IT FAILED
-		if ((Authenticate(Session)==TRUE) && StrLen(Session->UserName)) result=TRUE;
-
+		if ((Authenticate(Session)==TRUE) && StrValid(Session->UserName)) result=TRUE;
 		//If authentication provided any users settings, then apply those
-		if (StrLen(Session->UserSettings)) ParseConfigItemList(Session->UserSettings);
+		if (StrValid(Session->UserSettings)) ParseConfigItemList(Session->UserSettings);
 
 		//The FLAG_SSL_CERT_REQUIRED flag might have been set by user settings
 		//during authentication, so check it again here
@@ -1406,10 +1477,12 @@ anchor (href) tag.
 int HTTPServerProcessActions(STREAM *S, HTTPSession *Session)
 {
 typedef enum {ACT_NONE, ACT_GET, ACT_DEL, ACT_DEL_SELECTED, ACT_RENAME, ACT_EDIT, ACT_MKDIR, ACT_PACK, ACT_SAVE_PROPS, ACT_EDIT_WITH_ACCESSTOKEN, ACT_M3U, ACT_UPLOAD} TServerActs;
-char *QName=NULL, *QValue=NULL, *Name=NULL, *Value=NULL, *ptr;
+char *QName=NULL, *QValue=NULL, *Name=NULL, *Value=NULL;
 char *Arg1=NULL, *Arg2=NULL, *FileProperties=NULL, *SelectedFiles=NULL;
+const char *ptr;
 TServerActs Action=ACT_NONE;
 int result=FALSE;
+
 
 
 	//QName and QValue will be HTTP quoted, so arguments must be 
@@ -1424,97 +1497,106 @@ int result=FALSE;
 		switch (*Name)
 		{
 		case 'd':
+		case 'D':
 		if (strncasecmp(Name,"del:",4)==0) 
 		{
 			Action=ACT_DEL;
-			Arg1=CopyStr(Arg1,Name+4);
+			Arg1=CopyStr(Arg1, Name+4);
 		}
 		else if (strncasecmp(Name,"delete-selected:",16)==0) 
 		{
 			Action=ACT_DEL_SELECTED;
-			Arg1=CopyStr(Arg1,Name+16);
+			Arg1=CopyStr(Arg1, Name+16);
 		}
 		break;
 
 		case 'e':
+		case 'E':
 		if (strncasecmp(Name,"edit:",5)==0)
 		{
 			Action=ACT_EDIT;
-			Arg1=CopyStr(Arg1,Name+5);
+			Arg1=CopyStr(Arg1, Name + 5);
 		}
 		break;
 
 		case 'f':
+		case 'F':
 		if (strncasecmp(Name,"fileproperty:",13)==0) FileProperties=MCatStr(FileProperties,"&",Name,"=",Value,NULL);
 		break;
 
 		case 'g':
+		case 'G':
 		if (strncasecmp(Name,"get:",4)==0) 
 		{
 			Action=ACT_GET;
-			Arg1=CopyStr(Arg1,Name+4);
+			Arg1=CopyStr(Arg1, Name+4);
 		}
 		else if (strncasecmp(Name,"genaccess:",10)==0)
 		{
 			Action=ACT_EDIT_WITH_ACCESSTOKEN;
-			Arg1=CopyStr(Arg1,Name+10);
+			Arg1=CopyStr(Arg1, Name+10);
 		}
 		break;
 		
 		case 'm':
+		case 'M':
 		if (strncasecmp(Name,"mkdir:",6)==0) 
 		{
 			Action=ACT_MKDIR;
-			Arg1=CopyStr(Arg1,Name+6);
+			Arg1=CopyStr(Arg1, Name+6);
 		}
 		else if (strcasecmp(Name,"mkdir")==0) QValue=HTTPUnQuote(QValue,Value);
 		else if (strncasecmp(Name,"m3u:",4)==0) 
 		{
 			Action=ACT_M3U;
-			Arg1=CopyStr(Arg1,Name+4);
+			Arg1=CopyStr(Arg1, Name+4);
 		}
 		break;
 
 		case 'r':	
+		case 'R':	
 		if (strncasecmp(Name,"renm:",5)==0) 
 		{
 			Action=ACT_RENAME;
-			Arg1=CopyStr(Arg1,Name+5);
+			Arg1=CopyStr(Arg1, Name+5);
 		}
 		else if (strcasecmp(Name,"renameto")==0) QValue=HTTPUnQuote(QValue,Value);
 		break;
 
 		case 'p':
+		case 'P':
 		if (strncasecmp(Name,"pack:",5)==0) 
 		{
 			Action=ACT_PACK;
-			Arg1=CopyStr(Arg1,Name+5);
+			Arg1=CopyStr(Arg1, Name+5);
 		}
 		else if (strcasecmp(Name,"packtype")==0) QValue=HTTPUnQuote(QValue,Value);
 		else if (strcasecmp(Name,"packtarget")==0) QValue=HTTPUnQuote(QValue,Value);
 		break;
 
 		case 's':
+		case 'S':
 		if (strncasecmp(Name,"sprops:",7)==0) 
 		{
 			Action=ACT_SAVE_PROPS;
-			Arg1=CopyStr(Arg1,Name+7);
+			Arg1=CopyStr(Arg1, Name+7);
 		}
 		else if (strcasecmp(Name,"selected")==0) QValue=HTTPUnQuote(QValue,Value);
 		break;
 
 		case 'u':
+		case 'U':
 		if (strncasecmp(Name,"upload:",7)==0) 
 		{
 			Action=ACT_UPLOAD;
-			Arg1=CopyStr(Arg1,Name+7);
+			Arg1=CopyStr(Arg1, Name+7);
 		}
 		break;
 		}
 
 		//these are secondary arguments in the query string, whereas all the above are the primary 
 		//request that defines what action we're taking
-		if (StrLen(QValue)) Arg2=MCatStr(Arg2, Name, "=", QValue, "&",NULL);
+		if (StrValid(QValue)) Arg2=MCatStr(Arg2, Name, "=", QValue, "&",NULL);
 
 		ptr=GetNameValuePair(ptr,"&","=",&QName,&QValue);
 	}
@@ -1528,39 +1610,37 @@ int result=FALSE;
 		break;
 
 		case ACT_EDIT:
-		result=TRUE;
-		Value=MCopyStr(Value,Arg1,"?format=edit",NULL);
+		Value=MCopyStr(Value, Arg1, "?format=edit", NULL);
 		Session->LastModified=0;
 		HTTPServerSendResponse(S, Session, "302", "", Value);
 		result=TRUE;
 		break;
 
 		case ACT_EDIT_WITH_ACCESSTOKEN:
-		result=TRUE;
-		Value=MCopyStr(Value,Arg1,"?format=editaccesstoken",NULL);
+		Value=MCopyStr(Value, Arg1, "?format=editaccesstoken", NULL);
 		Session->LastModified=0;
 		HTTPServerSendResponse(S, Session, "302", "", Value);
 		result=TRUE;
 		break;
 
 	  case ACT_DEL:
-		result=TRUE;
-		Value=MCopyStr(Value,Arg1,"?format=delete",NULL);
+		Value=MCopyStr(Value, Arg1, "?format=delete", NULL);
 		Session->LastModified=0;
 		HTTPServerSendResponse(S, Session, "302", "", Value);
+		result=TRUE;
 		break;
 
 		case ACT_DEL_SELECTED:
-		result=TRUE;
-		Value=MCopyStr(Value,Arg1,"?format=delete-selected&",Arg2,NULL);
+		Value=MCopyStr(Value, Arg1, "?format=delete-selected&", Arg2, NULL);
 		Session->LastModified=0;
 		HTTPServerSendResponse(S, Session, "302", "", Value);
+		result=TRUE;
 		break;
 
 	  case ACT_RENAME: 
-		if (StrLen(Arg2))
+		if (StrValid(Arg2))
 		{
-			Value=MCopyStr(Value,Arg1,"?format=rename&",Arg2,NULL);
+			Value=MCopyStr(Value, Arg1, "?format=rename&", Arg2, NULL);
 			Session->LastModified=0;
 			HTTPServerSendResponse(S, Session, "302", "", Value);
 			result=TRUE;
@@ -1568,7 +1648,7 @@ int result=FALSE;
 		break;
 
 	  case ACT_MKDIR: 
-		if (StrLen(Arg2))
+		if (StrValid(Arg2))
 		{
 			Value=MCopyStr(Value,Arg1,"?format=mkdir&",Arg2,NULL);
 			Session->LastModified=0;
@@ -1589,15 +1669,18 @@ int result=FALSE;
 		break;
 
 		case ACT_SAVE_PROPS:
-		Value=MCopyStr(Value,Arg1,"?format=saveprops",FileProperties,NULL);
+		Value=MCopyStr(Value, Arg1, "?format=saveprops", FileProperties, NULL);
 		Session->LastModified=0;
 		HTTPServerSendResponse(S, Session, "302", "", Value);
+		result=TRUE;
 		break;
 
 		case ACT_PACK:
-		Value=MCopyStr(Value,Arg1,"?format=pack&",Arg2,NULL);
+		Value=MCopyStr(Value, Arg1, "?format=pack&", Arg2, NULL);
 		Session->LastModified=0;
+		LogToFile(Settings.LogPath,"PACK: %s", Value);
 		HTTPServerSendResponse(S, Session, "302", "", Value);
+		result=TRUE;
 		break;
 
 		case ACT_UPLOAD:
@@ -1607,14 +1690,14 @@ int result=FALSE;
 		break;
 	}
 
-DestroyString(FileProperties);
-DestroyString(SelectedFiles);
-DestroyString(QName);
-DestroyString(QValue);
-DestroyString(Name);
-DestroyString(Value);
-DestroyString(Arg1);
-DestroyString(Arg2);
+Destroy(FileProperties);
+Destroy(SelectedFiles);
+Destroy(QName);
+Destroy(QValue);
+Destroy(Name);
+Destroy(Value);
+Destroy(Arg1);
+Destroy(Arg2);
 
 return(result);
 }
@@ -1625,7 +1708,7 @@ return(result);
 
 int HTTPServerValidateURL(HTTPSession *Session, char **Token)
 {
-char *ptr;
+const char *ptr;
 
 ptr=GetToken(Settings.ForbiddenURLStrings,",",Token,0);
 while (ptr)
@@ -1643,40 +1726,14 @@ return(TRUE);
 }
 
 
-int HTTPServerActivateSSL(HTTPSession *Session,ListNode *Keys)
-{
-ListNode *Curr;
-int Flags=0;
-
-Curr=ListGetNext(Keys);
-while (Curr)
-{
-STREAMSetValue(Session->S,Curr->Tag,(char *) Curr->Item);
-Curr=ListGetNext(Curr);
-}
-
-Flags |= LU_SSL_PFS;
-if (Settings.AuthFlags & (FLAG_AUTH_CERT_REQUIRED | FLAG_AUTH_CERT_SUFFICIENT | FLAG_AUTH_CERT_ASK)) Flags |= LU_SSL_VERIFY_PEER;
-
-if (DoSSLServerNegotiation(Session->S,Flags))
-{
-	Session->Flags |= HTTP_SSL;
-	return(TRUE);
-}
-
-
-LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed with %s %s. Error was %s",Session->ClientHost,Session->ClientIP,STREAMGetValue(Session->S,"SSL-Error"));
-return(FALSE);
-}
-
-
 
 
 
 
 void HTTPServerFindAndSendDocument(STREAM *S, HTTPSession *Session, int Flags)
 {
-char *Path=NULL, *ptr;
+char *Path=NULL;
+const char *ptr;
 TPathItem *PI=NULL;
 ListNode *Curr;
 
@@ -1694,6 +1751,7 @@ ListNode *Curr;
 			if (PI->Flags & PATHITEM_NO_COMPRESS) Session->Flags &= ~FLAG_COMPRESS;
 			if (PI->CacheTime > 0) Session->CacheTime=PI->CacheTime;
 		}
+		else LogToFile(Settings.LogPath,"WARN: failed to find vpath '%s' \n",Session->Path);
 
 		//One day we will be able to handle scripts inside of chroot using embedded
 		//scripting. But not today.
@@ -1701,7 +1759,7 @@ ListNode *Curr;
     //else 
 		HTTPServerSendDocument(S, Session, Path, Flags);
   }
-DestroyString(Path);
+Destroy(Path);
 }
 
 
@@ -1788,7 +1846,7 @@ switch (Session->MethodID)
 		break;
 
 	case METHOD_MKCOL:
-		HTTPServerMkDir(Session->S,Session);
+		HTTPServerMkDir(Session->S,Session, DIRTYPE_NORMAL);
 		break;
 
 	case METHOD_DELETE:
@@ -1827,6 +1885,11 @@ switch (Session->MethodID)
 		HTTPServerHandleLock(Session->S, Session);
 		break;
 
+	//Caldav Extension
+	case METHOD_MKCALENDAR:
+		HTTPServerMkDir(Session->S, Session, DIRTYPE_CALDAV);
+		break;
+
 
 	case METHOD_WEBSOCKET:
 	case METHOD_WEBSOCKET75:
@@ -1848,12 +1911,13 @@ LogFileFlushAll(TRUE);
 
 STREAMFlush(Session->S);
 if (! (Session->Flags & SESSION_REUSE)) break;
+break;
 //LogToFile(Settings.LogPath,"REUSE: %s %s for %s@%s (%s)",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP);
 }
 
 
-DestroyString(Tempstr);
-DestroyString(Method);
-DestroyString(URL);
+Destroy(Tempstr);
+Destroy(Method);
+Destroy(URL);
 }
 

@@ -9,13 +9,12 @@
 
 void AlayaLog(char *Msg);
 
-
-STREAM *ChrootSendRequest(HTTPSession *Session, const char *Type, const char *Path, const char *SearchPath);
+void SetupEnvironment(HTTPSession *Session, const char *ScriptPath);
+STREAM *ChrootSendRequest(HTTPSession *Session, const char *Type, const char *ExtraArgs);
+STREAM *ChrootSendPathRequest(HTTPSession *Session, const char *Type, const char *Path, const char *SearchPath);
 int ChrootProcessRequest(STREAM *S, HTTPSession *Session, const char *Type, const char *Path, const char *SearchPath);
 int HandleChildProcessRequest(STREAM *S);
 
-void VPathMimeIcons(STREAM *S,HTTPSession *Session, TPathItem *VPath, int SendData);
-void HTTPServerHandleVPath(STREAM *S,HTTPSession *Session,TPathItem *VPath,int SendData);
 int HTTPServerHandleRegister(HTTPSession *Session, int Flags);
 
 #endif

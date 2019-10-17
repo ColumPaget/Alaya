@@ -13,7 +13,7 @@ const char *PhysicalProperties[]={"creationdate","CTime-secs", "getlastmodified"
 
 
 
-int SaveFileXAttr(char * Path, ListNode *PropList)
+int SaveFileXAttr(const char * Path, ListNode *PropList)
 {
 ListNode *Curr;
 char *Attr=NULL;
@@ -32,13 +32,13 @@ Curr=ListGetNext(Curr);
 }
 #endif
 
-DestroyString(Attr);
+Destroy(Attr);
 
 return(result);
 }
 
 
-int LoadFileXAttr(char *Path, ListNode *PropList)
+int LoadFileXAttr(const char *Path, ListNode *PropList)
 {
 int result=FALSE, len;
 char *AttrNamesList=NULL, *Attr=NULL, *Value=NULL;
@@ -66,23 +66,24 @@ for (ptr=AttrNamesList; ptr < end; ptr += strlen(ptr) + 1)
 }
 #endif
 
-DestroyString(Attr);
-DestroyString(Value);
-DestroyString(AttrNamesList);
+Destroy(Attr);
+Destroy(Value);
+Destroy(AttrNamesList);
 
 return(result);
 }
 
 
 
-void LoadDirPropsFile(char *Dir, char *RequestedFile, ListNode *Props)
+void LoadDirPropsFile(const char *Dir, const char *RequestedFile, ListNode *Props)
 {
-char *Tempstr=NULL, *Token=NULL, *FName=NULL, *ptr;
+char *Tempstr=NULL, *Token=NULL, *FName=NULL;
+const char *ptr;
 STREAM *S;
 
 Tempstr=MCopyStr(Tempstr,Dir,"/.props",NULL);
 
-S=STREAMOpenFile(Tempstr,SF_CREAT | SF_RDWR);
+S=STREAMFileOpen(Tempstr,SF_CREAT | SF_RDWR);
 if (S)
 {
 	Tempstr=STREAMReadLine(Tempstr,S);
@@ -101,13 +102,13 @@ if (S)
 STREAMClose(S);
 }
 
-DestroyString(Tempstr);
-DestroyString(Token);
-DestroyString(FName);
+Destroy(Tempstr);
+Destroy(Token);
+Destroy(FName);
 }
 
 
-void SaveDirPropsFile(char *Dir, char *RequestedFile, ListNode *Props)
+void SaveDirPropsFile(const char *Dir, const char *RequestedFile, ListNode *Props)
 {
 char *Tempstr=NULL, *Token=NULL;
 ListNode *Curr;
@@ -115,7 +116,7 @@ STREAM *S;
 
 Tempstr=MCopyStr(Tempstr,Dir,"/.props",NULL);
 
-S=STREAMOpenFile(Tempstr,SF_CREAT | SF_WRONLY | SF_TRUNC);
+S=STREAMFileOpen(Tempstr,SF_CREAT | SF_WRONLY | SF_TRUNC);
 if (S)
 {
 	Curr=ListGetNext(Props);
@@ -131,8 +132,8 @@ if (S)
 STREAMClose(S);
 }
 
-DestroyString(Tempstr);
-DestroyString(Token);
+Destroy(Tempstr);
+Destroy(Token);
 }
 
 
@@ -140,22 +141,21 @@ DestroyString(Token);
 
 //Real Properties are things like file size, mtime, etc, that are not strings defined
 //by the user
-int PropertiesLoadFromStream(char *FName, STREAM *S, ListNode *Vars)
+int PropertiesLoadFromStream(const char *FName, STREAM *S, ListNode *Vars)
 {
 char *Buffer=NULL;
 TFileMagic *FM=NULL;
 struct stat FileStat;
+int Flags=FILE_EXISTS;
 
-if (stat(FName,&FileStat)==-1) return(FILE_NOSUCH);
+if (stat(FName, &FileStat)==-1) return(FILE_NOSUCH);
 
-
-
-Buffer=FormatStr(Buffer,"%llu",(unsigned long long) FileStat.st_size);
-SetVar(Vars,"FileSize",Buffer);
-Buffer=FormatStr(Buffer,"%d",FileStat.st_ctime);
-SetVar(Vars,"CTime-Secs",Buffer);
-Buffer=FormatStr(Buffer,"%d",FileStat.st_mtime);
-SetVar(Vars,"MTime-Secs",Buffer);
+Buffer=FormatStr(Buffer, "%llu", (unsigned long long) FileStat.st_size);
+SetVar(Vars, "FileSize", Buffer);
+Buffer=FormatStr(Buffer, "%d", FileStat.st_ctime);
+SetVar(Vars, "CTime-Secs", Buffer);
+Buffer=FormatStr(Buffer, "%d", FileStat.st_mtime);
+SetVar(Vars, "MTime-Secs", Buffer);
 
 
 //if it's a directory, don't both doing any more examining
@@ -163,13 +163,22 @@ if (S_ISDIR(FileStat.st_mode))
 {
 	SetVar(Vars,"IsCollection","1");
 	SetVar(Vars,"ContentType","Directory");
-	DestroyString(Buffer);
+	Destroy(Buffer);
 	return(FILE_DIR);
 }
 
 
-if (! (FileStat.st_mode & S_IWUSR)) SetVar(Vars,"IsReadOnly","1");
-if ((FileStat.st_mode & S_IXUSR)) SetVar(Vars,"IsExecutable","T");
+if (! (FileStat.st_mode & S_IWUSR)) 
+{
+	SetVar(Vars,"IsReadOnly","1");
+	Flags |= FILE_READONLY;
+}
+
+if ((FileStat.st_mode & S_IXUSR)) 
+{
+	SetVar(Vars,"IsExecutable","T");
+	Flags |= FILE_EXEC;
+}
 else SetVar(Vars,"IsExecutable","F");
 
 
@@ -186,22 +195,20 @@ if (FM)
 }
 
 
-DestroyString(Buffer);
+Destroy(Buffer);
 
-return(TRUE);
+return(Flags);
 }
 
 
 
-int LoadFileRealProperties(char *FName, int ExamineContents, ListNode *Vars)
+int LoadFileRealProperties(const char *FName, int ExamineContents, ListNode *Vars)
 {
 STREAM *S=NULL;
 int result;
 
-if (ExamineContents) S=STREAMOpenFile(FName,SF_RDONLY);
-
+if (ExamineContents) S=STREAMOpen(FName, "r");
 result=PropertiesLoadFromStream(FName, S, Vars);
-
 STREAMClose(S);
 
 return(result);
@@ -209,9 +216,10 @@ return(result);
 
 
 
-int LoadFileProperties(char *Path, ListNode *PropList)
+int LoadFileProperties(const char *Path, ListNode *PropList)
 {
-char *Dir=NULL, *ptr;
+char *Dir=NULL;
+const char *ptr;
 int FType;
 
 ptr=GetToken(Path,"/",&Dir,0);
@@ -234,9 +242,10 @@ return(FType);
 }
 
 
-int SaveFileProperties(char *Path, ListNode *PropList)
+int SaveFileProperties(const char *Path, ListNode *PropList)
 {
-char *Dir=NULL, *ptr;
+char *Dir=NULL;
+const char *ptr;
 
 ptr=GetToken(Path,"/",&Dir,0);
 
@@ -259,10 +268,11 @@ return(TRUE);
 
 
 
-void SetProperties(char *File, ListNode *Props)
+void SetProperties(const char *File, ListNode *Props)
 {
-char *Token=NULL, *Dir=NULL, *FName=NULL, *ptr;
+char *Token=NULL, *Dir=NULL, *FName=NULL;
 ListNode *Curr, *FProps;
+const char *ptr;
 
 ptr=strrchr(File,'/');
 if (ptr) 
@@ -291,10 +301,10 @@ while (Curr)
 
 SaveFileProperties(File,FProps);
 
-ListDestroy(FProps,DestroyString);
-DestroyString(Token);
-DestroyString(Dir);
-DestroyString(FName);
+ListDestroy(FProps,Destroy);
+Destroy(Token);
+Destroy(Dir);
+Destroy(FName);
 }
 
 

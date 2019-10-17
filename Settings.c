@@ -4,22 +4,19 @@
 #include <grp.h>
 
 
-int YesNoTrueFalse(char *String)
-{
-	if (! StrLen(String)) return(TRUE);
-	if (strcasecmp(String,"true")==0) return(TRUE);
-	if (strcasecmp(String,"yes")==0) return(TRUE);
-	if (strcasecmp(String,"y")==0) return(TRUE);
-
-	return(FALSE);
-}
 
 
 void PostProcessSettings(TSettings *Settings)
 {
-char *Tempstr=NULL, *Token=NULL, *ptr;
+char *Tempstr=NULL, *Token=NULL;
+const char *ptr;
 
 if (StrLen(Settings->DefaultUser)==0) Settings->DefaultUser=CopyStr(Settings->DefaultUser,GetDefaultUser());
+
+//this seems odd, but it will generate a blank bind address in ServiceSocketsInit in main.c. 
+//if Settings->BindAddress is completely empty nothing will be bound, but if it has one blank option
+//then the default 'bind all tcp addresses' action will be carried out
+if (StrLen(Settings->BindAddress)==0) Settings->BindAddress=CopyStr(Settings->BindAddress, ",");
 
 Tempstr=CopyStr(Tempstr,"");
 ptr=GetToken(Settings->HttpMethods,",",&Token,0);
@@ -43,17 +40,18 @@ if (Settings->Port < 1)
   else Settings->Port=80;
 }
 
-DestroyString(Tempstr);
-DestroyString(Token);
+Destroy(Tempstr);
+Destroy(Token);
 }
 
 
 
 
 
-void ParseDirListType(char *Data)
+void ParseDirListType(const char *Data)
 {
-char *Token=NULL, *ptr;
+char *Token=NULL;
+const char *ptr;
 
 Settings.DirListFlags=DIR_REJECT;
 
@@ -77,15 +75,16 @@ while (ptr)
 
 ptr=GetToken(ptr,",",&Token,0);
 }
-DestroyString(Token);
+Destroy(Token);
 }
 
 
 
-void ParseEventConfig(char *ConfigLine)
+void ParseEventConfig(const char *ConfigLine)
 {
 const char *EventTypeStrings[]={"Method","Path","User","ClientIP","BadURL","Header","ResponseCode",NULL};
-char *Token=NULL, *ptr;
+char *Token=NULL;
+const char *ptr;
 ListNode *Node;
 int Type;
 
@@ -98,7 +97,7 @@ ptr=GetToken(ptr,":",&Token,0);
 Node=ListAddNamedItem(Settings.Events,Token,CopyStr(NULL,ptr));
 Node->ItemType=Type;
 
-DestroyString(Token);
+Destroy(Token);
 }
 
 
@@ -106,8 +105,10 @@ DestroyString(Token);
 //'download as zip' in the directory webpage
 char *ParsePackFormats(char *RetStr, const char *Config)
 {
-char *Name=NULL, *Value=NULL, *ptr, *tptr;
+char *Name=NULL, *Value=NULL;
 char *Path=NULL;
+const char *ptr;
+char *tptr;
 
 RetStr=CopyStr(RetStr,"");
 ptr=GetNameValuePair(Config, ",",":",&Name,&Value);
@@ -121,7 +122,7 @@ if (StrLen(Name) && StrLen(Value))
 		tptr=strchr(Value,' ');
 		if (tptr)
 		{
-			*tptr='\0';
+			StrTrunc(Value, tptr-Value);
 			tptr++;
 		}
 		//we don't want this to be null if strchr returns a null, otherwise it will
@@ -135,22 +136,23 @@ if (StrLen(Name) && StrLen(Value))
 ptr=GetNameValuePair(ptr, ",",":",&Name,&Value);
 }
 
-DestroyString(Name);
-DestroyString(Value);
+Destroy(Name);
+Destroy(Value);
 
 return(RetStr);
 }
 
-void ParseConfigItem(char *ConfigLine)
+void ParseConfigItem(const char *ConfigLine)
 {
 const char *ConfTokens[]={"Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","Path","FileType","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","WebsocketHandler","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings",
 "SSLKey","SSLCert","SSLCiphers","SSLDHParams","SSLClientCertificate","SSLVerifyPath", "SSLVersion",
-"Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats",NULL};
+"Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats","Admin",NULL};
 typedef enum {CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_PATH, CT_FILETYPE, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, 
 CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_SSL_VERSION, 
-CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS} TConfigTokens;
+CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS, CT_ADMIN} TConfigTokens;
 
-char *Token=NULL, *ptr;
+char *Token=NULL;
+const char *ptr;
 struct group *grent;
 struct stat Stat;
 TConfigTokens TokType;
@@ -223,15 +225,13 @@ switch(TokType)
 
 	case CT_SSLKEY:
 		if (! Settings.SSLKeys) Settings.SSLKeys=ListCreate();
-		Token=FormatStr(Token,"SSL_KEY_FILE:%d",ListSize(Settings.SSLKeys));
-		ListAddNamedItem(Settings.SSLKeys,Token,CopyStr(NULL,ptr));
+		ListAddNamedItem(Settings.SSLKeys,"SSL:KeyFile",CopyStr(NULL,ptr));
 		Settings.Flags |=FLAG_SSL;
 	break;
 
 	case CT_SSLCERT:
 		if (! Settings.SSLKeys) Settings.SSLKeys=ListCreate();
-		Token=FormatStr(Token,"SSL_CERT_FILE:%d",ListSize(Settings.SSLKeys));
-		ListAddNamedItem(Settings.SSLKeys,Token,CopyStr(NULL,ptr));
+		ListAddNamedItem(Settings.SSLKeys,"SSL:CertFile",CopyStr(NULL,ptr));
 		Settings.Flags |=FLAG_SSL;
 	break;
 	
@@ -257,7 +257,7 @@ switch(TokType)
 			Settings.Flags &= ~FLAG_COMPRESS;
 			Settings.Flags |= FLAG_PARTIAL_COMPRESS;
 		}
-		else if (! YesNoTrueFalse(ptr)) Settings.Flags &= ~(FLAG_COMPRESS | FLAG_PARTIAL_COMPRESS);
+		else if (! strtobool(ptr)) Settings.Flags &= ~(FLAG_COMPRESS | FLAG_PARTIAL_COMPRESS);
 		else
 		{
 			Settings.Flags &= ~FLAG_PARTIAL_COMPRESS;
@@ -283,12 +283,12 @@ switch(TokType)
 	break;
 
 	case CT_LOG_VERBOSE:
-		if (YesNoTrueFalse(ptr)) Settings.Flags |= FLAG_LOG_VERBOSE;
+		if (strtobool(ptr)) Settings.Flags |= FLAG_LOG_VERBOSE;
 		else Settings.Flags &= ~FLAG_LOG_VERBOSE;
 	break;
 
 	case CT_MAXLOGSIZE:
-		Settings.MaxLogSize = (int) ParseHumanReadableDataQty(ptr, 0);
+		Settings.MaxLogSize = (int) FromMetric(ptr, 0);
 	break;
 
   case CT_SCRIPTHANDLER:
@@ -325,7 +325,7 @@ switch(TokType)
 	break;
 
 	case CT_LOOKUPCLIENT:
-		if (YesNoTrueFalse(ptr)) Settings.Flags |= FLAG_LOOKUP_CLIENT;
+		if (strtobool(ptr)) Settings.Flags |= FLAG_LOOKUP_CLIENT;
 		else Settings.Flags &= ~FLAG_LOOKUP_CLIENT;
 	break;
 
@@ -361,7 +361,7 @@ switch(TokType)
 	break;
 
 	case CT_SESSION_KEEPALIVE:
-		if (YesNoTrueFalse(ptr)) Settings.Flags |= FLAG_KEEPALIVES;
+		if (strtobool(ptr)) Settings.Flags |= FLAG_KEEPALIVES;
 		else Settings.Flags &= ~FLAG_KEEPALIVES;
 	break;
 
@@ -388,16 +388,21 @@ switch(TokType)
 	case CT_ARCHIVE_FORMATS:
 		Settings.PackFormats=ParsePackFormats(Settings.PackFormats, ptr);
 	break;
+
+	case CT_ADMIN:
+		Settings.AuthFlags |= FLAG_AUTH_ADMIN;
+	break;
 }
 
-DestroyString(Token);
+Destroy(Token);
 }
 
 
 
 void ParseConfigItemList(const char *ConfigItemList)
 {
-char *Tempstr=NULL, *ptr;
+char *Tempstr=NULL;
+const char *ptr;
 
     if (StrLen(ConfigItemList))
     {
@@ -411,16 +416,17 @@ char *Tempstr=NULL, *ptr;
 
 	PostProcessSettings(&Settings);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
 
 
-void HandleUserSetup(char *Operation, int argc, char *argv[])
+void HandleUserSetup(const char *Operation, int argc, char *argv[])
 {
  int i, result;
- char *UserName=NULL, *Password=NULL, *PassType=NULL, *HomeDir=NULL, *RealUser=NULL, *Args=NULL;
+ char *UserName=NULL, *Password=NULL, *PassType=NULL, *HomeDir=NULL, *RealUser=NULL, *Args=NULL, *Path=NULL;
+ const char *ptr;
 
 	if (strcmp(Operation,"del")==0) PassType=CopyStr(PassType,"delete");
 	else PassType=CopyStr(PassType,"sha256");
@@ -456,21 +462,29 @@ void HandleUserSetup(char *Operation, int argc, char *argv[])
 	else Args=MCatStr(Args,argv[i]," ",NULL);
  }
 
-	if (strcmp(Operation,"list")==0) ListNativeFile(Settings.AuthPath);
+	if (strcmp(Operation,"list")==0) AuthNativeListUsers(Settings.AuthPath);
 	else if (! StrLen(UserName)) printf("ERROR: NO USERNAME GIVEN\n");
+	else if (strchr(UserName, ':')) printf("ERROR: The ':' character is not allowed in usernames as it is used for various purposes. Sorry.\n");
 	else if ((strcmp(Operation,"add")==0) && (! StrLen(Password))) printf("ERROR: NO PASSWORD GIVEN\n");
-	else 
-	{
-		result=UpdateNativeFile(Settings.AuthPath, UserName, PassType, Password, HomeDir,RealUser, Args);
-		if (result==ERR_FILE) printf("ERROR: Cannot open file '%s'\n",Settings.AuthPath);
-	}
+  else
+  {
+    ptr=GetToken(Settings.AuthPath, ":", &Path, 0);
+    while (ptr)
+    {
+    result=AuthNativeChange(Path, UserName, PassType, Password, HomeDir,RealUser, Args);
+    if (result==ERR_FILE) printf("ERROR: Cannot open file '%s'\n", Path);
+    else break;
+    ptr=GetToken(ptr, ":", &Path, 0);
+    }
+  }
 
- DestroyString(UserName);
- DestroyString(Password);
- DestroyString(PassType);
- DestroyString(RealUser);
- DestroyString(HomeDir);
- DestroyString(Args);
+ Destroy(UserName);
+ Destroy(Password);
+ Destroy(PassType);
+ Destroy(RealUser);
+ Destroy(HomeDir);
+ Destroy(Path);
+ Destroy(Args);
 
 	//Always exit when this is done, don't launch webserver
  exit(0);
@@ -550,8 +564,7 @@ if (strcmp(argv[1],"-user")==0)
 	else if (strcmp(argv[2],"del")==0) HandleUserSetup("del",argc, argv);
 	else printf("-user must be followed by one of \"add\", \"del\" or \"list\"\n");
 
-
-		exit(1);
+	exit(1);
 }
 
 
@@ -559,9 +572,10 @@ for (i=1; i < argc; i++)
 {
 	if (strcmp(argv[i],"-nodemon")==0) Settings->Flags |= FLAG_NODEMON;
 	else if (strcmp(argv[i],"-d")==0) Settings->Flags |= FLAG_NODEMON;
-	else if (strcmp(argv[i],"-i")==0) Settings->BindAddress=CopyStr(Settings->BindAddress,argv[++i]);
+	else if (strcmp(argv[i],"-i")==0) Settings->BindAddress=MCatStr(Settings->BindAddress,argv[++i],",",NULL);
 	else if (strcmp(argv[i],"-a")==0) Settings->AuthPath=CopyStr(Settings->AuthPath,argv[++i]);
 	else if (strcmp(argv[i],"-A")==0) Settings->AuthMethods=CopyStr(Settings->AuthMethods,argv[++i]);
+	else if (strcmp(argv[i],"-admin")==0) Settings->AdminUser=CopyStr(Settings->AdminUser, argv[++i]);
 	else if (strcmp(argv[i],"-v")==0) 
 	{
 		if (Settings->Flags & FLAG_LOG_VERBOSE) Settings->Flags |= FLAG_LOG_MORE_VERBOSE;
@@ -737,7 +751,7 @@ Settings.BindAddress=CopyStr(Settings.BindAddress,"");
 Settings.Flags |= FLAG_KEEPALIVES;
 Settings.DirListFlags=DIR_SHOWFILES | DIR_FANCY;
 Settings.AuthFlags=FLAG_AUTH_REQUIRED | FLAG_AUTH_COOKIE;
-Settings.AuthPath=CopyStr(Settings.AuthPath,"/etc/alaya.auth");
+Settings.AuthPath=CopyStr(Settings.AuthPath,"/etc/alaya.auth:~/.alaya/alaya.auth");
 Settings.AuthMethods=CopyStr(Settings.AuthMethods,"accesstoken,cookie,native");
 Settings.AuthRealm=CopyStr(Settings.AuthRealm,UnameData.nodename);
 Settings.IndexFiles=CopyStr(Settings.IndexFiles,"index.html,dir.html");
@@ -767,7 +781,7 @@ STREAM *S;
 char *Tempstr=NULL;
 
 
-S=STREAMOpenFile(Settings->ConfigPath,SF_RDONLY);
+S=STREAMFileOpen(Settings->ConfigPath,SF_RDONLY);
 if (S)
 {
 Tempstr=STREAMReadLine(Tempstr,S);
@@ -781,6 +795,6 @@ while (Tempstr)
 STREAMClose(S);
 }
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 

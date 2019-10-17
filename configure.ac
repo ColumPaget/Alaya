@@ -2,11 +2,6 @@
 
 AC_INIT([main.c])
 
-VERSION="1.1.2" 
-AC_SUBST(VERSION) 
-
-AC_CONFIG_SUBDIRS([libUseful-2.3])
-
 AC_PROG_CC 
 AC_LANG_C 
 AC_PROG_MAKE_SET 
@@ -17,33 +12,26 @@ AC_SYS_LARGEFILE
 AC_CHECK_LIB(z,deflate,,)
 cf_have_libz=$ac_cv_lib_z_deflate
 
-cf_have_capabilities=no
-cf_have_xattr=no
 cf_use_sendfile=yes
-cf_use_largefiles=yes
-
 AC_ARG_ENABLE(sendfile, [  --enable-sendfile       enable sendfile support (default=yes)], cf_use_sendfile=$enableval )
-AC_ARG_ENABLE(xattr, [  --enable-xattr       enable extended file attributes support (default=no)], cf_use_xattr=$enableval )
-AC_ARG_ENABLE(capabilities, [  --enable-capabilities       enable linux capabilities support (default=no)], cf_use_capabilities=$enableval )
-
-AC_ARG_ENABLE(ssl, [  --enable-ssl		use Secure Sockets Layer (default=no)], cf_use_ssl=$enableval )
 AC_ARG_ENABLE(ip6, [  --enable-ip6		use IPv6 (default=no)], cf_use_ip6=$enableval )
-AC_ARG_ENABLE(pam, [  --enable-pam		enable Pluggable Authentication Modules (default=autodetect) ], cf_use_pam=$enableval )
 
 
-
+cf_have_xattr=no
+AC_ARG_ENABLE(xattr, [  --enable-xattr       enable extended file attributes support (default=no)], cf_use_xattr=$enableval )
 if test "$cf_use_xattr" != "no"
 then
 AC_CHECK_HEADER(sys/xattr.h,AC_DEFINE([USE_XATTR]),,)
 fi
 
 
+cf_have_capabilities=no
+AC_ARG_ENABLE(capabilities, [  --enable-capabilities       enable linux capabilities support (default=no)], cf_use_capabilities=$enableval )
 if test "$cf_use_capabilities" != "no"
 then
 AC_CHECK_HEADER(sys/capability.h,cf_have_capabilities=yes,,)
 AC_CHECK_HEADER(linux/capability.h,cf_have_capabilities=yes,,)
 fi
-
 
 if test "$cf_have_capabilities" = "yes"
 then
@@ -52,6 +40,7 @@ AC_DEFINE([USE_LINUX_CAPABILITIES])
 fi
 
 
+AC_ARG_ENABLE(pam, [  --enable-pam		enable Pluggable Authentication Modules (default=autodetect) ], cf_use_pam=$enableval )
 if test "$cf_use_pam" != "no"
 then
 AC_CHECK_LIB(pam, pam_start,,)
@@ -60,6 +49,7 @@ fi
 
 
 
+AC_ARG_ENABLE(ssl, [  --enable-ssl		use Secure Sockets Layer (default=no)], cf_use_ssl=$enableval )
 if test "$cf_use_ssl" = "yes" 
 then
 AC_CHECK_LIB(ssl,SSL_library_init,,)
@@ -75,11 +65,36 @@ cf_have_libcrypt=$ac_cv_lib_crypt_crypt
 
 AC_CHECK_HEADER(shadow.h,AC_DEFINE(HAVE_SHADOW_H, 1))
 
+
+AC_ARG_WITH(system-libuseful, [  --with-system-libuseful       use systemwide libUseful.so rather than bundled version], cf_with_libuseful=$withval )
+
+if test "$cf_with_libuseful" != "no" -a "$cf_with_libuseful" != ""
+then
+AC_CHECK_LIB([Useful],[OpenSSLVerifyCallback],
+  [AC_CHECK_LIB([ssl],[SSL_new],,,[-lcrypto -lz])]
+  [AC_CHECK_LIB([crypto],[ERR_load_CRYPTO_strings],,,[-lz])]
+  [AC_CHECK_LIB([z],[inflate])]
+  ,,[-lssl -lcrypto -lz])
+AC_CHECK_LIB(Useful,GetToken)
+
+LUSEFUL="system"
+else
+LUSEFUL="bundled"
+STATIC_LIBS="libUseful/libUseful.a"
+AC_SUBST(STATIC_LIBS)
+AC_CONFIG_SUBDIRS([libUseful])
+fi
+
+
+
 dnl read Makefile.in and write Makefile 
 AC_OUTPUT(Makefile)
 
 echo
 echo "********** Alaya Compile Settings *********"
+
+echo "Using $LUSEFUL libUseful"
+
 if test	"$cf_have_libssl" != "yes" 
 then
 echo "SSL/https NOT enabled"

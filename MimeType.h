@@ -7,6 +7,8 @@
 #define FILE_NOSUCH 0
 #define FILE_EXISTS 1
 #define FILE_DIR    2
+#define FILE_EXEC   4
+#define FILE_READONLY 8
 
 #define FM_MEDIA_TAG 1
 #define FM_IMAGE_TAG 2
@@ -22,9 +24,9 @@ int Flags;
 } TFileMagic;
 
 
-void LoadFileMagics(char *MimeTypesPath, char *MagicsPath);
-TFileMagic *GetContentTypeInfo(char *ContentType);
-TFileMagic *GetFileTypeInfo(char *ContentType);
-TFileMagic *GetFileMagicForFile(char *Path, STREAM *S);
+void LoadFileMagics(const char *MimeTypesPath, const char *MagicsPath);
+TFileMagic *GetContentTypeInfo(const char *ContentType);
+TFileMagic *GetFileTypeInfo(const char *ContentType);
+TFileMagic *GetFileMagicForFile(const char *Path, STREAM *S);
 
 #endif

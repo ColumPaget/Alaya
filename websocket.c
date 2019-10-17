@@ -44,7 +44,8 @@ unsigned int Masked: 1;
 const char *WebsocketFindMatchingHelper(const char *Path, const char *Protocols, char **Proto)
 {
 ListNode *Curr;
-char *ptr, *p_Proto, *Token=NULL;
+char *Token=NULL;
+const char *ptr, *p_Proto;
 
 Curr=ListGetNext(Settings.ScriptHandlers);
 while (Curr)
@@ -61,7 +62,7 @@ while (Curr)
 			if (strcasecmp(p_Proto, Token)==0)
 			{
 				*Proto=CopyStr(*Proto, Token);
-				DestroyString(Token);
+				Destroy(Token);
 				return(Curr->Item);
 			}
 			ptr=GetToken(ptr," ",&Token,0);
@@ -72,7 +73,7 @@ while (Curr)
 Curr=ListGetNext(Curr);
 }
 
-DestroyString(Token);
+Destroy(Token);
 return(NULL);
 }
 
@@ -139,7 +140,8 @@ WebsocketCopyData(S, S, len, mask);
 void WebsocketWriteData(STREAM *S, const char *Data, int len, int mask, int flags)
 {
 TWSHeader Head;
-char *Tempstr=NULL, *ptr;
+char *Tempstr=NULL;
+const char *ptr;
 uint16_t val;
 
 memset(&Head,0,2);
@@ -159,7 +161,7 @@ if (len > 125)
 
 STREAMWriteBytes(S, Data, len);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
@@ -172,7 +174,7 @@ STREAM *Prog, *S;
 ListNode *Streams;
 
 	Streams=ListCreate();
-	Prog=ChrootSendRequest(Session, "WEBSOCKET", Helper, "/bin:/usr/bin");
+	Prog=ChrootSendPathRequest(Session, "WEBSOCKET", Helper, "/bin:/usr/bin");
 	STREAMSetFlushType(Prog, FLUSH_FULL, 0, 4096);
 	ListAddItem(Streams, Prog);
 	ListAddItem(Streams, Client);
@@ -208,12 +210,10 @@ ListNode *Streams;
 		}
 	} while((OpCode & 0xFF) != WEBSOCKET_CLOSE);
 
-fprintf(stderr,"WEBSOCK CLOSE!\n");
-
 	STREAMClose(Prog);
 
 ListDestroy(Streams, NULL);
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
@@ -250,7 +250,7 @@ for (ptr=Key; *ptr !='\0'; ptr++)
 
 val=strtoll(Tempstr, NULL, 10) / spaces;
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 
 return(val);
 }
@@ -272,7 +272,7 @@ memcpy(String+4,&v2,4);
 STREAMReadBytes(S, (char *) String+8,8);
 HashBytes(Key, "md5", String, 16, ENCODE_BASE64);
 
-DestroyString(String);
+Destroy(String);
 }
 
 
@@ -287,7 +287,7 @@ Response=HTTPSessionCreate();
 Response->MethodID=METHOD_WEBSOCKET;
 //SetVar(Response->Headers,"Sec-WebSocket-Origin", "file://");
 Helper=CopyStr(Helper, WebsocketFindMatchingHelper(Session->Path, Session->ContentType, &Proto));
-if (StrLen(Helper))
+if (StrValid(Helper))
 {
 	if (Session->MethodID==METHOD_WEBSOCKET75) 
 	{
@@ -321,9 +321,9 @@ else
 
 HTTPSessionDestroy(Response);
 
-DestroyString(Tempstr);
-DestroyString(Helper);
-DestroyString(Proto);
-DestroyString(Key);
+Destroy(Tempstr);
+Destroy(Helper);
+Destroy(Proto);
+Destroy(Key);
 }
 

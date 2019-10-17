@@ -1,27 +1,36 @@
 CC = @CC@
 CFLAGS = @CFLAGS@
 CPPFLAGS = @CPPFLAGS@
-LIBS = @LIBS@ @LDFLAGS@ #-lUseful-2.3
+LIBS = @LIBS@ @LDFLAGS@ -lUseful
 INSTALL=@INSTALL@
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 bindir=@sbindir@
 sysconfdir=@sysconfdir@
 FLAGS=$(CFLAGS) $(CPPFLAGS) @DEFS@ 
-OBJ=AccessTokens.o Authenticate.o MimeType.o DavProps.o Settings.o common.o server.o FileProperties.o directory_listing.o FileDetailsPage.o VPath.o ChrootHelper.o Events.o ID3.o upload.o proxy.o websocket.o libUseful-2.3/libUseful-2.3.a 
+OBJ=AccessTokens.o Authenticate.o auth_alaya_native.o auth_unix.o auth_pam.o MimeType.o DavProps.o Settings.o common.o server.o FileProperties.o tar.o directory_listing.o FileDetailsPage.o VPath.o ChrootHelper.o UserAdminScreen.o Events.o ID3.o upload.o proxy.o websocket.o xssi.o @STATIC_LIBS@
 EXE=alaya
 
 all: $(OBJ)
 	$(CC) $(FLAGS) -o $(EXE) $(OBJ) main.c $(LIBS) 
 
-libUseful-2.3/libUseful-2.3.a: 
-	@cd libUseful-2.3; $(MAKE)
+libUseful/libUseful.a: 
+	@cd libUseful; $(MAKE)
 
 AccessTokens.o: AccessTokens.c AccessTokens.h
 	$(CC) $(FLAGS) -c AccessTokens.c
 
 Authenticate.o: Authenticate.c Authenticate.h
 	$(CC) $(FLAGS) -c Authenticate.c
+
+auth_alaya_native.o: auth_alaya_native.c auth_alaya_native.h
+	$(CC) $(FLAGS) -c auth_alaya_native.c
+
+auth_unix.o: auth_unix.c auth_unix.h
+	$(CC) $(FLAGS) -c auth_unix.c
+
+auth_pam.o: auth_pam.c auth_pam.h
+	$(CC) $(FLAGS) -c auth_pam.c
 
 MimeType.o: MimeType.c MimeType.h
 	$(CC) $(FLAGS) -c MimeType.c 
@@ -47,6 +56,9 @@ Events.o: Events.c Events.h
 VPath.o: VPath.c VPath.h
 	$(CC) $(FLAGS) -c VPath.c
 
+UserAdminScreen.o: UserAdminScreen.c UserAdminScreen.h
+	$(CC) $(FLAGS) -c UserAdminScreen.c
+
 directory_listing.o: directory_listing.c directory_listing.h
 	$(CC) $(FLAGS) -c directory_listing.c 
 
@@ -56,6 +68,9 @@ FileDetailsPage.o: FileDetailsPage.c FileDetailsPage.h
 FileProperties.o: FileProperties.c FileProperties.h
 	$(CC) $(FLAGS) -c FileProperties.c 
 
+tar.o: tar.c tar.h
+	$(CC) $(FLAGS) -c tar.c 
+
 ID3.o: ID3.c ID3.h
 	$(CC) $(FLAGS) -c ID3.c 
 
@@ -64,6 +79,9 @@ upload.o: upload.c upload.h
 
 proxy.o: proxy.c proxy.h
 	$(CC) $(FLAGS) -c proxy.c
+
+xssi.o: xssi.c xssi.h
+	$(CC) $(FLAGS) -c xssi.c
 
 websocket.o: websocket.c websocket.h
 	$(CC) $(FLAGS) -c websocket.c
@@ -83,7 +101,6 @@ install:
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)
 	$(INSTALL) $(EXE) $(DESTDIR)$(bindir)
 	$(INSTALL) alaya.conf $(DESTDIR)$(sysconfdir)
-
 
 test: libUseful.so
 	-echo "No tests written yet"

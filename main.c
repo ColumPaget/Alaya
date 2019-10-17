@@ -35,6 +35,10 @@ STREAM *ParentProcessPipe=NULL;
 void SigHandler(int sig)
 {
 if (sig==SIGHUP) Settings.Flags |= FLAG_SIGHUP_RECV;
+
+//we do not want SIGPIPE to kill the parent process if a child process exits!
+signal(SIGPIPE, SigHandler);
+
 signal(SIGHUP, SigHandler);
 
 //This is to stop select restarting if we get a SIGCHLD, if we get a signal
@@ -49,7 +53,12 @@ int ChildFunc(void *Data)
 {
 HTTPSession *Session;
 
+		//go back to the default behavior for SIGPIPE. If a child process gets disconnected
+		//from anything we don't want to keep sending to it.
+		signal(SIGPIPE, SIG_DFL);
+
 		ParentProcessPipe=STREAMFromDualFD(0,1);
+		STREAMSetTimeout(ParentProcessPipe, 10);
 		Session=(HTTPSession *) Data;
 		Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 		STREAMSetFlushType(Session->S,FLUSH_FULL,0,4096);
@@ -65,7 +74,7 @@ HTTPSession *Session;
 		_exit(0);
 }
 
-void AcceptConnection(int ServiceSock)
+void AcceptConnection(STREAM *Serv)
 {
 int fd, infd, outfd;
 char *Tempstr=NULL;
@@ -77,20 +86,19 @@ pid_t pid;
 		LogFileCheckRotate(Settings.LogPath);
 
 		Session=HTTPSessionCreate();
-		fd=TCPServerSockAccept(ServiceSock,&Session->ClientIP);
-		Session->S=STREAMFromFD(fd);
+		Session->S=STREAMServerAccept(Serv);
 		STREAMSetFlushType(Session->S, FLUSH_FULL,0,0);
 
-		pid=PipeSpawnFunction(&infd,&outfd,NULL, ChildFunc, Session);
+		pid=PipeSpawnFunction(&infd,&outfd,NULL, ChildFunc, Session, "");
 		Tempstr=FormatStr(Tempstr,"%d",pid);
 		S=STREAMFromDualFD(outfd, infd);
 		ListAddNamedItem(Connections,Tempstr,S);
 
-	//Close the *socket* connection, as this parent app no longer needsto speak to it.
-	//however, the pipe connection to the child process stays open in Connectoins list
+	//Close the *socket* connection, as this parent app no longer needs to speak to it.
+	//however, the pipe connection to the child process stays open in Connections list
 	STREAMClose(Session->S);
 	HTTPSessionDestroy(Session);
-	DestroyString(Tempstr);
+	Destroy(Tempstr);
 }
 
 
@@ -125,7 +133,7 @@ while (Curr)
 	Next=ListGetNext(Curr);
 
 	S=(STREAM *) Curr->Item;
-	if (StrLen(Curr->Tag))
+	if (StrValid(Curr->Tag))
 	{
 	owner=strtol(Curr->Tag, NULL, 10);
 	helper=(int) STREAMGetItem(S,"HelperPid");
@@ -148,8 +156,8 @@ while (Curr)
 	Curr=Next;
 }
 
-DestroyString(PidsList);
-DestroyString(StatusList);
+Destroy(PidsList);
+Destroy(StatusList);
 }
 
 
@@ -178,7 +186,7 @@ void SetResourceLimits()
 struct rlimit limit;
 rlim_t val;
 
-val= (rlim_t) ParseHumanReadableDataQty(Settings.AddressSpace, 0);
+val= (rlim_t) FromMetric(Settings.AddressSpace, 0);
 if (val > 0)
 {
 getrlimit(RLIMIT_AS, &limit);
@@ -186,7 +194,7 @@ limit.rlim_cur=val;
 setrlimit(RLIMIT_AS, &limit);
 }
 
-val= (rlim_t) ParseHumanReadableDataQty(Settings.AddressSpace, 0);
+val= (rlim_t) FromMetric(Settings.AddressSpace, 0);
 if (val > 0)
 {
 getrlimit(RLIMIT_STACK, &limit);
@@ -201,29 +209,29 @@ setrlimit(RLIMIT_STACK, &limit);
 // inconsistent
 void InitSSL()
 {
-char *ptr;
+const char *ptr;
 
 	if (Settings.Flags & FLAG_SSL_PFS) 
 	{
-	//if (! StrLen(LibUsefulGetValue("SSL-DHParams-File"))) OpenSSLGenerateDHParams();
+	//if (! StrValid(LibUsefulGetValue("SSL-DHParams-File"))) OpenSSLGenerateDHParams();
 	}
 
 	ptr=LibUsefulGetValue("SSL-Permitted-Ciphers");
-	if (! StrLen(ptr))
+	if (! StrValid(ptr))
 	{
 		LibUsefulSetValue("SSL-Permitted-Ciphers", "DH+AESGCM:DH+AES256:DH+CAMELLIA256:ECDH+AESGCM:ECDH+AES256:ECDH+AES128:DH+AES:EDH-RSA-DES-CBC3-SHA:ECDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:CAMELLIA256:AES128-SHA256:CAMELLIA128:AES128-GCM-SHA256:AES128-SHA256:AES128-SHA:DES-CBC3-SHA:!ADH:!AECDH:!aNULL:!eNULL:!LOW:!EXPORT:!MD5");
 	}
 
 	ptr=LibUsefulGetValue("SSL_VERIFY_CERTFILE");
-	if (! StrLen(ptr)) ptr=LibUsefulGetValue("SSL_VERIFY_CERTDIR");
+	if (! StrValid(ptr)) ptr=LibUsefulGetValue("SSL_VERIFY_CERTDIR");
 
-	if ((Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED) && (! StrLen(ptr)))
+	if ((Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED) && (! StrValid(ptr)))
 	{
 		HandleError(ERR_PRINT|ERR_LOG|ERR_EXIT, "ERROR: Client SSL Certificate required, but no certificate verify file/directory given.\nPlease Supply one with the -verify-path command-line-argument, or the SSLVerifyPath config file entry.");
 	}
 
 	ptr=LibUsefulGetValue("SSL-DHParams-File");
-	if (! StrLen(ptr))
+	if (! StrValid(ptr))
 	{
 		HandleError(ERR_PRINT|ERR_LOG, "WARNING: No DH parameters file given for SSL. Perfect Forward Secrecy can only be achieved with Eliptic Curve (ECDH) methods. ECDH depends on fixed values recomended by the U.S. National Institute of Standards and technology (NIST) and thus may not be trustworthy.\n\nCreate a DHParams file with 'openssl dhparam -2 -out dhparams.pem 4096' and give the path to it using the -dhparams command-line-argument or the DHParams config file entry, if you want DiffieHelman key exchange for Perfect Forward Secrecy.");
 
@@ -232,9 +240,62 @@ char *ptr;
 
 
 
+int ServiceSocketsInit(ListNode *Connections)
+{
+char *Tempstr=NULL, *Token=NULL;
+const char *ptr;
+int fd, BoundCount=0;
+STREAM *S;
+
+////Allow 5 secs for any previous instance of alaya to shutdown
+//for (i=0; i < 5; i++)
+
+ptr=GetToken(Settings.BindAddress,",",&Token,0);
+while (ptr)
+{
+	//if it starts with a '/' it's a unix Socket
+	if (*Token=='/') Tempstr=MCopyStr(Tempstr,"unix:",Token,NULL);
+	else Tempstr=FormatStr(Tempstr,"tcp:%s:%d",Token,Settings.Port);
+
+	S=STREAMServerInit(Tempstr);
+	if (! S)
+	{
+		sleep(1);
+		S=STREAMServerInit(Tempstr);
+	}
+
+	if (S) 
+	{
+			ListAddItem(Connections,S);
+			if (StrLen(Token)==0) Tempstr=MCopyStr(Tempstr,"alaya", Token, NULL);
+			else Tempstr=MCopyStr(Tempstr,"alaya-", Token, NULL);
+			WritePidFile(Tempstr);
+			BoundCount++;
+	}
+	else
+	{
+		LogToFile(Settings.LogPath, "Cannot bind to port %s",Tempstr);
+		printf("Cannot bind to port %s\n",Tempstr);
+	}
+
+	ptr=GetToken(ptr, ",",&Token,0);
+}
+
+if (BoundCount==0)
+{
+printf("Failed to bind any interface! Exiting.");
+LogToFile(Settings.LogPath, "Failed to bind any interface! Exiting.");
+exit(1);
+}
+
+Destroy(Tempstr);
+Destroy(Token);
+}
+
+
 main(int argc, char *argv[])
 {
-STREAM *ServiceSock, *S;
+STREAM *S;
 int fd;
 char *Tempstr=NULL;
 int result, i;
@@ -254,7 +315,7 @@ InitSettings();
 LibUsefulSetValue("SwitchUserAllowFail","yes");
 LibUsefulSetValue("SwitchGroupAllowFail","yes");
 
-if (StrLen(Settings.Timezone)) setenv("TZ",Settings.Timezone,TRUE);
+if (StrValid(Settings.Timezone)) setenv("TZ",Settings.Timezone,TRUE);
 //LibUsefulMemFlags |= MEMORY_CLEAR_ONFREE;
 
 openlog("alaya",LOG_PID, LOG_DAEMON);
@@ -285,27 +346,9 @@ if (Settings.Flags & FLAG_SSL) InitSSL();
 
 LoadFileMagics("/etc/mime.types","/etc/magic");
 
-//Allow 5 secs for any previous instance of alaya to shutdown
-for (i=0; i < 5; i++)
-{
-	fd=InitServerSock(SOCK_STREAM, Settings.BindAddress,Settings.Port);
-	if (fd != -1) break;
-	sleep(1);
-}
 
-if (fd==-1)
-{
-	LogToFile(Settings.LogPath, "Cannot bind to port %s:%d",Settings.BindAddress,Settings.Port);
-	printf("Cannot bind to port %s:%d\n",Settings.BindAddress,Settings.Port);
-	exit(1);
-}
+ServiceSocketsInit(Connections);
 
-
-Tempstr=FormatStr(Tempstr,"alaya-%s-port%d",Settings.BindAddress,Settings.Port);
-WritePidFile(Tempstr);
-
-ServiceSock=STREAMFromFD(fd);
-ListAddItem(Connections,ServiceSock);
 
 //We no longer need the 'bind port' capablity
 DropCapabilities(CAPS_LEVEL_NETBOUND);
@@ -316,9 +359,14 @@ S=STREAMSelect(Connections,NULL);
 
 if (S)
 {
-	if (S==ServiceSock) AcceptConnection(S->in_fd);
-	else 
+	switch (S->Type)
 	{
+	case STREAM_TYPE_UNIX_SERVER:
+	case STREAM_TYPE_TCP_SERVER:
+		AcceptConnection(S);
+	break;
+
+	default:
 		//This handles a request from a child process that is servicing a connection
 		//Often they are chrooted and need to call back to the parent process to 
 		//perform tasks for them. HandleChildProcessRequest can either return '0',
@@ -334,6 +382,7 @@ if (S)
 			STREAMClose(S);
 		}
 		else if (pid > 0) STREAMSetItem(S,"HelperPid",(void *) pid);
+	break;
 	}
 }
 
@@ -346,5 +395,5 @@ CollectChildProcesses();
 }
 
 LogFileFlushAll(TRUE);
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }

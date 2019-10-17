@@ -6,7 +6,7 @@
 #include "Authenticate.h"
 
 TSettings Settings;
-char *Version="2.0";
+char *Version="2.2";
 
 void SetTimezoneEnv()
 {
@@ -15,11 +15,11 @@ time_t Now;
 time(&Now);
 localtime(&Now);
 
-if (StrLen(tzname[1]))
+if (StrValid(tzname[1]))
 {
    setenv("TZ",tzname[1],TRUE);
 }
-else if (StrLen(tzname[0]))
+else if (StrValid(tzname[0]))
 {
    setenv("TZ",tzname[0],TRUE);
 }
@@ -149,34 +149,34 @@ HTTPSession *Trans;
 if (! p_Trans) return;
 Trans=(HTTPSession *) p_Trans;
 
-DestroyString(Trans->Protocol);
-DestroyString(Trans->Method);
-DestroyString(Trans->ResponseCode);
-DestroyString(Trans->OriginalURL);
-DestroyString(Trans->URL);
-DestroyString(Trans->Path);
-DestroyString(Trans->Cipher);
-DestroyString(Trans->Arguments);
-DestroyString(Trans->Destination);
-DestroyString(Trans->ContentType);
-DestroyString(Trans->ContentBoundary);
-DestroyString(Trans->UserName);
-DestroyString(Trans->Password);
-DestroyString(Trans->RealUser);
-DestroyString(Trans->HomeDir);
-DestroyString(Trans->AuthType);
-DestroyString(Trans->Host);
-DestroyString(Trans->ClientIP);
-DestroyString(Trans->ClientMAC);
-DestroyString(Trans->ClientHost);
-DestroyString(Trans->ClientReferrer);
-DestroyString(Trans->UserAgent);
-DestroyString(Trans->ServerName);
-DestroyString(Trans->SearchPath);
-DestroyString(Trans->UserSettings);
-DestroyString(Trans->StartDir);
+Destroy(Trans->Protocol);
+Destroy(Trans->Method);
+Destroy(Trans->ResponseCode);
+Destroy(Trans->OriginalURL);
+Destroy(Trans->URL);
+Destroy(Trans->Path);
+Destroy(Trans->Cipher);
+Destroy(Trans->Arguments);
+Destroy(Trans->Destination);
+Destroy(Trans->ContentType);
+Destroy(Trans->ContentBoundary);
+Destroy(Trans->UserName);
+Destroy(Trans->Password);
+Destroy(Trans->RealUser);
+Destroy(Trans->HomeDir);
+Destroy(Trans->AuthType);
+Destroy(Trans->Host);
+Destroy(Trans->ClientIP);
+Destroy(Trans->ClientMAC);
+Destroy(Trans->ClientHost);
+Destroy(Trans->ClientReferrer);
+Destroy(Trans->UserAgent);
+Destroy(Trans->ServerName);
+Destroy(Trans->SearchPath);
+Destroy(Trans->UserSettings);
+Destroy(Trans->StartDir);
 
-ListDestroy(Trans->Headers,DestroyString);
+ListDestroy(Trans->Headers,Destroy);
 free(Trans);
 }
 
@@ -220,10 +220,31 @@ Trans->SearchPath=CopyStr(Trans->SearchPath,"");
 //Trans->ServerName=CopyStr(Trans->ServerName,"");
 
 
-ListClear(Trans->Headers,DestroyString);
+ListClear(Trans->Headers,Destroy);
 }
 
+char *HTTPSessionGetArg(char *RetStr, HTTPSession *Session, const char *Arg)
+{
+char *Name=NULL, *Value=NULL;
+const char *ptr;
 
+RetStr=CopyStr(RetStr, "");
+ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
+while (ptr)
+{
+	if (strcasecmp(Name, Arg) ==0) 
+	{
+		RetStr=HTTPUnQuote(RetStr, Value);
+		break;
+	}
+	ptr=GetNameValuePair(ptr,"&","=",&Name,&Value);
+}
+
+Destroy(Name);
+Destroy(Value);
+
+return(RetStr);
+}
 
 
 void HandleError(int Flags, const char *FmtStr, ...)
@@ -238,7 +259,7 @@ va_end(args);
 if (Flags & ERR_LOG) LogToFile(Settings.LogPath, "%s", Tempstr);
 if (Flags & ERR_PRINT) printf("%s\n",Tempstr);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 if (Flags & ERR_EXIT) exit(1);
 }
 
@@ -261,10 +282,10 @@ void PathItemDestroy(void *pi_ptr)
 TPathItem *PI;
 
 PI=(TPathItem *) pi_ptr;
-DestroyString(PI->Path);
-DestroyString(PI->URL);
-DestroyString(PI->Name);
-DestroyString(PI->ContentType);
+Destroy(PI->Path);
+Destroy(PI->URL);
+Destroy(PI->Name);
+Destroy(PI->ContentType);
 free(PI);
 }
 
@@ -277,7 +298,7 @@ char *Tempstr=NULL, *Quoted=NULL;
 const char *ptr=NULL, *sd_ptr;
 int len;
 
-if (StrLen(Session->Host))
+if (StrValid(Session->Host))
 {
 if (Settings.Flags & FLAG_SSL) Tempstr=MCopyStr(Buff,"https://",Session->Host,"/",NULL);
 else Tempstr=MCopyStr(Buff,"http://",Session->Host,"/",NULL);
@@ -287,7 +308,7 @@ else Tempstr=CopyStr(Tempstr,"/");
 ptr=ItemPath;
 while (*ptr == '/') ptr++;
 
-if (StrLen(Session->StartDir)) sd_ptr=Session->StartDir;
+if (StrValid(Session->StartDir)) sd_ptr=Session->StartDir;
 else sd_ptr="";
 
 while (*sd_ptr == '/') sd_ptr++;
@@ -295,11 +316,11 @@ while (*sd_ptr == '/') sd_ptr++;
 len=StrLen(sd_ptr);
 
 if (strncmp(ptr, sd_ptr,len)==0) ptr+=len;
-Quoted=HTTPQuoteChars(Quoted,ptr," ()[]{}\t?&%!,+\':;#");
+Quoted=HTTPQuoteChars(Quoted, ptr, " ()[]{}\t?&%!,+\':;#");
 
 Tempstr=CatStr(Tempstr,Quoted);
 
-DestroyString(Quoted);
+Destroy(Quoted);
 return(Tempstr);
 }
 
@@ -320,9 +341,8 @@ if (len > 1)
   StripDirectorySlash(RetStr);
 
   //Now strip off one dir name (the result of '..')
-  ptr=strrchr(RetStr,'/');
-  if (ptr) *ptr='\0';
-  if (StrLen(RetStr)==0) RetStr=CopyStr(RetStr,"/");
+  StrRTruncChar(RetStr,'/');
+  if (! StrValid(RetStr)) RetStr=CopyStr(RetStr,"/");
 }
 RetStr=SlashTerminateDirectoryPath(RetStr);
 
@@ -332,7 +352,8 @@ return(RetStr);
 
 char *SessionGetArgument(char *RetBuff, HTTPSession *Session, const char *ReqName)
 {
-char *Name=NULL, *Value=NULL, *RetStr=NULL, *ptr;
+char *Name=NULL, *Value=NULL, *RetStr=NULL;
+const char *ptr;
 
 ptr=GetNameValuePair(Session->Arguments, "&", "=", &Name, &Value);
 while (ptr)
@@ -345,8 +366,8 @@ while (ptr)
 ptr=GetNameValuePair(ptr, "&", "=", &Name, &Value);
 }
 
-DestroyString(Name);
-DestroyString(Value);
+Destroy(Name);
+Destroy(Value);
 
 return(RetStr);
 }
@@ -354,10 +375,10 @@ return(RetStr);
 
 int IsLocalHost(HTTPSession *Session, char *Host)
 {
-char *ptr;
+const char *ptr;
 int len;
 
-if (StrLen(Host)==0) return(TRUE);
+if (! StrValid(Host)) return(TRUE);
 if (strcmp(Host,"localhost")==0) return(TRUE);
 if (strcmp(Host,"127.0.0.1")==0) return(TRUE);
 
@@ -402,10 +423,10 @@ if (S_ISDIR(FStat.st_mode))
 }
 else
 {
-	In=STREAMOpenFile(From,SF_RDONLY);
+	In=STREAMFileOpen(From,SF_RDONLY);
 	if (In)
 	{
-		Out=STREAMOpenFile(To, SF_CREAT| SF_WRONLY | SF_TRUNC);
+		Out=STREAMFileOpen(To, SF_CREAT| SF_WRONLY | SF_TRUNC);
 		if (Out) RetVal=STREAMSendFile(In, Out, 0, SENDFILE_KERNEL | SENDFILE_LOOP);
 	}
 }
@@ -414,7 +435,7 @@ else
 //here as STREAMClose will ignore a NULL argument
 STREAMClose(In);
 STREAMClose(Out);
-DestroyString(Tempstr);
+Destroy(Tempstr);
 
 return(RetVal);
 }
@@ -437,8 +458,8 @@ if (IsLocalHost(Session,Host))
 
 	if (! IsLocalHost(Session,Host)) 
 	{
-			In=HTTPGet(From,User,Password);
-			if (In) Out=STREAMOpenFile(ToPath,SF_CREAT|SF_WRONLY|SF_TRUNC);
+			In=HTTPGet(From);
+			if (In) Out=STREAMFileOpen(ToPath,SF_CREAT|SF_WRONLY|SF_TRUNC);
 			if (Out) RetVal=STREAMSendFile(In, Out, 0, SENDFILE_KERNEL | SENDFILE_LOOP);
 			STREAMClose(In);
 			STREAMClose(Out);
@@ -446,13 +467,13 @@ if (IsLocalHost(Session,Host))
 	else RetVal=CopyLocalItem(FromPath, ToPath);
 }
 
-DestroyString(User);
-DestroyString(Password);
-DestroyString(Tempstr);
-DestroyString(Host);
-DestroyString(PortStr);
-DestroyString(FromPath);
-DestroyString(ToPath);
+Destroy(User);
+Destroy(Password);
+Destroy(Tempstr);
+Destroy(Host);
+Destroy(PortStr);
+Destroy(FromPath);
+Destroy(ToPath);
 
 return(RetVal);
 }

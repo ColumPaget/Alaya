@@ -6,11 +6,12 @@
 
 int UploadReadMultipartHeaders(STREAM *S, char **Field, char **FileName)
 {
-char *Tempstr=NULL, *Name=NULL, *Value=NULL, *ptr;
+char *Tempstr=NULL, *Name=NULL, *Value=NULL;
+const char *ptr;
 int result=FALSE;
 
 Tempstr=STREAMReadLine(Tempstr,S);
-while (StrLen(Tempstr))
+while (StrValid(Tempstr))
 {
 StripTrailingWhitespace(Tempstr);
 ptr=GetToken(Tempstr,":",&Name,0);
@@ -42,22 +43,23 @@ Tempstr=STREAMReadLine(Tempstr,S);
 StripTrailingWhitespace(Tempstr);
 }
 
-DestroyString(Tempstr);
-DestroyString(Name);
-DestroyString(Value);
+Destroy(Tempstr);
+Destroy(Name);
+Destroy(Value);
 
 return(result);
 }
 
 
-int MultipartReadFile(STREAM *S,char *FName,char *Boundary, int BoundaryLen)
+int MultipartReadFile(STREAM *S, const char *FName, const char *Boundary, int BoundaryLen)
 {
-char *Tempstr=NULL, *ptr;
+char *Tempstr=NULL;
+const char *ptr;
 int result, RetVal=FALSE;
 STREAM *FOut=NULL;
 off_t fsize;
 
-FOut=STREAMOpenFile(FName,SF_CREAT | SF_TRUNC | SF_WRONLY);
+FOut=STREAMFileOpen(FName,SF_CREAT | SF_TRUNC | SF_WRONLY);
 if (FOut)
 {
 	Tempstr=SetStrLen(Tempstr,4096);
@@ -90,7 +92,7 @@ STREAMClose(FOut);
 
 if (result==-1) RetVal=UPLOAD_DONE;
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 
 return(RetVal);
 }
@@ -102,7 +104,7 @@ char *Tempstr=NULL, *Name=NULL, *FileName=NULL, *QName=NULL, *QValue=NULL;
 char *Boundary;
 int blen=0;
 
-if (! (Session->Flags & SESSION_UPLOAD)) return;
+//if (! (Session->Flags & SESSION_UPLOAD)) return;
 Boundary=MCopyStr(Boundary,"--",Session->ContentBoundary, NULL);
 blen=StrLen(Boundary);
 
@@ -118,7 +120,7 @@ while (Tempstr)
 
 		if (UploadReadMultipartHeaders(S, &Name, &FileName))
 		{
-			if (StrLen(FileName) > 0)
+			if (StrValid(FileName))
 			{
 			Tempstr=MCopyStr(Tempstr,Session->Path,"/",FileName,NULL);
 			if (MultipartReadFile(S,Tempstr,Boundary, blen)==UPLOAD_DONE) break;
@@ -130,7 +132,7 @@ while (Tempstr)
 				continue;
 			}
 			}
-			else if (StrLen(Name) > 0)
+			else if (StrValid(Name))
 			{
 				Tempstr=STREAMReadLine(Tempstr,S);
 				StripTrailingWhitespace(Tempstr);
@@ -150,16 +152,16 @@ Session->Arguments=CatStr(Session->Arguments,"&");
 Session->ContentSize=StrLen(Session->Arguments);
 if (Session->ContentSize > 0) Session->ContentType=CopyStr(Session->ContentType,"application/x-www-form-urlencoded");
 
-DestroyString(Boundary);
-DestroyString(FileName);
-DestroyString(Tempstr);
-DestroyString(Name);
-DestroyString(QName);
-DestroyString(QValue);
+Destroy(Boundary);
+Destroy(FileName);
+Destroy(Tempstr);
+Destroy(Name);
+Destroy(QName);
+Destroy(QValue);
 }
 
 
-void UploadSelectPage(STREAM *S,HTTPSession *Session,char *Path)
+void UploadSelectPage(STREAM *S, HTTPSession *Session, const char *Path)
 {
 char *HTML=NULL, *Tempstr=NULL;
 int i;
@@ -170,7 +172,7 @@ int i;
 	HTML=CatStr(HTML,"<table align=center border=0><tr><th bgcolor=#AAAAFF>Select files for upload</th></tr>\r\n");
 	for (i=0; i < 10; i++)
 	{
-  Tempstr=FormatStr(Tempstr,"<tr><td><input type=file name=uploadfile:%d></td></tr>\r\n",i);
+  Tempstr=FormatStr(Tempstr,"<tr><td><input multiple type=file name=uploadfile:%d></td></tr>\r\n",i);
   HTML=CatStr(HTML,Tempstr);
 	}
 	HTML=MCatStr(HTML,"<tr><td><input type=submit value=Upload></td></tr></table>\r\n",NULL);
@@ -179,8 +181,8 @@ int i;
 
 	HTTPServerSendResponse(S, Session, "200 OK","text/html",HTML);
 
-DestroyString(HTML);
-DestroyString(Tempstr);
+Destroy(HTML);
+Destroy(Tempstr);
 }
 
 

@@ -5,7 +5,7 @@
 
 #define FDETAILS_ACCESSTOKEN 1
 
-void FileDetailsSaveProps(STREAM *S, HTTPSession *Session, char *Props);
-void DirectoryItemEdit(STREAM *S, HTTPSession *Session, char *Path, int Flags);
+void FileDetailsSaveProps(STREAM *S, HTTPSession *Session, const char *Props);
+void DirectoryItemEdit(STREAM *S, HTTPSession *Session, const char *Path, int Flags);
 
 #endif

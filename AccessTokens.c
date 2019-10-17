@@ -4,7 +4,8 @@
 void ParseAccessToken(HTTPSession *Session)
 {
 char *Salt=NULL, *Token=NULL;
-char *Name=NULL, *Value=NULL, *ptr;
+char *Name=NULL, *Value=NULL;
+const char *ptr;
 
     ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
     while (ptr)
@@ -14,10 +15,10 @@ char *Name=NULL, *Value=NULL, *ptr;
     }
     Session->Password=CopyStr(Session->Password,Token);
 
-  DestroyString(Salt);
-  DestroyString(Name);
-  DestroyString(Value);
-  DestroyString(Token);
+  Destroy(Salt);
+  Destroy(Name);
+  Destroy(Value);
+  Destroy(Token);
 }
 
 
@@ -27,13 +28,13 @@ char *Tempstr=NULL, *RetStr=NULL;
 
 RetStr=CopyStr(Buffer,"");
 
-if (StrLen(Settings.AccessTokenKey))
+if (StrValid(Settings.AccessTokenKey))
 {
   Tempstr=MCopyStr(Tempstr,Salt,":",User,":",Settings.AccessTokenKey,":",RequestingHost,":",RequestURL,NULL);
   HashBytes(&RetStr,"sha1",Tempstr,StrLen(Tempstr),ENCODE_HEX);
 
 }
-DestroyString(Tempstr);
+Destroy(Tempstr);
 
 return(RetStr);
 }
@@ -46,7 +47,7 @@ char *Digest=NULL, *RetStr=NULL;
 Digest=MakeAccessDigest(Digest, User, Salt, RequestingHost, RequestURL);
 RetStr=MCopyStr(RetStr,User,":",Salt,":",Digest,NULL);
 
-DestroyString(Digest);
+Destroy(Digest);
 return(RetStr);
 }
 
@@ -60,9 +61,9 @@ if (strcmp(Session->Method, "PUT")==0) return(FALSE);
 if (strcmp(Session->Method, "POST")==0) return(FALSE);
 Token=MakeAccessDigest(Token, User, Salt, ClientIP, URL);
 
-if (StrLen(Token) && (strcmp(Token, CorrectToken)==0)) result=TRUE; 
+if (StrValid(Token) && (strcmp(Token, CorrectToken)==0)) result=TRUE; 
 
-DestroyString(Token);
+Destroy(Token);
 return(result);
 }
 
@@ -74,20 +75,20 @@ const char *ptr, *ipptr;
 int result=FALSE;
 
 //if (! (Session->Flags & FLAG_AUTH_ACCESS_TOKEN)) return(FALSE);
-if (StrLen(Settings.AccessTokenKey)==0) return(FALSE);
+if (! StrValid(Settings.AccessTokenKey)) return(FALSE);
 
 URL=FormatURL(URL,Session,Session->Path);
 
 
 //Password will be in format <salt>:<access token>
 ptr=GetToken(AccessToken,":",&User,0);
-if (StrLen(Session->UserName)==0) Session->UserName=CopyStr(Session->UserName,User);
+if (! StrValid(Session->UserName)) Session->UserName=CopyStr(Session->UserName,User);
 
 ptr=GetToken(ptr,":",&Salt,0);
 ptr=GetToken(ptr,"\\S",&Token,0);
 
 
-if (StrLen(Salt) && StrLen(User) && StrLen(Token))
+if (StrValid(Salt) && StrValid(User) && StrValid(Token))
 {
 	if (strncmp(Session->ClientIP,"::ffff:",7)==0) ipptr=Session->ClientIP+7;
 	else ipptr=Session->ClientIP;
@@ -99,8 +100,8 @@ if (StrLen(Salt) && StrLen(User) && StrLen(Token))
 	else if (CheckAccessToken(Session, User, Salt, "*", "*", Token)) result=TRUE;
 }
 
-DestroyString(Salt);
-DestroyString(URL);
+Destroy(Salt);
+Destroy(URL);
 
 return(result);
 }
@@ -108,8 +109,8 @@ return(result);
 
 int AccessTokenAuthCookie(HTTPSession *Session)
 {
-char *ptr, *Name=NULL, *Value=NULL, *Token=NULL;
-char *Tempstr=NULL;
+char *Name=NULL, *Value=NULL, *Token=NULL, *Tempstr=NULL;
+const char *ptr;
 int result=FALSE;
 
 Tempstr=CopyStr(Tempstr, Session->Cookies);
@@ -124,16 +125,16 @@ if (strcasecmp(Name,"AlayaAccessToken")==0)
 
 	if (result) Session->AuthFlags |= FLAG_AUTH_HASCOOKIE;
 }
-else Session->Cookies=MCatStr(Session->Cookies, Name, "=", Value, ";", NULL);
+else Session->Cookies=MCatStr(Session->Cookies, Name, "=", Value, "; ", NULL);
 
 while (isspace(*ptr)) ptr++;
 ptr=GetNameValuePair(ptr, ";", "=", &Name, &Value);
 }
 
-DestroyString(Name);
-DestroyString(Value);
-DestroyString(Token);
-DestroyString(Tempstr);
+Destroy(Name);
+Destroy(Value);
+Destroy(Token);
+Destroy(Tempstr);
 
 return(result);
 }
@@ -147,8 +148,8 @@ GenerateRandomBytes(&Salt,24,ENCODE_HEX);
 AccessToken=MakeAccessToken(AccessToken, Session->UserName, Salt, Session->ClientIP, "*");
 RetStr=MCopyStr(RetStr, "AlayaAccessToken=",AccessToken," domain=",Session->Host, NULL);
 
-DestroyString(AccessToken);
-DestroyString(Salt);
+Destroy(AccessToken);
+Destroy(Salt);
 
 return(RetStr);
 }

@@ -1,7 +1,9 @@
-#ifndef Authenticate_H
-#define Authenticate_H
+#ifndef ALAYA_AUTH_H
+#define ALAYA_AUTH_H
 
 #include "common.h"
+
+#define USER_UNKNOWN -1
 
 #define AUTH_OPEN 1
 #define AUTH_DENY 2
@@ -15,15 +17,14 @@
 
 
 
-int AuthenticateExamineMethods(char *Methods, int LogErrors);
-int CheckUserExists(char *);
-int Authenticate(HTTPSession *);
-int AuthPAM(HTTPSession *);
-char *GetDefaultUser();
+int AuthenticateExamineMethods(const char *Methods, int LogErrors);
+int CheckServerAllowDenyLists(const char *UserName);
+int CheckUserExists(const char *UserName);
+int Authenticate(HTTPSession *Session);
+const char *GetDefaultUser();
 
 
-int CheckServerAllowDenyLists(char *UserName);
-void ListNativeFile(char *Path);
-int UpdateNativeFile(char *Path, char *Name, char *PassType, char *Pass, char *HomeDir, char *RealUser, char *Args);
+void AuthNativeListUsers(const char *Path);
+int AuthNativeChange(const char *Path, const char *Name, const char *PassType, const char *Pass, const char *HomeDir, const char *RealUser, const char *Args);
 ;
 #endif

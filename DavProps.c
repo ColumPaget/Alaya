@@ -3,8 +3,8 @@
 #include "server.h"
 #include "FileProperties.h"
 
-const char *Props[]={"creationdate","displayname","getcontentlanguage","getcontentlength","getcontenttype","getetag","getlastmodified","lockdiscovery","resourcetype","source","supportedlock","iscollection","ishidden","isreadonly","executable",NULL};
-typedef enum {PROP_CREATE_DATE,PROP_DISPLAY_NAME,PROP_CONTENT_LANG, PROP_CONTENT_SIZE, PROP_CONTENT_TYPE,PROP_ETAG,PROP_LASTMODIFIED,PROP_LOCK_CHECK,PROP_RESOURCE_TYPE,PROP_SOURCE,PROP_SUPPORTEDLOCK, PROP_ISCOLLECTION,PROP_ISHIDDEN, PROP_ISREADONLY, PROP_EXECUTABLE} TDavProps;
+const char *Props[]={"creationdate","displayname","getcontentlanguage","getcontentlength","getcontenttype","getetag","getctag","getlastmodified","lockdiscovery","resourcetype","source","supportedlock","iscollection","ishidden","isreadonly","executable",NULL};
+typedef enum {PROP_CREATE_DATE,PROP_DISPLAY_NAME,PROP_CONTENT_LANG, PROP_CONTENT_SIZE, PROP_CONTENT_TYPE,PROP_ETAG,PROP_CTAG,PROP_LASTMODIFIED,PROP_LOCK_CHECK,PROP_RESOURCE_TYPE,PROP_SOURCE,PROP_SUPPORTEDLOCK, PROP_ISCOLLECTION,PROP_ISHIDDEN, PROP_ISREADONLY, PROP_EXECUTABLE} TDavProps;
 
 
 
@@ -20,7 +20,7 @@ for (i=0; Props[i] !=NULL; i++) ListAddNamedItem(PropList,Props[i],NULL);
 
 void TagSeparateNamespace(char *Tag, char **Namespace, char **Name)
 {
-char *ptr, *ptr2;
+const char *ptr, *ptr2;
 
 if (Namespace) *Namespace=CopyStr(*Namespace,"");
 *Name=CopyStr(*Name,"");
@@ -48,22 +48,123 @@ StripDirectorySlash(*Name);
 }
 
 
-char *HTTPServerParseProp(char *XML, char *PropName, ListNode *PropList)
+char *DavPropsGenerateEtag(char *RetStr, const char *Target)
 {
-char *ptr;
+struct stat Stat;
+char *Tempstr=NULL;
+
+RetStr=CopyStr(RetStr, "");
+if (stat(Target, &Stat)==-1) return(RetStr);
+
+Tempstr=FormatStr(Tempstr, "%s:%lu:%lu", Target, Stat.st_mtime, Stat.st_size);
+HashBytes(&RetStr, "md5", Tempstr, StrLen(Tempstr), ENCODE_BASE64);
+
+Destroy(Tempstr);
+return(RetStr);
+}
+
+
+char *DavPropsMakePath(char *Path, const char *Target, const char *Property)
+{
+struct stat Stat;
+char *Tempstr=NULL;
+const char *ptr;
+
+stat(Target, &Stat);
+if (S_ISDIR(Stat.st_mode)) 
+{
+	Path=MCopyStr(Path, Target, "/.alaya/", Property, NULL);
+	MakeDirPath(Path, 0770);
+}
+else
+{
+	ptr=strrchr(Target, '/');
+	Tempstr=CopyStrLen(Tempstr, Target, ptr-Target);
+	Path=MCopyStr(Path, Tempstr, "/.alaya/", Property, NULL);
+}
+
+Destroy(Tempstr);
+
+return(Path);
+}
+
+
+
+char *DavPropsGet(char *RetStr, const char *Target, const char *Property)
+{
+char *Path=NULL;
+int RetVal=FALSE;
+STREAM *S;
+
+RetStr=CopyStr(RetStr, "");
+Path=DavPropsMakePath(Path, Target, Property);
+S=STREAMOpen(Path, "r");
+if (S)
+{
+RetStr=STREAMReadLine(RetStr, S);
+STREAMClose(S);
+}
+
+return(RetStr);
+}
+
+
+int DavPropsStore(const char *Target, const char *Property, const char *Value)
+{
+char *Path=NULL;
+int RetVal=FALSE;
+STREAM *S;
+
+Path=DavPropsMakePath(Path, Target, Property);
+
+S=STREAMOpen(Path, "w");
+if (S)
+{
+STREAMWriteLine(Value, S);
+RetVal=TRUE;	
+STREAMClose(S);
+}
+
+return(RetVal);
+}
+
+
+
+
+int DavPropsIncr(const char *Target, const char *Property)
+{
+char *Tempstr=NULL;
+int val;
+STREAM *S;
+
+Tempstr=DavPropsGet(Tempstr, Target, Property);
+val=atoi(Tempstr) +1;
+Tempstr=FormatStr(Tempstr, "%d", val);
+DavPropsStore(Target, Property, Tempstr);
+
+Destroy(Tempstr);
+return(TRUE);
+}
+
+
+
+
+const char *HTTPServerParseProp(const char *XML, char *PropName, ListNode *PropList)
+{
 char *Tag=NULL, *Args=NULL;
+const char *ptr;
 
 
-if (! StrLen(PropName)) return(XML);
+if (! StrValid(PropName)) return(XML);
 if (*PropName=='/') return(XML);
 
 //if PropName has format getcontenttype/ then strip '/'
 StripDirectorySlash(PropName);
 
-ptr=HtmlGetTag(XML,&Tag,&Args);
+ptr=XMLGetTag(XML,NULL,&Tag,&Args);
 
 //if the next thing is an XML tag, then 'rewind' and add a blank prop
-if (StrLen(Tag)!=0)
+if (StrValid(Tag))
 {
 	ptr=XML;
 	Args=CopyStr(Args,"");
@@ -72,8 +173,8 @@ if (StrLen(Tag)!=0)
 StripTrailingWhitespace(Args);
 ListAddNamedItem(PropList, PropName, CopyStr(NULL,Args));
 
-DestroyString(Args);
-DestroyString(Tag);
+Destroy(Args);
+Destroy(Tag);
 
 return(ptr);
 }
@@ -82,41 +183,40 @@ return(ptr);
 
 void HTTPServerReadProps(STREAM *S, HTTPSession *Heads, ListNode *PropList)
 {
-char *XML=NULL, *Tag=NULL, *Args=NULL,  *Data=NULL, *Tempstr=NULL;
-char *ptr;
+char *XML=NULL, *Tag=NULL, *Args=NULL,  *NS=NULL, *Tempstr=NULL;
+const char *ptr;
 
 
-HTTPServerReadBody(Heads, &Tempstr);
+HTTPServerReadBody(Heads,  &XML);
 
-ptr=HtmlGetTag(XML,&Tempstr,&Args);
+ptr=XMLGetTag(XML, &NS, &Tag, &Args);
 while (ptr)
 {
-TagSeparateNamespace(Tempstr, NULL, &Tag);
-
-if (strcasecmp(Tag,"prop")==0)
+LogToFile(Settings.LogPath, "OF TAG: %s ", Tag);
+if (strcasecmp(Tag, "prop")==0)
 {
-	ptr=HtmlGetTag(ptr,&Tempstr,&Args);
+	ptr=XMLGetTag(ptr, &NS, &Tag, &Args);
 	while (ptr)
 	{
-		TagSeparateNamespace(Tempstr, NULL, &Tag);
-		if (strcasecmp(Tag,"/prop")==0) break;
-		if (strcasecmp(Tag,"/propfind")==0) break;
+LogToFile(Settings.LogPath, "PF TAG: %s ", Tag);
+		if (strcasecmp(Tag, "/prop")==0) break;
+		if (strcasecmp(Tag, "/propfind")==0) break;
 		
-		ptr=HTTPServerParseProp(ptr,Tag,PropList);
+		ptr=HTTPServerParseProp(ptr, Tag, PropList);
 
-		ptr=HtmlGetTag(ptr,&Tempstr,&Args);
+		ptr=XMLGetTag(ptr, &NS, &Tag, &Args);
 	}
 }
-else if (strcasecmp(Tag,"allprop")==0) AddStandardProps(PropList);
+else if (strcasecmp(Tag, "allprop")==0) AddStandardProps(PropList);
 
-ptr=HtmlGetTag(ptr,&Tempstr,&Args);
+ptr=XMLGetTag(ptr, &NS, &Tag, &Args);
 }
 
 
-DestroyString(Tag);
-DestroyString(Args);
-DestroyString(Data);
-DestroyString(XML);
+Destroy(Tag);
+Destroy(Args);
+Destroy(NS);
+Destroy(XML);
 }
 
 
@@ -160,8 +260,16 @@ if (FileType==FILE_DIR) RetStr=MCatStr(RetStr,"<getcontenttype>httpd/unix-direct
 else RetStr=MCatStr(RetStr,"<getcontenttype>",Curr->Item,"</getcontenttype>\n",NULL);
 break;
 
+
+case PROP_CTAG:
+ValBuff=DavPropsGet(ValBuff, ItemName, "ctag");
+if (StrValid(ValBuff)) RetStr=MCatStr(RetStr,"<getctag>", ValBuff, "</getctag>\n", NULL);
+else RetStr=CatStr(RetStr, "<getctag/>\n");
+break;
+
 case PROP_ETAG:
-RetStr=CatStr(RetStr,"<getetag />\n");
+ValBuff=DavPropsGenerateEtag(ValBuff, ItemName);
+RetStr=MCatStr(RetStr,"<getetag>", ValBuff, "</getetag>\n", NULL);
 break;
 
 case PROP_LASTMODIFIED:
@@ -205,7 +313,7 @@ break;
 
 
 default:
-if (StrLen(Curr->Item)) RetStr=MCatStr(RetStr,"<",Curr->Tag,">",Curr->Item,"</",Curr->Tag,">\n",NULL);
+if (StrValid(Curr->Item)) RetStr=MCatStr(RetStr,"<",Curr->Tag,">",Curr->Item,"</",Curr->Tag,">\n",NULL);
 else RetStr=MCatStr(RetStr,"<",Curr->Tag," />\n",NULL);
 
 break;
@@ -214,7 +322,7 @@ break;
 Curr=ListGetNext(Curr);
 }
 
-DestroyString(ValBuff);
+Destroy(ValBuff);
 
 return(RetStr);
 }
@@ -233,7 +341,7 @@ RetStr=HTTPServerPropFindItemPropsXML(RetStr, ItemPath, FType, PropList);
 
 RetStr=CatStr(RetStr,"</prop>\n<status>HTTP/1.1 200 OK</status>\n</propstat>\n</response>\n");
 
-DestroyString(URL);
+Destroy(URL);
 
 return(RetStr);
 }
@@ -267,7 +375,7 @@ if (FileType)
 			CopyVars(LocalPropList,PropList);
 			FileType=LoadFileProperties(DirGlob.gl_pathv[i], LocalPropList);
 			RetStr=HTTPServerPropFindItemXML(RetStr, Heads, DirGlob.gl_pathv[i], FileType, LocalPropList);
-			ListDestroy(LocalPropList,DestroyString);
+			ListDestroy(LocalPropList,Destroy);
 		}
 		globfree(&DirGlob);
 	}
@@ -284,19 +392,20 @@ else
 RetStr=CatStr(RetStr,"</multistatus>\n");
 
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 
 return(RetStr);
 }
 
 
 
-void HTTPServerPropFind(STREAM *S,HTTPSession *Heads)
+void HTTPServerPropFind(STREAM *S, HTTPSession *Heads)
 {
 char *Tempstr=NULL, *XML=NULL;
 ListNode *PropList;
 
 
+LogToFile(Settings.LogPath,"PROPFIND: %s %d",Heads->Path, Heads->ContentSize);
 PropList=ListCreate();
 if (Heads->ContentSize > 0) HTTPServerReadProps(S, Heads, PropList);
 else
@@ -313,12 +422,11 @@ XML=HTTPServerPropFindXML(XML,Heads,PropList);
 HTTPServerSendResponse(S, Heads, "207 OK","text/xml",XML);
 if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"PROPFIND RESPONSE FOR %s\n%s",Heads->Path,XML);
 
-
-ListDestroy(PropList,DestroyString);
+ListDestroy(PropList,Destroy);
 STREAMClose(S);
 
-DestroyString(Tempstr);
-DestroyString(XML);
+Destroy(Tempstr);
+Destroy(XML);
 }
 
 
@@ -357,11 +465,11 @@ XML=CatStr(XML,"</response></multistatus>\n");
 
 HTTPServerSendResponse(S, Heads, "207 OK","text/xml",XML);
 
-ListDestroy(PropList,DestroyString);
+ListDestroy(PropList,Destroy);
 
 STREAMClose(S);
-DestroyString(Tempstr);
-DestroyString(XML);
+Destroy(Tempstr);
+Destroy(XML);
 }
 
 void FakeFunc()

@@ -5,7 +5,7 @@ ListNode *FileMagics=NULL;
 #define FILEMAGIC 1
 #define FILEEXTN  2
 
-TFileMagic *GetFileMagic(char *Data, int Len)
+TFileMagic *GetFileMagic(const char *Data, int Len)
 {
 ListNode *Curr;
 TFileMagic *FM;
@@ -22,11 +22,11 @@ return(NULL);
 }
 
 
-TFileMagic *GetFileTypeInfo(char *FName)
+TFileMagic *GetFileTypeInfo(const char *FName)
 {
 ListNode *Curr;
 TFileMagic *FM;
-char *ptr;
+const char *ptr;
 
 
 ptr=strrchr(FName,'.');
@@ -53,7 +53,7 @@ return(NULL);
 
 
 
-TFileMagic *GetContentTypeInfo(char *ContentType)
+TFileMagic *GetContentTypeInfo(const char *ContentType)
 {
 ListNode *Node;
 
@@ -79,7 +79,7 @@ return(RetStr);
 
 
 
-void MimeTypesAddItem(char *ContentType, int Type, char *Data, int Len)
+void MimeTypesAddItem(const char *ContentType, int Type, const char *Data, int Len)
 {
 TFileMagic *FM;
 char *Tempstr=NULL;
@@ -92,17 +92,18 @@ char *Tempstr=NULL;
 
   ListAddNamedItem(FileMagics,FM->ContentType,FM);
 
-	DestroyString(Tempstr);
+	Destroy(Tempstr);
 }
 
 
-int LoadMagicsFile(char *MagicsPath)
+int LoadMagicsFile(const char *MagicsPath)
 {
 STREAM *S;
-char *Tempstr=NULL, *Token=NULL, *ContentType=NULL, *ptr;
+char *Tempstr=NULL, *Token=NULL, *ContentType=NULL;
+const char *ptr;
 TFileMagic *FM;
 
-S=STREAMOpenFile(MagicsPath,SF_RDONLY);
+S=STREAMFileOpen(MagicsPath,SF_RDONLY);
 if (! S) return(FALSE);
 Tempstr=STREAMReadLine(Tempstr,S);
 while (Tempstr)
@@ -125,9 +126,9 @@ while (Tempstr)
 	Tempstr=STREAMReadLine(Tempstr,S);
 }
 
-DestroyString(Tempstr);
-DestroyString(Token);
-DestroyString(ContentType);
+Destroy(Tempstr);
+Destroy(Token);
+Destroy(ContentType);
 STREAMClose(S);
 
 return(TRUE);
@@ -135,7 +136,7 @@ return(TRUE);
 
 
 
-void MimeTypesSetFlag(char *ContentType, int Flag)
+void MimeTypesSetFlag(const char *ContentType, int Flag)
 {
 ListNode *Curr;
 TFileMagic *FM;
@@ -153,10 +154,11 @@ Curr=ListGetNext(Curr);
 }
 
 
-void LoadFileMagics(char *MimeTypesPath, char *MagicsPath)
+void LoadFileMagics(const char *MimeTypesPath, const char *MagicsPath)
 {
 STREAM *S;
-char *Tempstr=NULL, *Token=NULL, *ContentType=NULL, *ptr;
+char *Tempstr=NULL, *Token=NULL, *ContentType=NULL;
+const char *ptr;
 
 if (! FileMagics) FileMagics=ListCreate();
 
@@ -195,11 +197,16 @@ if (! FileMagics) FileMagics=ListCreate();
    MimeTypesAddItem("application/x-bzip", FILEEXTN, "bz", 0);
    MimeTypesAddItem("application/x-bzip2", FILEEXTN, "bz2", 0);
    MimeTypesAddItem("application/x-gzip", FILEEXTN, "gz", 0);
+   MimeTypesAddItem("application/x-xz", FILEEXTN, "xz", 0);
+   MimeTypesAddItem("application/x-tar", FILEEXTN, "tar", 0);
+   MimeTypesAddItem("application/x-tgz", FILEEXTN, "tgz", 0);
+   MimeTypesAddItem("application/x-tbz", FILEEXTN, "tbz", 0);
+   MimeTypesAddItem("application/x-tbz", FILEEXTN, "txz", 0);
    MimeTypesAddItem("application/x-shockwave-flash", FILEEXTN, "swf", 0);
    MimeTypesAddItem("application/x-sh", FILEEXTN, "sh", 0);
 
 
-S=STREAMOpenFile(MimeTypesPath,SF_RDONLY);
+S=STREAMFileOpen(MimeTypesPath,SF_RDONLY);
 if (S)
 {
 	Tempstr=STREAMReadLine(Tempstr,S);
@@ -227,18 +234,18 @@ MimeTypesSetFlag("image/jpeg",FM_IMAGE_TAG);
 MimeTypesSetFlag("image/png",FM_IMAGE_TAG);
 MimeTypesSetFlag("image/bmp",FM_IMAGE_TAG);
 
-DestroyString(Tempstr);
-DestroyString(Token);
-DestroyString(ContentType);
+Destroy(Tempstr);
+Destroy(Token);
+Destroy(ContentType);
 }
 
 
 
-TFileMagic *GetFileMagicForFile(char *Path, STREAM *S)
+TFileMagic *GetFileMagicForFile(const char *Path, STREAM *S)
 {
 TFileMagic *FM=NULL;
-int result;
 char *Buffer=NULL;
+int result;
 
 if (S)
 {
@@ -251,7 +258,7 @@ if (S)
 // Do this even if S not open 
 if (! FM) FM=GetFileTypeInfo(Path);
 
-DestroyString(Buffer);
+Destroy(Buffer);
 return(FM);
 }
 

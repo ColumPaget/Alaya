@@ -74,7 +74,7 @@ SetVar(Vars,"Media-Year",Tempstr);
 
 result=TRUE;
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 free(Tag);
 
 return(result);
@@ -136,7 +136,7 @@ uint8_t Type;
 	Type=*ptr;
 	ptr++;
 	
-	for (; ptr != '\0'; ptr++) /*description string*/ ;
+	for (; *ptr != '\0'; ptr++) /*description string*/ ;
 	ptr++;
 
 	offset=ptr-Data;
@@ -147,8 +147,8 @@ uint8_t Type;
 		SetVar(Vars,"Thumbnail",Tempstr);
 	}
 
-DestroyString(Tempstr);
-DestroyString(Encoded);
+Destroy(Tempstr);
+Destroy(Encoded);
 }
 
 
@@ -179,8 +179,8 @@ while (1)
 {
 TagName=SetStrLen(TagName,TagNameLen);
 result=STREAMReadBytes(S,TagName,TagNameLen);
-TagName[result]='\0';
-if (*TagName=='\0') break;
+if (result < 1) break;
+StrTrunc(TagName, result);
 
 //Flags
 STREAMReadBytes(S,Tempstr,3);
@@ -192,8 +192,7 @@ Tempstr=SetStrLen(Tempstr,Len);
 result=STREAMReadBytes(S,Tempstr,Len);
 
 if (result < 1) break;
-
-Tempstr[result]='\0';
+StrTrunc(Tempstr, result);
 
 if (result > 0)
 {
@@ -234,8 +233,8 @@ if (result > 0)
 
 }
 
-DestroyString(TagName);
-DestroyString(Tempstr);
+Destroy(TagName);
+Destroy(Tempstr);
 
 return(TRUE);
 }
@@ -270,8 +269,8 @@ while (1)
 {
 TagName=SetStrLen(TagName,TagNameLen);
 result=STREAMReadBytes(S,TagName,TagNameLen);
-TagName[result]='\0';
-if (*TagName=='\0') break;
+if (result < 1) break;
+StrTrunc(TagName, result);
 
 //Flags
 STREAMReadBytes(S,Tempstr,2);
@@ -287,8 +286,7 @@ STREAMReadBytes(S,Tempstr,1);
 Tempstr=SetStrLen(Tempstr,len);
 result=STREAMReadBytes(S,Tempstr,len-1);
 if (result < 1) break;
-
-Tempstr[result]='\0';
+StrTrunc(Tempstr, result);
 
 if (StrLen(Tempstr))
 {
@@ -326,8 +324,8 @@ if (StrLen(Tempstr))
 
 }
 
-DestroyString(TagName);
-DestroyString(Tempstr);
+Destroy(TagName);
+Destroy(Tempstr);
 
 return(TRUE);
 }
@@ -350,7 +348,7 @@ for (i=0; TagTypes[i] !=NULL; i++)
 STREAMSeek(S,(double) 0, SEEK_SET); 
 
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 	
 return(result);
 }
@@ -375,7 +373,7 @@ STREAMReadBytes(S,(char *) &NoOfSegments,1);
 STREAMReadBytes(S,(char *) SegTable,NoOfSegments);
 }
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 
 return(NoOfSegments);
 }
@@ -389,9 +387,8 @@ uint8_t NoOfSegments;
 char *Tempstr=NULL, *ptr;
 int i, len=0, result;
 
-*Data=realloc(*Data,4096);
-SegTable=(uint8_t *) calloc(1,255);
-Tempstr=SetStrLen(Tempstr,1024);
+SegTable=(uint8_t *) calloc(1, 255);
+Tempstr=SetStrLen(Tempstr, 1024);
 
 //Read segment header
 NoOfSegments=OggReadHeader(S, SegTable);
@@ -399,23 +396,25 @@ NoOfSegments=OggReadHeader(S, SegTable);
 for (i=0; i < NoOfSegments; i++)
 {
 	memset(Tempstr,0,255);
-	result=STREAMReadBytes(S,Tempstr,(int) SegTable[i]);
+	result=STREAMReadBytes(S, Tempstr, (int) SegTable[i]);
+	*Data=SetStrLen(*Data, len + result);
 	ptr=(*Data) +len;
-	memcpy(ptr,Tempstr,result);
+	memcpy(ptr, Tempstr, result);
 	len+=result;
 }
 
-DestroyString(SegTable);
-DestroyString(Tempstr);
+Destroy(SegTable);
+Destroy(Tempstr);
 
 return(len);
 }
 
 
-void OggInterpretComment(char *Data, int MaxLen, ListNode *Vars)
+void OggInterpretComment(const char *Data, int MaxLen, ListNode *Vars)
 {
 uint32_t flen, NoOfFields, i;
-char *Tempstr=NULL, *Name=NULL, *Token=NULL, *Value=NULL, *ptr, *end;
+char *Tempstr=NULL, *Name=NULL, *Token=NULL, *Value=NULL;
+const char *ptr, *end;
 
 if (MaxLen==0) return;
 end=Data+MaxLen;
@@ -443,29 +442,28 @@ for (i=0; i < NoOfFields; i++)
 	ptr+=4;
 
 	//255 means the field is a continuation of what went before
-	if (i==0) Tempstr=CatStr(Tempstr," '");
-	else if (flen < 255 ) Tempstr=CatStr(Tempstr,"' '");
-	Tempstr=CatStrLen(Tempstr,ptr,flen);
+	if (StrValid(Tempstr) && (flen < 255) ) Tempstr=CatStr(Tempstr, "\n");
+
+	Token=CopyStrLen(Token, ptr, flen);
+	strrep(Token, '\n', ' ');
+	Tempstr=CatStr(Tempstr, Token);
 	
 	ptr+=flen;
 }
 
-if (StrLen(Tempstr)) Tempstr=CatStr(Tempstr,"'");
-
-ptr=GetToken(Tempstr," ",&Token,GETTOKEN_QUOTES);
+ptr=GetNameValuePair(Tempstr,"\n","=", &Name, &Value);
 while (ptr)
 {
-	Value=CopyStr(Value,GetToken(Token,"=",&Name,0));
 	Token=MCopyStr(Token,"Media-",Name,NULL);
-	SetVar(Vars,Token,Value);
-ptr=GetToken(ptr," ",&Token,GETTOKEN_QUOTES);
+	SetVar(Vars, Token, Value);
+	ptr=GetNameValuePair(ptr,"\n","=", &Name, &Value);
 }
 
 
-DestroyString(Tempstr);
-DestroyString(Token);
-DestroyString(Value);
-DestroyString(Name);
+Destroy(Tempstr);
+Destroy(Token);
+Destroy(Value);
+Destroy(Name);
 }
 
 
@@ -480,7 +478,7 @@ len=OggReadData(S,&Data);
 
 OggInterpretComment(Data, len, Vars);
 
-DestroyString(Data);
+Destroy(Data);
 
 return(TRUE);
 }
@@ -540,7 +538,7 @@ Tempstr=FormatStr(Tempstr,"%ux%u",x,y);
 SetVar(Vars,"Media-Resolution",Tempstr);
 }
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 
 return(Data+len);
 }
@@ -577,7 +575,7 @@ if (
 */
 
 }
-DestroyString(Data);
+Destroy(Data);
 
 return(TRUE);
 }
@@ -614,8 +612,8 @@ if (strncmp(Data+12,"IHDR",4)==0)
 }
 }
 
-DestroyString(Type);
-DestroyString(Data);
+Destroy(Type);
+Destroy(Data);
 
 return(TRUE);
 }
@@ -663,7 +661,7 @@ Tempstr=FormatStr(Tempstr,"%ux%u",x,y);
 SetVar(Vars,"Media-Resolution",Tempstr);
 
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 return(TRUE);
 }
 

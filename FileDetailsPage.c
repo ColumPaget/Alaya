@@ -7,10 +7,11 @@
 #include "AccessTokens.h"
 
 
-char *FormatFileProperties(char *HTML, HTTPSession *Session, int FType, char *URL, char *Path, ListNode *Vars, int Flags)
+char *FormatFileProperties(char *HTML, HTTPSession *Session, int FType, const char *URL, const char *Path, ListNode *Vars, int Flags)
 {
 ListNode *Curr;
-char *Tempstr=NULL, *Salt=NULL, *ptr;
+char *Tempstr=NULL, *Salt=NULL;
+const char *ptr;
 const char *IgnoreFields[]={"FileSize","ContentType","CTime-Secs","MTime-Secs", "IsExecutable", "creationdate", "getlastmodified", "getcontentlength", "getcontenttype", "executable",NULL};
 
 
@@ -24,7 +25,7 @@ const char *IgnoreFields[]={"FileSize","ContentType","CTime-Secs","MTime-Secs", 
 	if (FType != FILE_DIR) 
 	{
 		ptr=GetVar(Vars,"FileSize");
-		if (ptr) HTML=MCatStr(HTML,"<tr><td>Size</td><td colspan=2>", GetHumanReadableDataQty(strtod(ptr, NULL),0), " - (",ptr," bytes)","</td></tr>",NULL);
+		if (ptr) HTML=MCatStr(HTML,"<tr><td>Size</td><td colspan=2>", ToMetric(strtod(ptr, NULL),0), " - (",ptr," bytes)","</td></tr>",NULL);
 	}
 
 	ptr=GetVar(Vars,"MTime-Secs");
@@ -66,8 +67,8 @@ const char *IgnoreFields[]={"FileSize","ContentType","CTime-Secs","MTime-Secs", 
 	Curr=ListGetNext(Curr);
 	}
 
-DestroyString(Tempstr);
-DestroyString(Salt);
+Destroy(Tempstr);
+Destroy(Salt);
 
 return(HTML);
 }
@@ -77,9 +78,10 @@ return(HTML);
 
 //Path is the ACTUAL path to the item, not it's VPath or URL. Thus, use Session->URL
 //unless accessing the actual file
-void DirectoryItemEdit(STREAM *S, HTTPSession *Session, char *Path, int Flags)
+void DirectoryItemEdit(STREAM *S, HTTPSession *Session, const char *Path, int Flags)
 {
-char *HTML=NULL, *Tempstr=NULL, *URL=NULL, *Salt=NULL, *ptr;
+char *HTML=NULL, *Tempstr=NULL, *URL=NULL, *Salt=NULL, *wptr;
+const char *ptr;
 ListNode *Vars;
 int FType;
 
@@ -89,7 +91,7 @@ HTML=MCopyStr(HTML,"<html>\r\n<head><title>Editing ",Session->URL,"</title></hea
 
 HTML=CatStr(HTML,"<table align=center width=90%% border=0>");
 	
-URL=FormatURL(URL,Session,Session->URL);
+URL=FormatURL(URL, Session, Session->URL);
 
 Vars=ListCreate();	
 FType=LoadFileProperties(Path, Vars);
@@ -97,10 +99,8 @@ FType=LoadFileProperties(Path, Vars);
 
 //Parent Directory Link
 Tempstr=CopyStr(Tempstr,URL);
-ptr=strrchr(Tempstr,'?');
-if (ptr) *ptr='\0';
-ptr=strrchr(Tempstr,'/');
-if (ptr) *ptr='\0';
+StrRTruncChar(Tempstr, '?');
+StrRTruncChar(Tempstr, '/');
 			
 HTML=MCatStr(HTML,"<tr><td colspan=3><a href=\"",Tempstr,"\">.. (Parent Directory)</a></td><td> &nbsp; </td></tr>",NULL);
 
@@ -131,19 +131,20 @@ HTML=FormatFileProperties(HTML, Session, FType, URL, Path, Vars, Flags);
 
 	HTTPServerSendResponse(S, Session, "200 OKAY", "text/html",HTML);
 
-DestroyString(Tempstr);
-DestroyString(Salt);
-DestroyString(HTML);
-DestroyString(URL);
+Destroy(Tempstr);
+Destroy(Salt);
+Destroy(HTML);
+Destroy(URL);
 
-ListDestroy(Vars,DestroyString);
+ListDestroy(Vars,Destroy);
 }
 
 
 
-void FileDetailsSaveProps(STREAM *S, HTTPSession *Session, char *Path)
+void FileDetailsSaveProps(STREAM *S, HTTPSession *Session, const char *Path)
 {
-char *QuotedName=NULL, *QuotedValue=NULL, *Name=NULL, *Value=NULL, *ptr;
+char *QuotedName=NULL, *QuotedValue=NULL, *Name=NULL, *Value=NULL;
+const char *ptr;
 ListNode *Props;
 
 Props=ListCreate();
@@ -159,10 +160,10 @@ ptr=GetNameValuePair(ptr,"&","=",&QuotedName,&QuotedValue);
 SetProperties(Path, Props);
 
 
-ListDestroy(Props,DestroyString);
+ListDestroy(Props,Destroy);
 
-DestroyString(QuotedName);
-DestroyString(QuotedValue);
-DestroyString(Value);
-DestroyString(Name);
+Destroy(QuotedName);
+Destroy(QuotedValue);
+Destroy(Value);
+Destroy(Name);
 }

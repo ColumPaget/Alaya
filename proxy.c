@@ -46,7 +46,7 @@ while (1)
   }
 }
 
-DestroyString(Buffer);
+Destroy(Buffer);
 ListDestroy(List,NULL);
 }
 
@@ -58,22 +58,22 @@ char *Tempstr=NULL;
 HTTPInfoStruct *Info;
 ListNode *Curr;
 
-if (StrLen(Session->Arguments)) Tempstr=MCopyStr(Tempstr,Session->Path,"?",Session->Arguments,NULL);
+if (StrValid(Session->Arguments)) Tempstr=MCopyStr(Tempstr,Session->Path,"?",Session->Arguments,NULL);
 else Tempstr=CopyStr(Tempstr,Session->Path);
 
 if (Session->MethodID==METHOD_RPOST) 
 {
 	Info=HTTPInfoFromURL("POST",Tempstr);
 	Info->PostContentLength=Session->ContentSize;
-	if (StrLen(Session->ContentType))
+	if (StrValid(Session->ContentType))
 	{
 	Info->PostContentType=CopyStr(Info->PostContentType,Session->ContentType);
-	if (StrLen(Session->ContentBoundary)) Info->PostContentType=MCatStr(Info->PostContentType, "; boundary=", Session->ContentBoundary, NULL);
+	if (StrValid(Session->ContentBoundary)) Info->PostContentType=MCatStr(Info->PostContentType, "; boundary=", Session->ContentBoundary, NULL);
 	}
 }
 else Info=HTTPInfoFromURL("GET",Tempstr);
 
-if (StrLen(Session->RemoteAuthenticate))
+if (StrValid(Session->RemoteAuthenticate))
 {
 	SetVar(Info->CustomSendHeaders,"Authorization",Session->RemoteAuthenticate);
 }
@@ -99,7 +99,7 @@ STREAMFlush(ParentProcessPipe);
 Tempstr=STREAMReadLine(Tempstr,ParentProcessPipe);
 StripTrailingWhitespace(Tempstr);
 LogToFile(Settings.LogPath,"GOTIP: %s\n",Tempstr);
-if (StrLen(Tempstr)) Info->Host=CopyStr(Info->Host,Tempstr);
+if (StrValid(Tempstr)) Info->Host=CopyStr(Info->Host,Tempstr);
 }
 */
 
@@ -152,7 +152,7 @@ else
 }
 STREAMClose(TargetS);
 
-DestroyString(Tempstr);
+Destroy(Tempstr);
 }
 
 
@@ -181,7 +181,7 @@ if (Port > 0)
 {
 	TargetS=STREAMCreate();
 	LogToFile(Settings.LogPath,"HTTP CONNECT: [%s] [%d]",Host,Port);
-	if (STREAMConnectToHost(TargetS,Host,Port,0))
+	if (STREAMTCPConnect(TargetS,Host,Port,0,0,0))
 	{
 		STREAMWriteLine("HTTP/1.1 200 OK Connection Established\r\n",S);
 		Tempstr=MCopyStr(Tempstr, "Server: Alaya/",Version,"\r\n",NULL);
@@ -214,9 +214,9 @@ else
 }
 STREAMClose(TargetS);
 
-DestroyString(Tempstr);
-DestroyString(Host);
-DestroyString(Date);
+Destroy(Tempstr);
+Destroy(Host);
+Destroy(Date);
 }
 
 

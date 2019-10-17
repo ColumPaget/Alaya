@@ -26,7 +26,8 @@ return(FALSE);
 
 int EventTriggerMatch(ListNode *Node, HTTPSession *Session, char **MatchStr)
 {
-char *Token=NULL, *ptr;
+char *Token=NULL;
+const char *ptr;
 int result=FALSE;
 
 ptr=GetToken(Node->Tag,",",&Token,0);
@@ -35,7 +36,7 @@ while (ptr)
 	switch (Node->ItemType)
 	{
 			case EVENT_RESPONSE:
-			if (StrLen(Session->ResponseCode))
+			if (StrValid(Session->ResponseCode))
 			{
 			if (strncmp(Token,Session->ResponseCode,3) ==0) 
 			{
@@ -93,7 +94,7 @@ while (ptr)
 }
 
 
-DestroyString(Token);
+Destroy(Token);
 
 return(result);
 }
@@ -102,7 +103,7 @@ return(result);
 
 void ProcessEventScript(HTTPSession *Session, char *URL, char *TriggerScript, char *ExtraInfo, ListNode *Vars)
 {
-	char *Tempstr=NULL, *Args=NULL, *Command=NULL, *ptr;
+	char *Tempstr=NULL, *Command=NULL, *ptr;
 	int result;
 
 		LogToFile(Settings.LogPath, "EVENT TRIGGERED: Source='%s@%s (%s)' REQUEST='%s' TriggeredScript='%s' MatchInfo='%s'",Session->UserName, Session->ClientHost, Session->ClientIP, URL, TriggerScript, ExtraInfo);
@@ -116,9 +117,14 @@ void ProcessEventScript(HTTPSession *Session, char *URL, char *TriggerScript, ch
 		}
   	else 
 		{
-			Tempstr=MCopyStr(Tempstr, TriggerScript,"\n",NULL);
-			if (getuid()==0) result=Spawn(Tempstr,Settings.DefaultUser,Settings.DefaultGroup,NULL);
-			else result=Spawn(Tempstr,NULL,NULL,NULL);
+			Command=MCopyStr(Command, TriggerScript,"\n",NULL);
+			
+			if (getuid()==0) 
+			{
+				if (StrValid(Settings.DefaultGroup)) Tempstr=MCopyStr(Tempstr,"group=",Settings.DefaultGroup,NULL);
+				if (StrValid(Settings.DefaultUser)) Tempstr=MCopyStr(Tempstr,"user=",Settings.DefaultUser,NULL);
+			}
+			result=Spawn(Command,Tempstr);
 
 			if (result==-1)
 			{
@@ -126,17 +132,16 @@ void ProcessEventScript(HTTPSession *Session, char *URL, char *TriggerScript, ch
 			}
 		}
 
-	DestroyString(Command);
-	DestroyString(Tempstr);
-	DestroyString(Args);
+	Destroy(Command);
+	Destroy(Tempstr);
 }
 
 
 
 void ProcessEventTrigger(HTTPSession *Session, char *URL, char *Trigger, char *ExtraInfo, ListNode *Vars)
 {
-char *ptr, *Type=NULL, *Token=NULL, *Tempstr=NULL, *LogStr=NULL;
-
+char *Type=NULL, *Token=NULL, *Tempstr=NULL, *LogStr=NULL;
+const char *ptr;
 
 	LogToFile(Settings.LogPath,"TRIGGER: %s\n",Trigger);
 		Tempstr=SubstituteVarsInString(Tempstr,Trigger,Vars,0);
@@ -147,32 +152,32 @@ char *ptr, *Type=NULL, *Token=NULL, *Tempstr=NULL, *LogStr=NULL;
 
     if (strcasecmp(Type,"log")==0) 
 		{
-			if (StrLen(ptr)) LogStr=CopyStr(LogStr, ptr);
+			if (StrValid(ptr)) LogStr=CopyStr(LogStr, ptr);
 			LogToFile(Settings.LogPath,"%s",LogStr);
 		}
     else if (strcasecmp(Type,"logfile")==0) 
 		{
 		ptr=GetToken(ptr,"\\S",&Token,GETTOKEN_QUOTES);
-		if (StrLen(ptr)) LogStr=CopyStr(LogStr, ptr);
+		if (StrValid(ptr)) LogStr=CopyStr(LogStr, ptr);
     LogToFile(Token,"%s",LogStr);
 		}
     else if (strcasecmp(Type,"syslog")==0) 
 		{
-			if (StrLen(ptr)) LogStr=CopyStr(LogStr, ptr);
+			if (StrValid(ptr)) LogStr=CopyStr(LogStr, ptr);
 			syslog(LOG_WARNING, "%s",LogStr);
 		}
 		else if (strcasecmp(Type,"deny") ==0)
 		{
-			if (StrLen(ptr)) LogStr=CopyStr(LogStr, ptr);
+			if (StrValid(ptr)) LogStr=CopyStr(LogStr, ptr);
 			LogToFile(Settings.LogPath,"WARN: 'Deny' Event Rule encountered (%s on %s). Denying Authentication",ExtraInfo,URL);
 			Settings.AuthMethods=CopyStr(Settings.AuthMethods, "deny");
 		}
 		else ProcessEventScript(Session, URL, Tempstr, ExtraInfo, Vars);
 
-	DestroyString(Type);
-	DestroyString(Token);
-	DestroyString(LogStr);
-	DestroyString(Tempstr);
+	Destroy(Type);
+	Destroy(Token);
+	Destroy(LogStr);
+	Destroy(Tempstr);
 }
 
 
@@ -182,7 +187,8 @@ void ProcessSessionEventTriggers(HTTPSession *Session)
 {
 ListNode *Curr;
 char *Tempstr=NULL, *URL=NULL, *MatchStr=NULL;
-char *Token=NULL, *ptr;
+char *Token=NULL;
+const char *ptr;
 ListNode *Vars;
 
 Vars=ListCreate();
@@ -210,17 +216,18 @@ while (Curr)
 			}
 			ProcessEventTrigger(Session, Tempstr, Token, MatchStr, Vars);
 
+
 			ptr=GetToken(ptr,",",&Token,GETTOKEN_QUOTES);
 		}
 	}
 	Curr=ListGetNext(Curr);
 }
 
-ListDestroy(Vars,DestroyString);
-DestroyString(MatchStr);
-DestroyString(Tempstr);
-DestroyString(Token);
-DestroyString(URL);
+ListDestroy(Vars,Destroy);
+Destroy(MatchStr);
+Destroy(Tempstr);
+Destroy(Token);
+Destroy(URL);
 }
 
 
