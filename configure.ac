@@ -17,7 +17,7 @@ AC_ARG_ENABLE(sendfile, [  --enable-sendfile       enable sendfile support (defa
 AC_ARG_ENABLE(ip6, [  --enable-ip6		use IPv6 (default=no)], cf_use_ip6=$enableval )
 
 
-cf_have_xattr=no
+cf_use_xattr=no
 AC_ARG_ENABLE(xattr, [  --enable-xattr       enable extended file attributes support (default=no)], cf_use_xattr=$enableval )
 if test "$cf_use_xattr" != "no"
 then

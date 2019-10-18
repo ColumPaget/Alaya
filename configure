@@ -3630,7 +3630,7 @@ fi
 
 
 
-cf_have_xattr=no
+cf_use_xattr=no
 # Check whether --enable-xattr was given.
 if test "${enable_xattr+set}" = set; then :
   enableval=$enable_xattr; cf_use_xattr=$enableval
