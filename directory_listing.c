@@ -437,6 +437,7 @@ static char *DisplayDirUpload(char *HTML, HTTPSession *Session)
 static char *DisplayDirMkDir(char *HTML, HTTPSession *Session, int Flags)
 {
 	HTML=MCatStr(HTML,"<form><td align=left bgcolor='yellow'>New Folder:<input type=text name=mkdir><input type=submit name='mkdir:",Session->URL,"' value='MkDir'></td></form>",NULL);
+	return(HTML);
 }
 
 
