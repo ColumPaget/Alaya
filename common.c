@@ -74,6 +74,7 @@ Session->UserAgent=CopyStr(Session->UserAgent, Src->UserAgent);
 Session->UserName=CopyStr(Session->UserName, Src->UserName);
 Session->RealUser=CopyStr(Session->RealUser, Src->RealUser);
 Session->Group=CopyStr(Session->Group, Src->Group);
+Session->HomeDir=CopyStr(Session->HomeDir, Src->HomeDir);
 Session->RemoteAuthenticate=CopyStr(Session->RemoteAuthenticate, Src->RemoteAuthenticate);
 
 Session->ContentType=CopyStr(Session->ContentType, Src->ContentType);

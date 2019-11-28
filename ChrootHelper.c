@@ -445,6 +445,7 @@ HTTPSession *Response;
 	}
 	else
 	{
+		if (StrValid(Response->StartDir)) chdir(Response->StartDir);
 		STREAMFlush(ClientCon);
 		LogFileFlushAll(TRUE);
 		result=fork();
@@ -868,7 +869,7 @@ Tempstr=MCatStr(Tempstr," ServerName=",Session->ServerName," ServerPort=",Quoted
 if (StrValid(Session->Cipher)) Tempstr=MCatStr(Tempstr," Cipher='",Session->Cipher,"'",NULL);
 if (StrValid(Session->Cookies)) Tempstr=MCatStr(Tempstr," Cookies='",Session->Cookies,"'",NULL);
 
-Quoted=QuoteCharsInStr(Quoted,Session->StartDir,"'&");
+Quoted=QuoteCharsInStr(Quoted,Session->HomeDir,"'&");
 Tempstr=MCatStr(Tempstr," StartDir='",Quoted,"'",NULL);
 
 Quoted=QuoteCharsInStr(Quoted,Session->ClientReferrer,"'&");
