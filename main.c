@@ -49,7 +49,7 @@ signal(SIGCHLD, SigHandler);
 
 
 
-int ChildFunc(void *Data)
+int ChildFunc(void *Data, int Flags)
 {
 HTTPSession *Session;
 
@@ -211,15 +211,11 @@ void InitSSL()
 {
 const char *ptr;
 
-	if (Settings.Flags & FLAG_SSL_PFS) 
-	{
-	//if (! StrValid(LibUsefulGetValue("SSL-DHParams-File"))) OpenSSLGenerateDHParams();
-	}
-
-	ptr=LibUsefulGetValue("SSL-Permitted-Ciphers");
+#ifdef HAVE_LIBSSL
+	ptr=LibUsefulGetValue("SSL:PermittedCiphers");
 	if (! StrValid(ptr))
 	{
-		LibUsefulSetValue("SSL-Permitted-Ciphers", "DH+AESGCM:DH+AES256:DH+CAMELLIA256:ECDH+AESGCM:ECDH+AES256:ECDH+AES128:DH+AES:EDH-RSA-DES-CBC3-SHA:ECDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:CAMELLIA256:AES128-SHA256:CAMELLIA128:AES128-GCM-SHA256:AES128-SHA256:AES128-SHA:DES-CBC3-SHA:!ADH:!AECDH:!aNULL:!eNULL:!LOW:!EXPORT:!MD5");
+		LibUsefulSetValue("SSLPermitted:Ciphers", "DH+AESGCM:DH+AES256:DH+CAMELLIA256:ECDH+AESGCM:ECDH+AES256:ECDH+AES128:DH+AES:EDH-RSA-DES-CBC3-SHA:ECDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:CAMELLIA256:AES128-SHA256:CAMELLIA128:AES128-GCM-SHA256:AES128-SHA256:AES128-SHA:DES-CBC3-SHA:!ADH:!AECDH:!aNULL:!eNULL:!LOW:!EXPORT:!MD5");
 	}
 
 	ptr=LibUsefulGetValue("SSL_VERIFY_CERTFILE");
@@ -230,12 +226,22 @@ const char *ptr;
 		HandleError(ERR_PRINT|ERR_LOG|ERR_EXIT, "ERROR: Client SSL Certificate required, but no certificate verify file/directory given.\nPlease Supply one with the -verify-path command-line-argument, or the SSLVerifyPath config file entry.");
 	}
 
-	ptr=LibUsefulGetValue("SSL-DHParams-File");
+	if (Settings.Flags & FLAG_SSL_PFS) 
+	{
+	ptr=LibUsefulGetValue("SSL:DHParamsFile");
 	if (! StrValid(ptr))
 	{
-		HandleError(ERR_PRINT|ERR_LOG, "WARNING: No DH parameters file given for SSL. Perfect Forward Secrecy can only be achieved with Eliptic Curve (ECDH) methods. ECDH depends on fixed values recomended by the U.S. National Institute of Standards and technology (NIST) and thus may not be trustworthy.\n\nCreate a DHParams file with 'openssl dhparam -2 -out dhparams.pem 4096' and give the path to it using the -dhparams command-line-argument or the DHParams config file entry, if you want DiffieHelman key exchange for Perfect Forward Secrecy.");
+		if (Settings.Flags & FLAG_PFS_GENERATE) 
+		{
+			printf("Generating Diffie-Helman parameters\n");
+			OpenSSLGenerateDHParams();
+			printf("DONE Generating Diffie-Helman parameters\n");
+		}
+		else HandleError(ERR_PRINT|ERR_LOG, "WARNING: No DH parameters file given for SSL. Perfect Forward Secrecy can only be achieved with Eliptic Curve (ECDH) methods. ECDH depends on fixed values recomended by the U.S. National Institute of Standards and technology (NIST) and thus may not be trustworthy.\n\nCreate a DHParams file with 'openssl dhparam -2 -out dhparams.pem 4096' and give the path to it using the -dhparams command-line-argument or the DHParams config file entry, if you want DiffieHelman key exchange for Perfect Forward Secrecy.");
 
 	}
+	}
+#endif
 }
 
 
@@ -324,13 +330,9 @@ Connections=ListCreate();
 
 
 ParseSettings(argc,argv,&Settings);
-ReadConfigFile(&Settings);
+ReadConfigFile(Settings.ConfigPath);
 ParseSettings(argc,argv,&Settings);
 PostProcessSettings(&Settings);
-
-
-//Do this before any logging!
-if (! (Settings.Flags & FLAG_NODEMON)) demonize();
 
 SetResourceLimits();
 
@@ -348,6 +350,10 @@ LoadFileMagics("/etc/mime.types","/etc/magic");
 
 
 ServiceSocketsInit(Connections);
+
+
+//Do this before any logging!
+if (! (Settings.Flags & FLAG_NODEMON)) demonize();
 
 
 //We no longer need the 'bind port' capablity

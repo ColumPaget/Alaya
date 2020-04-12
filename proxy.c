@@ -1,16 +1,7 @@
 #include "proxy.h"
 #include "server.h"
 
-int IsProxyMethod(int Method)
-{
-if (Method==METHOD_RGET) return(TRUE);
-if (Method==METHOD_RPOST) return(TRUE);
-if (Method==METHOD_CONNECT) return(TRUE);
-
-return(FALSE);
-}
-
-void HTTPProxyCopyData(STREAM *Client, STREAM *Target)
+static void ProxyCopyData(STREAM *Client, STREAM *Target)
 {
 ListNode *List;
 STREAM *S;
@@ -29,7 +20,7 @@ while (1)
 
   if (S)
   {
-  result=STREAMReadBytes(S,Buffer,BUFSIZ);
+  result=STREAMReadBytes(S, Buffer, BUFSIZ);
   if (result > 0) total+=result;
   if (result ==EOF) break;
 
@@ -51,7 +42,25 @@ ListDestroy(List,NULL);
 }
 
 
-void HTTPProxyRGETURL(STREAM *S,HTTPSession *Session)
+
+//none of the usual complexity of 'HttpServerSendResponse'
+static void HTTPProxySendResponse(STREAM *S, const char *Response)
+{
+char *Date=NULL;
+
+		STREAMWriteLine(Response,S);
+		Date=CopyStr(Date,GetDateStr("Date: %a, %d %b %Y %H:%M:%S %Z\r\n",NULL));
+		STREAMWriteLine(Date,S);
+		STREAMWriteLine("Connection: close\r\n",S);
+		STREAMWriteLine("\r\n",S);
+		STREAMFlush(S);
+		LogToFile(Settings.LogPath,"PROXY: %s", Response);
+
+Destroy(Date);
+}
+
+//this function relates to old-fashioned HTTP proxy methods using GET and POST with a full URL
+void HTTPProxyRGETURL(HTTPSession *Session)
 {
 STREAM *TargetS;
 char *Tempstr=NULL;
@@ -113,7 +122,7 @@ if (TargetS)
 	//Must send POST data before doing anything else
 	if (Session->ContentSize > 0)
 	{
-  STREAMSendFile(S, TargetS, Session->ContentSize, SENDFILE_LOOP);
+  STREAMSendFile(Session->S, TargetS, Session->ContentSize, SENDFILE_LOOP);
 	//we shouldn't need this CR-LF, as we've sent 'Content-Length' characters
 	//but some CGI implementations seem to expect it, and it does no harm to
 	//provide it anyway
@@ -124,85 +133,119 @@ if (TargetS)
 	HTTPTransact(Info);
 	}
 
-	STREAMWriteLine("HTTP/1.1 200 OK Connection Established\r\n",S);
+	STREAMWriteLine("HTTP/1.1 200 OK Connection Established\r\n", Session->S);
 	Curr=ListGetNext(Info->ServerHeaders);
 	while (Curr)
 	{
 		Tempstr=MCopyStr(Tempstr,Curr->Tag,": ",Curr->Item,"\r\n",NULL);
-		STREAMWriteLine(Tempstr,S);
+		STREAMWriteLine(Tempstr, Session->S);
 		Curr=ListGetNext(Curr);
 	}
-	STREAMWriteLine("Connection: close\r\n",S);
-	STREAMWriteLine("\r\n",S);
+	STREAMWriteLine("Connection: close\r\n",Session->S);
+	STREAMWriteLine("\r\n",Session->S);
 
 
 	//Still have to do this, it's a two-way copy
-	HTTPProxyCopyData(S, TargetS);
+	ProxyCopyData( Session->S, TargetS);
 }
-else
-{
-		LogToFile(Settings.LogPath,"PROXY: Connect FAILED to %s",Session->Path);
-		STREAMWriteLine("HTTP/1.1 502 Connection Failed\r\n",S);
-		Tempstr=MCopyStr(Tempstr, "Server: Alaya/",Version,"\r\n",NULL);
-		STREAMWriteLine(Tempstr,S);
-		Tempstr=CopyStr(Tempstr,GetDateStr("Date: %a, %d %b %Y %H:%M:%S %Z\r\n",NULL));
-		STREAMWriteLine(Tempstr,S);
-		STREAMWriteLine("Connection: close\r\n",S);
-		STREAMWriteLine("\r\n",S);
-}
+else HTTPProxySendResponse( Session->S, "HTTP/1.1 502 Connection Failed\r\n");
+
 STREAMClose(TargetS);
 
 Destroy(Tempstr);
 }
 
 
-void HTTPProxyConnect(STREAM *S,HTTPSession *ClientHeads)
+//ClientHeads->Path will normally start with a '/', and may not have a port number
+//so we reformat it here to be consistent
+void HTTPProxyReformatPath(HTTPSession *ClientHeads)
+{
+char *Host=NULL;
+int Port=443;
+const char *ptr;
+
+ptr=ClientHeads->Path;
+while (*ptr=='/') ptr++;
+ptr=GetToken(ptr, ":", &Host,0);
+if StrValid(ptr) Port=atoi(ptr);
+ClientHeads->Path=FormatStr(ClientHeads->Path, "%s:%d", Host, Port);
+
+Destroy(Host);
+}
+
+
+#define HTTP_PROXY_DENY 0
+#define HTTP_PROXY_ALLOW 1
+#define HTTP_PROXY_SSL 2
+
+int HTTPProxyConnectAllowed(HTTPSession *ClientHeads)
+{
+ListNode *Curr;
+char *Tempstr=NULL, *Token=NULL;
+char *Host=NULL;
+const char *ptr;
+int RetVal=HTTP_PROXY_DENY;
+
+Curr=ListGetNext(Settings.ProxyConfig);
+while (Curr)
+{
+
+if (fnmatch(Curr->Tag, ClientHeads->Path, FNM_CASEFOLD)==0)
+{
+	if (Curr->ItemType == TRUE) RetVal = HTTP_PROXY_ALLOW;
+
+	ptr=GetToken(Curr->Item, "\\S|,", &Token, GETTOKEN_MULTI_SEP);
+	while (ptr)
+	{
+	if (strncasecmp(Token, "redirect=", 9)==0)
+	{
+		ClientHeads->Path=CopyStr(ClientHeads->Path, Token+9);
+	}
+	if (strcasecmp(Token,"https")==0) RetVal |= HTTP_PROXY_SSL;
+	if (strcasecmp(Token,"ssl")==0) RetVal |= HTTP_PROXY_SSL;
+	if (strcasecmp(Token,"tls")==0) RetVal |= HTTP_PROXY_SSL;
+	ptr=GetToken(ptr, "\\S|,", &Token, GETTOKEN_MULTI_SEP);
+	}
+}
+
+Curr=ListGetNext(Curr);
+}
+
+
+Destroy(Tempstr);
+Destroy(Token);
+
+return(RetVal);
+}
+
+
+//this function relates to SSL/HTTPS proxies using the HTTP CONNECT method
+void HTTPProxyConnect(HTTPSession *Session)
 {
 STREAM *TargetS=NULL;
-int Port=0;
-char *Host=NULL, *Date=NULL, *Tempstr=NULL, *ptr;
+char *Tempstr=NULL;
+int ConnectFlags=0;
 
-//Path will normally start with a '/', remove it
-ptr=ClientHeads->Path;
-if (*ptr=='/') ptr++;
+HTTPProxyReformatPath(Session);
 
-Host=CopyStr(Host,ptr);
-
-ptr=strrchr(Host,':');
-if (ptr)
+ConnectFlags=HTTPProxyConnectAllowed(Session);
+if (ConnectFlags & HTTP_PROXY_ALLOW) 
 {
-	*ptr='\0';
-	ptr++;
-	Port=atoi(ptr);
-}
+	LogToFile(Settings.LogPath,"HTTP CONNECT: [%s]", Session->Path);
 
-Date=CopyStr(Date,GetDateStr("Date: %a, %d %b %Y %H:%M:%S %Z\r\n",NULL));
-if (Port > 0)
-{
-	TargetS=STREAMCreate();
-	LogToFile(Settings.LogPath,"HTTP CONNECT: [%s] [%d]",Host,Port);
-	if (STREAMTCPConnect(TargetS,Host,Port,0,0,0))
+	Tempstr=MCopyStr(Tempstr, "tcp:", Session->Path, NULL);
+	TargetS=STREAMOpen(Tempstr, "");
+	if (TargetS)
 	{
-		STREAMWriteLine("HTTP/1.1 200 OK Connection Established\r\n",S);
-		Tempstr=MCopyStr(Tempstr, "Server: Alaya/",Version,"\r\n",NULL);
-		STREAMWriteLine(Tempstr,S);
-		STREAMWriteLine(Date,S);
-		STREAMWriteLine("Connection: close\r\n",S);
-		STREAMWriteLine("\r\n",S);
-		STREAMFlush(S);
-
-		HTTPProxyCopyData(S,TargetS);
+		HTTPProxySendResponse(Session->S, "HTTP/1.1 200 OK Connection Established\r\n");
+		if (ConnectFlags & HTTP_PROXY_SSL) HTTPServerActivateSSL(Session, Settings.SSLKeys);
+		ProxyCopyData(Session->S,TargetS);
 	}
-	else
-	{
-		STREAMWriteLine("HTTP/1.1 502 Connection Failed\r\n",S);
-		Tempstr=MCopyStr(Tempstr, "Server: Alaya/",Version,"\r\n",NULL);
-		STREAMWriteLine(Tempstr,S);
-		STREAMWriteLine(Date,S);
-		STREAMWriteLine("Connection: close\r\n",S);
-		STREAMWriteLine("Content-Length: 0\r\n\r\n",S);
-	}
+	else HTTPProxySendResponse(Session->S, "HTTP/1.1 502 Connection Failed\r\n");
 }
+else HTTPProxySendResponse(Session->S, "HTTP/1.1 502 Connection Not Permitted\r\n");
+
+/*
 else
 {
 	STREAMWriteLine("HTTP/1.1 400 No port given\r\n",S);
@@ -212,11 +255,87 @@ else
 	STREAMWriteLine("Connection: close\r\n",S);
 	STREAMWriteLine("Content-Length: 0\r\n\r\n",S);
 }
+*/
+
+
 STREAMClose(TargetS);
 
 Destroy(Tempstr);
-Destroy(Host);
-Destroy(Date);
 }
 
+
+
+int IsProxyMethod(int Method)
+{
+if (Method==METHOD_RGET) return(TRUE);
+if (Method==METHOD_RPOST) return(TRUE);
+if (Method==METHOD_CONNECT) return(TRUE);
+
+return(FALSE);
+}
+
+
+
+#ifdef USE_SOCKS
+//this function relates to SSL/HTTPS proxies using the HTTP CONNECT method
+void SocksProxyConnect(HTTPSession *Session)
+{
+STREAM *TargetS=NULL;
+char *Tempstr=NULL, *Host=NULL;
+uint16_t port;
+uint32_t ip4;
+int ConnectFlags=0;
+int val;
+
+val=STREAMReadChar(Session->S);
+if (val==4)
+{
+	val=STREAMReadChar(Session->S);
+	if (val==1)
+	{
+		STREAMReadBytes(Session->S, &port, 2);
+		STREAMReadBytes(Session->S, &ip4, 4);
+		ip4=ntohl(ip4);
+		port=ntohs(port);
+
+		if (ip4 > 255) Session->Path=FormatStr(Session->Path, "%s:%d", IPtoStr(ip4), port);
+		else
+		{
+			Session->UserName=STREAMReadToTerminator(Session->UserName, Session->S, '\0');
+			Tempstr=STREAMReadToTerminator(Tempstr, Session->S, '\0');
+			Session->Path=FormatStr(Session->Path, "%s:%d", Tempstr, port);
+		}
+	}
+}
+
+if (StrValid(Session->Path))
+{
+	ConnectFlags=HTTPProxyConnectAllowed(Session);
+	if (ConnectFlags & HTTP_PROXY_ALLOW) 
+	{
+		LogToFile(Settings.LogPath,"SOCKS CONNECT: [%s]", Session->Path);
+
+		Tempstr=MCopyStr(Tempstr, "tcp:", Session->Path, NULL);
+		TargetS=STREAMOpen(Tempstr, "");
+		if (TargetS)
+		{
+		val=0;
+		STREAMWriteBytes(Session->S, &val, 1);
+		val=0x5a;
+		STREAMWriteBytes(Session->S, &val, 1);
+		port=0; //these are just padding
+		STREAMWriteBytes(Session->S, &port, 2);
+		ip4=0; //these are just padding
+		STREAMWriteBytes(Session->S, &ip4, 4);
+		STREAMFlush(Session->S);
+
+		ProxyCopyData(Session->S, TargetS);
+		STREAMClose(TargetS);
+		}
+	}
+}
+
+Destroy(Tempstr);
+}
+#endif
 

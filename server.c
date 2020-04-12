@@ -12,9 +12,11 @@
 #include "upload.h"
 #include "proxy.h"
 #include "fnmatch.h"
-#include "AccessTokens.h"
+#include "auth_access_token.h"
+#include "auth_client_certificate.h"
 #include "VPath.h"
 #include "xssi.h"
+#include "icecast.h"
 
 const char *HTTPMethods[]={"HEAD","GET","POST","PUT","DELETE","MKCOL","PROPFIND","PROPPATCH","MOVE","COPY","OPTIONS","CONNECT","LOCK","UNLOCK","MKCALENDAR", "REPORT", NULL};
 
@@ -34,7 +36,7 @@ int bytes_read=0, len;
 
 if (Session->ContentSize > 0)
 {
-	*Data=SetStrLen(*Data,Session->ContentSize+10);
+	*Data=SetStrLen(*Data, Session->ContentSize+10);
   while (bytes_read < Session->ContentSize)
   {
   len=STREAMReadBytes(Session->S, (*Data) + bytes_read, Session->ContentSize-bytes_read);
@@ -44,13 +46,13 @@ if (Session->ContentSize > 0)
 }
 else
 {
-  Tempstr=STREAMReadLine(Tempstr,Session->S);
+  Tempstr=STREAMReadLine(Tempstr, Session->S);
   while (Tempstr)
   {
 		len=StrLen(Tempstr);
     *Data=CatStrLen(*Data,Tempstr,len);
 		bytes_read+=len;
-    Tempstr=STREAMReadLine(Tempstr,Session->S);
+    Tempstr=STREAMReadLine(Tempstr, Session->S);
   }
 }
 
@@ -85,7 +87,7 @@ Curr=ListGetNext(Curr);
 }
 
 Flags |= LU_SSL_PFS;
-//if (Settings.AuthFlags & (FLAG_AUTH_CERT_REQUIRED | FLAG_AUTH_CERT_SUFFICIENT | FLAG_AUTH_CERT_ASK)) Flags |= LU_SSL_VERIFY_PEER;
+if (Settings.AuthFlags & (FLAG_AUTH_CERT_REQUIRED | FLAG_AUTH_CERT_SUFFICIENT | FLAG_AUTH_CERT_ASK)) Flags |= LU_SSL_VERIFY_PEER;
 
 if (DoSSLServerNegotiation(Session->S,Flags))
 {
@@ -94,7 +96,7 @@ if (DoSSLServerNegotiation(Session->S,Flags))
 }
 
 
-LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed with %s %s. Error was %s",Session->ClientHost,Session->ClientIP,STREAMGetValue(Session->S,"SSL-Error"));
+LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed with %s %s. Error was %s", Session->ClientHost, Session->ClientIP,STREAMGetValue(Session->S,"SSL:Error"));
 return(FALSE);
 }
 
@@ -111,12 +113,14 @@ int len;
 
 if (strcmp(Type,"Basic")==0)
 {
+	LogToFile(Settings.LogPath,"AUTH: method 'basic'");
 	len=DecodeBytes(&Tempstr, Data, ENCODE_BASE64);
 	ptr=GetToken(Tempstr,":",&Heads->UserName,0);
 	Heads->Password=CopyStr(Heads->Password,ptr);
 }
 else if (strcmp(Type,"Digest")==0)
 {
+	LogToFile(Settings.LogPath,"AUTH: method 'digest'");
 	uri=CopyStr(uri,"");
 	algo=CopyStr(algo,"");
 	ptr=GetNameValuePair(Data, ",", "=", &Name, &Value);
@@ -141,7 +145,7 @@ else if (strcmp(Type,"Digest")==0)
 
 // server nonce (nonce), request counter (nc), client nonce (cnonce), quality of protection code (qop) and HA2 result is calculated. The result is the "response" value provided by the client.
 
-if (StrValid(qop)) Heads->AuthDetails=MCopyStr(Heads->AuthDetails,uri,":",algo,":",nonce,":",request_count,":",cnonce,":",qop, NULL);
+if (StrValid(qop)) Heads->AuthDetails=MCopyStr(Heads->AuthDetails, uri," ",algo," ",nonce,":",request_count,":",cnonce,":",qop, NULL);
 else Heads->AuthDetails=CopyStr(Heads->AuthDetails,nonce);
 
 }
@@ -181,36 +185,6 @@ Destroy(Value);
 }
 
 
-//Will only return false if FLAG_SSL_CERT_REQUIRED is set
-int HTTPServerCheckCertificate(HTTPSession *Session, STREAM *S)
-{
-const char *ptr;
-int result=TRUE;
-
-	ptr=STREAMGetValue(S,"SSL-Certificate-Verify");
-
-	if (StrValid(ptr) && (strcmp(ptr,"no certificate") !=0)  )
-	{
-		LogToFile(Settings.LogPath,"AUTH SSL Certificate Provided by '%s@%s'. Subject=%s Issuer=%s",Session->UserName,Session->ClientIP,STREAMGetValue(S,"SSL-Certificate-Subject"), STREAMGetValue(S,"SSL-Certificate-Issuer"));
-
-		if (strcmp(ptr,"OK")!=0)
-		{
-			if (Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED)
-			{
-				LogToFile(Settings.LogPath,"AUTH: ERROR: SSL Certificate REQUIRED from client '%s@%s'. Invalid Certificate. Error was: %s",Session->UserName,Session->ClientIP, ptr);
-				result=FALSE;
-			}
-			else LogToFile(Settings.LogPath,"AUTH: SSL Certificate Optional for client '%s@%s'. Invalid Certificate. Error was: %s",Session->UserName,Session->ClientIP, ptr);
-
-			LogFileFlushAll(TRUE);
-		}
-	}
-	else if (Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED) LogToFile(Settings.LogPath,"AUTH: ERROR: SSL Certificate REQUIRED from client '%s@%s'. Missing Certificate.",Session->UserName,Session->ClientIP);
-
-
-return(result);
-}
-
 
 
 //This function reads the first line of an HTTP Request, including the Method, URL, and cgi arguments
@@ -221,23 +195,19 @@ const char *ptr;
 char *tmp_ptr;
 int val;
 
-GetSockDetails(S->in_fd,&Session->ServerName,&Session->ServerPort,&Session->ClientIP,&val);
-GetHostARP(Session->ClientIP, &Token, &Session->ClientMAC);
-if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrValid(Session->ClientIP)) Session->ClientHost=CopyStr(Session->ClientHost,IPStrToHostName(Session->ClientIP));
-
 LogToFile(Settings.LogPath,"");
 //Log first line of the response
 
-Token=MCopyStr(Token, "NEW REQUEST: ",Session->ClientHost," (",Session->ClientIP,") ", Command, NULL);
+Token=MCopyStr(Token, "NEW REQUEST: ", Session->ClientHost," (", Session->ClientIP,") ", Command, NULL);
 if (Settings.Flags & FLAG_SSL)
 {
-	Session->Cipher=CopyStr(Session->Cipher,STREAMGetValue(S,"SSL-Cipher"));
+	Session->Cipher=CopyStr(Session->Cipher,STREAMGetValue(S,"SSL:Cipher"));
 	Token=MCatStr(Token,"  SSL-CIPHER=", Session->Cipher, NULL);
-	if (! HTTPServerCheckCertificate(Session,S)) exit(1);
+	if (! auth_client_certificate(Session,S)) exit(1);
 
 	//Set the Username to be the common name signed in the certificate. If it doesn't
 	//authenticate against a user then we can query for a username later
-	Session->UserName=CopyStr(Session->UserName,STREAMGetValue(Session->S,"SSL-Certificate-CommonName"));
+	Session->UserName=CopyStr(Session->UserName,STREAMGetValue(Session->S,"SSL:CertificateCommonName"));
 	if (Settings.AuthFlags & FLAG_AUTH_CERT_SUFFICIENT)
 	{
 		if (StrValid(Session->UserName)) Session->AuthFlags |= FLAG_AUTH_PRESENT;
@@ -307,7 +277,7 @@ ListNode *Curr;
 int val;
 
 HTTPSessionClear(Session);
-Tempstr=STREAMReadLine(Tempstr,Session->S);
+Tempstr=STREAMReadLine(Tempstr, Session->S);
 if (! Tempstr) return(FALSE);
 
 StripTrailingWhitespace(Tempstr);
@@ -316,7 +286,7 @@ StripTrailingWhitespace(Tempstr);
 HTTPServerParseCommand(Session, Session->S, Tempstr);
 
 
-Tempstr=STREAMReadLine(Tempstr,Session->S);
+Tempstr=STREAMReadLine(Tempstr, Session->S);
 
 if (Tempstr)
 {
@@ -399,7 +369,7 @@ while (StrValid(Tempstr) )
 		Curr=ListGetNext(Settings.UserAgents);
 		while (Curr)
 		{
-		if (fnmatch(Curr->Tag,Session->UserAgent,0)==0) 
+		if (fnmatch(Curr->Tag, Session->UserAgent,0)==0) 
 		{
 			if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"Applying User Agent Settings: %s",Curr->Item);
 			ParseConfigItemList((char *) Curr->Item);
@@ -469,7 +439,7 @@ while (StrValid(Tempstr) )
 	break;
 	}
 
-Tempstr=STREAMReadLine(Tempstr,Session->S);
+Tempstr=STREAMReadLine(Tempstr, Session->S);
 StripTrailingWhitespace(Tempstr);
 StripLeadingWhitespace(Tempstr);
 }
@@ -478,10 +448,10 @@ StripLeadingWhitespace(Tempstr);
 if (strstr(Session->Arguments,"AccessToken")) Session->AuthFlags |= FLAG_AUTH_PRESENT | FLAG_AUTH_ACCESS_TOKEN;
 
 
-Session->URL=HTTPUnQuote(Session->URL,Session->OriginalURL);
+Session->URL=HTTPUnQuote(Session->URL, Session->OriginalURL);
 
-if (*Session->URL=='/') Session->Path=CopyStr(Session->Path,Session->URL);
-else Session->Path=MCopyStr(Session->Path,"/",Session->URL,NULL);
+if (*Session->URL=='/') Session->Path=CopyStr(Session->Path, Session->URL);
+else Session->Path=MCopyStr(Session->Path,"/", Session->URL,NULL);
 
 Destroy(Tempstr);
 Destroy(Token);
@@ -505,33 +475,37 @@ Destroy(Tempstr);
 
 void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
 {
-char *Tempstr=NULL;
+char *Tempstr=NULL, *AuthType=NULL;
 ListNode *Curr;
 
-Tempstr=MCopyStr(Tempstr,Session->Protocol," ",Session->ResponseCode,"\r\n",NULL);
+Tempstr=MCopyStr(Tempstr, Session->Protocol," ", Session->ResponseCode,"\r\n",NULL);
 STREAMWriteLine(Tempstr,S);
 if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,">> %s",Tempstr);
 
 HTTPServerSendHeader(S,"Date",GetDateStr("%a, %d %b %Y %H:%M:%S %Z",NULL));
 
-if (Session->LastModified > 0) HTTPServerSendHeader(S,"Last-Modified",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",Session->LastModified,NULL));
+if (Session->LastModified > 0) HTTPServerSendHeader(S,"Last-Modified",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z", Session->LastModified,NULL));
 
 if (Flags & HEADERS_AUTH) 
 {
-	if (Settings.AuthFlags & FLAG_AUTH_DIGEST) Tempstr=FormatStr(Tempstr,"Digest realm=\"%s\", qop=\"auth\", nonce=\"%x\"", Settings.AuthRealm, rand());
-	else Tempstr=MCopyStr(Tempstr,"Basic realm=\"",Settings.AuthRealm,"\"",NULL);
+	if (IsProxyMethod(Session->MethodID) ) AuthType=CopyStr(AuthType, "Proxy-Authenticate");
+	else AuthType=CopyStr(AuthType, "WWW-Authenticate");
 
-	if (IsProxyMethod(Session->MethodID) ) HTTPServerSendHeader(S,"Proxy-Authenticate",Tempstr);
-	else
+	if (Settings.AuthFlags & FLAG_AUTH_DIGEST)
 	{
-		Tempstr=MCopyStr(Tempstr,"Basic realm=\"",Settings.AuthRealm,"\"",NULL);
-		HTTPServerSendHeader(S,"WWW-Authenticate",Tempstr);
+		Tempstr=FormatStr(Tempstr,"Digest realm=\"%s\", algorithm=\"sha256\" qop=\"auth\", nonce=\"%x\"", Settings.AuthRealm, rand());
+		HTTPServerSendHeader(S,AuthType,Tempstr);
 
-		if (Settings.AuthFlags & FLAG_AUTH_DIGEST)
-		{
-			Tempstr=FormatStr(Tempstr,"Digest realm=\"%s\", qop=\"auth\", nonce=\"%x\"", Settings.AuthRealm, rand());
-			HTTPServerSendHeader(S,"WWW-Authenticate",Tempstr);
-		}
+		Tempstr=FormatStr(Tempstr,"Digest realm=\"%s\", qop=\"auth\", nonce=\"%x\"", Settings.AuthRealm, rand());
+		HTTPServerSendHeader(S,AuthType,Tempstr);
+
+		LogToFile(Settings.LogPath, "OFFER AUTH DIGEST: %s  %s\n", AuthType, Tempstr);
+	}
+
+	if (Settings.AuthFlags & FLAG_AUTH_BASIC)
+	{
+	Tempstr=MCopyStr(Tempstr,"Basic realm=\"",Settings.AuthRealm,"\"",NULL);
+	HTTPServerSendHeader(S,AuthType,Tempstr);
 	}
 }
 
@@ -566,7 +540,7 @@ else
 {
 	if ((Flags & HEADERS_USECACHE) && (Settings.DocumentCacheTime > 0))
 	{
-	Tempstr=FormatStr(Tempstr,"max-age=%d",Session->CacheTime);
+	Tempstr=FormatStr(Tempstr,"max-age=%d", Session->CacheTime);
 	HTTPServerSendHeader(S, "Cache-Control", Tempstr);
 	HTTPServerSendHeader(S,"Expires",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",time(NULL) + Session->CacheTime,NULL));
 	}
@@ -604,17 +578,20 @@ else
 	}
 */
 
+
+
 //If we are running a CGI script, then the script will handle all headers relating to content
+//otherwise we send them here
 if (! (Flags & HEADERS_CGI)) 
 {
 	HTTPServerSendHeader(S, "DAV", "1");
-	if (StrValid(Session->ContentType)) HTTPServerSendHeader(S,"Content-Type",Session->ContentType);
+	if (StrValid(Session->ContentType)) HTTPServerSendHeader(S,"Content-Type", Session->ContentType);
 	else HTTPServerSendHeader(S,"Content-Type","octet/stream");
 
 
 	if ((Session->Flags & SESSION_REUSE) || (Session->ContentSize > 0))
 	{
-		Tempstr=FormatStr(Tempstr,"%d",Session->ContentSize);
+		Tempstr=FormatStr(Tempstr,"%d", Session->ContentSize);
 		HTTPServerSendHeader(S,"Content-Length",Tempstr);
 	}
 	
@@ -629,7 +606,9 @@ if (! (Flags & HEADERS_CGI))
 }
 
 LogFileFlushAll(TRUE);
+
 Destroy(Tempstr);
+Destroy(AuthType);
 }
 
 
@@ -639,7 +618,7 @@ HTTPSession *Response;
 char *Tempstr=NULL;
 long ResponseCode=0;
 
-LogToFile(Settings.LogPath,"RESPONSE: '%s' to %s@%s for '%s %s'",ResponseLine,Session->UserName,Session->ClientIP,Session->Method,Session->Path);
+LogToFile(Settings.LogPath,"RESPONSE: '%s' to %s@%s for '%s %s'",ResponseLine, Session->UserName, Session->ClientIP, Session->Method, Session->Path);
 
 ResponseCode=strtol(ResponseLine,NULL,10);
 
@@ -654,11 +633,11 @@ if (Session)
 	Response->LastModified=Session->LastModified;
 	Response->Flags |= Session->Flags & (SESSION_KEEPALIVE | SESSION_AUTHENTICATED);
 	//Response->Flags |= SESSION_KEEPALIVE;
-	Response->ClientIP=CopyStr(Response->ClientIP,Session->ClientIP);
-	Response->Path=CopyStr(Response->Path,Session->Path);
-	Response->Method=CopyStr(Response->Method,Session->Method);
-	Response->URL=CopyStr(Response->URL,Session->URL);
-	Response->UserName=CopyStr(Response->UserName,Session->UserName);
+	Response->ClientIP=CopyStr(Response->ClientIP, Session->ClientIP);
+	Response->Path=CopyStr(Response->Path, Session->Path);
+	Response->Method=CopyStr(Response->Method, Session->Method);
+	Response->URL=CopyStr(Response->URL, Session->URL);
+	Response->UserName=CopyStr(Response->UserName, Session->UserName);
 }
 
 Response->ResponseCode=CopyStr(Response->ResponseCode,ResponseLine);
@@ -709,27 +688,9 @@ Destroy(Tempstr);
 
 
 
-void SendICYMessage(STREAM *Output, const char *ICYMessage)
-{
-uint8_t len;
-char *Tempstr=NULL;
-
-	len=StrLen(ICYMessage);
-	if (len > 0) len=(len / 16) + 1;
-	Tempstr=SetStrLen(Tempstr,len * 16);
-	memset(Tempstr,0,len * 16);
-	strcpy(Tempstr,ICYMessage);
-	STREAMWriteBytes(Output,(char *) &len,1);
-	STREAMWriteBytes(Output,Tempstr,len * 16);
-
-Destroy(Tempstr);
-}
 
 
-
-
-
-HTTPSession *FileSendCreateSession(const char *Path, HTTPSession *Request, ListNode *Vars, int ICYInterval)
+static HTTPSession *FileSendCreateSession(const char *Path, HTTPSession *Request, ListNode *Vars)
 {
 	HTTPSession *Session;
 	char *Tempstr=NULL;
@@ -740,14 +701,7 @@ HTTPSession *FileSendCreateSession(const char *Path, HTTPSession *Request, ListN
 	Session->LastModified=atoi(GetVar(Vars,"MTime-secs"));
 	Session->ContentSize=atoi(GetVar(Vars,"FileSize"));
 
-	if (Session->Flags & SESSION_ICECAST) 
-	{
-		Session->Flags |= SESSION_ICECAST;
-		Session->Protocol=CopyStr(Session->Protocol,"ICY");
-		Tempstr=FormatStr(Tempstr,"%d",ICYInterval);
-		SetVar(Session->Headers,"icy-metaint",Tempstr);
-	}
-	else if (HTTPServerDecideToCompress(Request,Path))
+	if (HTTPServerDecideToCompress(Request,Path))
 	{
 		Session->ContentSize=0;
 		Session->Flags |= SESSION_ENCODE_GZIP;
@@ -759,84 +713,8 @@ HTTPSession *FileSendCreateSession(const char *Path, HTTPSession *Request, ListN
 
 
 
-void IcecastSendData(STREAM *Input, STREAM *Output, int ICYInterval)
-{
-char *ICYMessage=NULL, *Tempstr=NULL;
-int BuffSize=4096, BytesRead=0, len, result;
-ListNode *Vars;
 
-	Vars=ListCreate();
-	SetVar(Vars, "Title",GetBasename(Input->Path));
-	MediaReadDetails(Input,Vars);
-
-	ICYMessage=SubstituteVarsInString(ICYMessage,"StreamTitle='$(Title)'; StreamArtist='$(Artist)';",Vars,0);
-	LogToFile(Settings.LogPath,"Open: %s, message: %s",Input->Path,ICYMessage);
-	Tempstr=SetStrLen(Tempstr,BuffSize);
-	while (TRUE) 
-	{
-		len=ICYInterval-BytesRead;
-		if (len > BuffSize) len=BuffSize;
-		result=STREAMReadBytes(Input,Tempstr,len);
-		if (result==EOF) break;
-
-		BytesRead+=result;
-		STREAMWriteBytes(Output,Tempstr,result);
-
-		if (BytesRead==ICYInterval)
-		{
-			LogToFile(Settings.LogPath,"SEND ICY: %s",ICYMessage);
-			BytesRead=0;
-			SendICYMessage(Output, ICYMessage);
-			//Don't send it again.
-			ICYMessage=CopyStr(ICYMessage,"");
-		}	
-	}
-
-ListDestroy(Vars,Destroy);
-Destroy(ICYMessage);
-Destroy(Tempstr);
-}
-
-
-void HTTPServerHandleStream(STREAM *Output, HTTPSession *Session, const char *SearchPath, int SendData)
-{
-char *Tempstr=NULL;
-HTTPSession *Response;
-ListNode *Vars;
-STREAM *S;
-glob_t Glob;
-int i;
-
-
-Vars=ListCreate();
-SetVar(Vars,"ContentType","audio/mpeg");
-Response=FileSendCreateSession("", Session, Vars, 0);
-HTTPServerSendHeaders(Output, Response, FALSE);
-STREAMFlush(Output);
-
-Tempstr=MCopyStr(Tempstr,SearchPath,"/*",NULL);
-glob(Tempstr,0,0,&Glob);
-
-LogToFile(Settings.LogPath,"Stream from Dir: %s, %d files",SearchPath,Glob.gl_pathc);
-
-for (i=0; i < Glob.gl_pathc; i++)
-{
-	S=STREAMFileOpen(Glob.gl_pathv[i],SF_RDONLY);
-	if (S)
-	{
-		IcecastSendData(S, Output, 4096000);
-		STREAMClose(S);
-	}
-}
-
-globfree(&Glob);
-Destroy(Tempstr);
-ListDestroy(Vars,Destroy);
-}
-
-
-
-void HTTPServerFormatExtraHeaders(HTTPSession *Session, ListNode *Vars)
+static void HTTPServerFormatExtraHeaders(HTTPSession *Session, ListNode *Vars)
 {
 ListNode *Curr;
 char *Tempstr=NULL;
@@ -861,7 +739,6 @@ void HTTPServerSendFile(STREAM *S, HTTPSession *Session, const char *Path, ListN
 STREAM *Doc;
 HTTPSession *Response;
 char *Buffer=NULL, *Tempstr=NULL;
-int ICYInterval=4096000;
 
 	Doc=STREAMFileOpen(Path, SF_RDONLY);
 	if (! Doc) HTTPServerSendHTML(S, Session, "403 Forbidden","You don't have permission for that.");
@@ -869,10 +746,10 @@ int ICYInterval=4096000;
 	{
 		if (Session)
 		{
-			LogToFile(Settings.LogPath,"%s@%s (%s) downloading %s (%s bytes)",Session->UserName,Session->ClientHost,Session->ClientIP,Path,GetVar(Vars,"FileSize"));
+			LogToFile(Settings.LogPath,"%s@%s (%s) downloading %s (%s bytes)", Session->UserName, Session->ClientHost, Session->ClientIP,Path,GetVar(Vars,"FileSize"));
 		}
 
-		Response=FileSendCreateSession(Path, Session, Vars, ICYInterval);
+		Response=FileSendCreateSession(Path, Session, Vars);
 		MediaReadDetails(Doc,Vars);
 		HTTPServerFormatExtraHeaders(Response,Vars);
 /*
@@ -890,9 +767,11 @@ int ICYInterval=4096000;
 		if (Flags & HEADERS_SENDFILE)
 		{
 //      LogToFile(Settings.LogPath,"SF: %d %s", Response->ContentSize, Buffer);
-			if (Session->Flags & SESSION_ICECAST) IcecastSendData(Doc, S, ICYInterval);
+//			if (Session->Flags & SESSION_ICECAST) IcecastSendData(Doc, S);
 			//else if (Flags & HEADERS_XSSI) STREAMWriteLine(Buffer, S);
-			else STREAMSendFile(Doc, S, 0, SENDFILE_KERNEL | SENDFILE_LOOP);
+			//else 
+			//
+			STREAMSendFile(Doc, S, 0, SENDFILE_KERNEL | SENDFILE_LOOP);
 		}
 
 
@@ -917,6 +796,7 @@ void HTTPServerSendDocument(STREAM *S, HTTPSession *Session, const char *Path, i
 {
 int result;
 ListNode *Vars;
+TPathItem *PI=NULL;
 
 
 	Vars=ListCreate();
@@ -924,9 +804,22 @@ ListNode *Vars;
 	if (! StrValid(Path)) result=FILE_NOSUCH;
 	else result=LoadFileRealProperties(Path, TRUE, Vars);
 
+
 	if (result==FILE_NOSUCH) HTTPServerSendHTML(S, Session, "404 Not Found","Couldn't find that document.");
 	else 
 	{
+
+	//filetype VPATHS can override some settings
+  PI=VPathFind(PATHTYPE_FILETYPE, Session->Path);
+  if (PI)
+  {
+     if (PI->Flags & PATHITEM_COMPRESS) Session->Flags |= FLAG_COMPRESS;
+     if (PI->Flags & PATHITEM_NO_COMPRESS) Session->Flags &= ~FLAG_COMPRESS;
+     if (PI->CacheTime > 0) Session->CacheTime=PI->CacheTime;
+     if (StrValid(PI->ContentType)) SetVar(Vars, "ContentType", PI->ContentType);
+  }
+
+
 		//Set 'LastModified' so we can use it if the server sends 'If-Modified-Since'
 	  Session->LastModified=atoi(GetVar(Vars,"MTime-secs"));
 
@@ -948,66 +841,12 @@ ListDestroy(Vars,Destroy);
 
 
 
-int HTTPServerExecCGI(STREAM *ClientCon, HTTPSession *Session, const char *ScriptPath)
-{
-char *Tempstr=NULL;
-int i;
-
-      if (StrValid(Session->Group) && (! SwitchGroup(Session->Group)))
-      {
-        LogToFile(Settings.LogPath,"WARN: Failed to switch to group '%s' to execute script: %s",Session->Group, ScriptPath);
-      }
-
-
-    //Switch user. ALAYA WILL NOT RUN SCRIPTS AS ROOT!
-      if ((geteuid()==0) && (! SwitchUser(Session->RealUser)))
-      {
-        LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s",Session->RealUser, ScriptPath);
-				return(FALSE);
-      }
-
-      if (geteuid()==0)
-      {
-        HTTPServerSendHTML(ClientCon, NULL, "403 Forbidden","Alaya will not run .cgi programs as 'root'.<br>\r\nTry setting 'Default User' in config file or command line.");
-        LogToFile(Settings.LogPath, "Failed to switch user to '%s' for running a .cgi program. Will not run programs as 'root'. Set 'DefaultUser' in config file or command line.",Session->RealUser);
-      }
-      else
-      {
-        Session->ResponseCode=CopyStr(Session->ResponseCode,"200 OK");
-        HTTPServerSendHeaders(ClientCon, Session, HEADERS_CGI);
-        STREAMFlush(ClientCon);
-
-        SetupEnvironment(Session, ScriptPath);
-        Tempstr=FindScriptHandlerForScript(Tempstr,ScriptPath);
-        if (Tempstr) LogToFile(Settings.LogPath,"Execute script: %s using handler '%s'",ScriptPath,Tempstr);
-        else LogToFile(Settings.LogPath,"Execute script: %s QUERY_STRING= '%s'",ScriptPath,getenv("QUERY_STRING"));
-
-        //Only do this late! Otherwise logging won't work.
-        for (i=3; i < 1000; i++) close(i);
-
-        if (StrValid(Tempstr)) execl(Tempstr, Tempstr, ScriptPath,NULL);
-        else execl(ScriptPath,ScriptPath,NULL);
-
-        /*If this code gets executed, then 'execl' failed*/
-        HTTPServerSendHTML(ClientCon, Session, "403 Forbidden","You don't have permission for that.");
-  
-        //Logging won't work after we've closed all the file descriptors!
-        LogToFile(Settings.LogPath,"Cannot execute script: %s",ScriptPath);
-    }
-
-	//if we get there then, for whatever reason, our script didn't run
-	Destroy(Tempstr);
-	return(FALSE);
-}
-
-
-
 void HTTPServerHandlePost(STREAM *S, HTTPSession *Session)
 {
 char *Tempstr=NULL;
 int bytes_read=0, result;
 
-	LogToFile(Settings.LogPath,"HANDLE POST: %s",Session->ContentType);
+	LogToFile(Settings.LogPath,"HANDLE POST: %s", Session->ContentType);
 	if (strcmp(Session->ContentType,"application/x-www-form-urlencoded")==0) HTTPServerReadBody(Session, &Session->Arguments);
 	else if (strncmp(Session->ContentType,"multipart/",10)==0) UploadMultipartPost(S, Session);
 	HTTPServerSendResponse(S, Session, "302", "", Session->URL);
@@ -1017,7 +856,7 @@ Destroy(Tempstr);
 
 
 
-void HTTPServerRecieveURL(STREAM *S,HTTPSession *Heads)
+static void HTTPServerRecieveURL(STREAM *S,HTTPSession *Heads)
 {
 STREAM *Doc;
 struct stat FileStat;
@@ -1048,7 +887,7 @@ Destroy(Buffer);
 
 
 
-void HTTPServerMkDir(STREAM *S, HTTPSession *Heads, int DirFlags)
+static void HTTPServerMkDir(STREAM *S, HTTPSession *Heads, int DirFlags)
 {
 int result;
 
@@ -1082,7 +921,8 @@ else switch (errno)
 
 }
 
-int HTTPServerDeleteCollection(HTTPSession *Session,char *Path)
+
+static int HTTPServerDeleteCollection(HTTPSession *Session,char *Path)
 {
 struct stat FileStat;
 glob_t myGlob;
@@ -1090,14 +930,14 @@ int result, i;
 char *Tempstr=NULL, *ptr;
 
 
-LogToFile(Settings.LogPath,"%s@%s (%s) DeleteCollection: %s",Session->UserName,Session->ClientHost,Session->ClientIP,Path);
+LogToFile(Settings.LogPath,"%s@%s (%s) DeleteCollection: %s", Session->UserName, Session->ClientHost, Session->ClientIP,Path);
 
 
 Tempstr=MCopyStr(Tempstr,Path,"/*",NULL);
 glob(Tempstr,0,0,&myGlob);
 for (i=0; i < myGlob.gl_pathc; i++)
 {
-	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"%s@%s (%s) DeleteSubItem: %s",Session->UserName,Session->ClientHost,Session->ClientIP,myGlob.gl_pathv[i]);
+	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"%s@%s (%s) DeleteSubItem: %s", Session->UserName, Session->ClientHost, Session->ClientIP,myGlob.gl_pathv[i]);
 
 	ptr=myGlob.gl_pathv[i];
 	if ((strcmp(ptr,".") !=0) && (strcmp(ptr,"..") !=0)) 
@@ -1117,7 +957,7 @@ return(result);
 }
 
 
-void HTTPServerDelete(STREAM *S,HTTPSession *Heads)
+static void HTTPServerDelete(STREAM *S,HTTPSession *Heads)
 {
 int result;
 struct stat FileStat;
@@ -1152,7 +992,7 @@ else switch (errno)
 
 
 
-void HTTPServerCopy(STREAM *S,HTTPSession *Heads)
+static void HTTPServerCopy(STREAM *S,HTTPSession *Heads)
 {
 int result=-1;
 char *Tempstr=NULL, *Host=NULL, *Destination=NULL;
@@ -1194,7 +1034,7 @@ Destroy(Destination);
 
 
 
-void HTTPServerMove(STREAM *S,HTTPSession *Heads)
+static void HTTPServerMove(STREAM *S,HTTPSession *Heads)
 {
 int result;
 char *Tempstr=NULL, *Host=NULL, *Destination=NULL;
@@ -1239,7 +1079,9 @@ Destroy(Tempstr);
 Destroy(Destination);
 }
 
-void HTTPServerHandleLock(STREAM *S, HTTPSession *ClientHeads)
+
+
+static void HTTPServerHandleLock(STREAM *S, HTTPSession *ClientHeads)
 {
 
 if (ClientHeads->MethodID==METHOD_LOCK)
@@ -1259,7 +1101,7 @@ else
 
 
 
-void HTTPServerOptions(STREAM *S,HTTPSession *ClientHeads)
+static void HTTPServerOptions(STREAM *S,HTTPSession *ClientHeads)
 {
 char *Tempstr=NULL;
 
@@ -1281,7 +1123,7 @@ Destroy(Tempstr);
 
 
 
-int HTTPServerSetUserContext(HTTPSession *Session)
+static int HTTPServerSetUserContext(HTTPSession *Session)
 {
 char *ChrootDir=NULL, *Tempstr=NULL;
 
@@ -1294,10 +1136,10 @@ if (IsProxyMethod(Session->MethodID))
 }
 else 
 {
-	if (Settings.Flags & FLAG_CHHOME) ChrootDir=CopyStr(ChrootDir,Session->HomeDir);
+	if (Settings.Flags & FLAG_CHHOME) ChrootDir=CopyStr(ChrootDir, Session->HomeDir);
 
 		//if (Settings.Flags & FLAG_LOG_VERBOSE) 
-	LogToFile(Settings.LogPath,"ChRoot to: %s home=%s",ChrootDir,Session->HomeDir);
+	LogToFile(Settings.LogPath,"ChRoot to: %s home=%s",ChrootDir, Session->HomeDir);
 
 	if (StrValid(ChrootDir))
 	{
@@ -1312,13 +1154,14 @@ else
 	Session->StartDir=CopyStr(Session->StartDir,ChrootDir);
 	}
 
+	//if we are run as the root user we do a full chroot
 	if (getuid()==0)
 	{
-	if (Settings.Flags & (FLAG_CHHOME | FLAG_CHROOT))
-	{
-	chroot(".");
-	Session->StartDir=CopyStr(Session->StartDir,"/");
-	}
+		if (Settings.Flags & (FLAG_CHHOME | FLAG_CHROOT))
+		{
+			chroot(".");
+			Session->StartDir=CopyStr(Session->StartDir,"/");
+		}
 	}
 }
 
@@ -1330,7 +1173,7 @@ else if (Settings.Flags & FLAG_CHSHARE)
 	chroot(".");
 	if (strncmp(Session->StartDir,Settings.DefaultDir,StrLen(Settings.DefaultDir))==0)
 	{
-		Tempstr=MCopyStr(Tempstr,"/",Session->StartDir+StrLen(Settings.DefaultDir),NULL);
+		Tempstr=MCopyStr(Tempstr,"/", Session->StartDir+StrLen(Settings.DefaultDir),NULL);
 		chdir(Tempstr);
 		Session->StartDir=CopyStr(Session->StartDir,Tempstr);
 	}
@@ -1339,14 +1182,14 @@ else if (Settings.Flags & FLAG_CHSHARE)
 
 Session->StartDir=SlashTerminateDirectoryPath(Session->StartDir);
 
-LogToFile(Settings.LogPath,"User Context: Chroot: %s, StartDir: %s, HomeDir: %s, UserID: %d, GroupID: %d,",ChrootDir, Session->StartDir, Session->HomeDir, Session->RealUserUID,Session->GroupID);
+LogToFile(Settings.LogPath,"User Context: Chroot: %s, StartDir: %s, HomeDir: %s, UserID: %d, GroupID: %d,",ChrootDir, Session->StartDir, Session->HomeDir, Session->RealUserUID, Session->GroupID);
 
 if (Session->GroupID > 0)
 {
 	if (setgid(Session->GroupID) != 0)
 	{
 		HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user-group");
-	  LogToFile(Settings.LogPath,"ERROR: Failed to switch group to %s/%d. Exiting",Session->RealUser,Session->RealUserUID);
+	  LogToFile(Settings.LogPath,"ERROR: Failed to switch group to %s/%d. Exiting", Session->RealUser, Session->RealUserUID);
  		_exit(1);
 	}
 }
@@ -1355,22 +1198,25 @@ else if (Settings.DefaultGroupID > 0)
 	if (setgid(Settings.DefaultGroupID) != 0)
 	{
 		HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user-group");
-		LogToFile(Settings.LogPath,"ERROR: Failed to switch group to %s/%d. Exiting",Session->RealUser,Session->RealUserUID);
+		LogToFile(Settings.LogPath,"ERROR: Failed to switch group to %s/%d. Exiting", Session->RealUser, Session->RealUserUID);
  		_exit(1);
 	}
 }
 
-DropCapabilities(CAPS_LEVEL_CHROOTED);
 
-if (setresuid(Session->RealUserUID,Session->RealUserUID,Session->RealUserUID)!=0)
+if (getuid()==0)
 {
-	HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user");
-  LogToFile(Settings.LogPath,"ERROR: Failed to switch user to %s/%d. Exiting",Session->RealUser,Session->RealUserUID);
-  _exit(1);
-}
+	DropCapabilities(CAPS_LEVEL_CHROOTED);
+	if (setresuid(Session->RealUserUID, Session->RealUserUID, Session->RealUserUID)!=0)
+	{
+		HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user");
+ 		LogToFile(Settings.LogPath,"ERROR: Failed to switch user to %s/%d. Exiting", Session->RealUser, Session->RealUserUID);
+ 	 _exit(1);
+	}
 
 //drop everything! (In case someting went wrong with setresuid) 
 DropCapabilities(CAPS_LEVEL_SESSION);
+}
 
 Destroy(Tempstr);
 Destroy(ChrootDir);
@@ -1381,7 +1227,7 @@ return(TRUE);
 
 
 
-int HTTPMethodAllowed(HTTPSession *Session) 
+static int HTTPMethodAllowed(HTTPSession *Session) 
 {
 char *Token=NULL;
 const char *ptr;
@@ -1391,13 +1237,13 @@ if (! StrValid(Settings.HttpMethods)) return(TRUE);
 ptr=GetToken(Settings.HttpMethods,",",&Token,0);
 while (ptr)
 {
-if (strcmp(Token,Session->Method)==0) 
-{
-Destroy(Token);
-return(TRUE);
-}
+	if (strcmp(Token, Session->Method)==0) 
+	{
+		Destroy(Token);
+		return(TRUE);
+	}
 
-ptr=GetToken(ptr,",",&Token,0);
+	ptr=GetToken(ptr,",",&Token,0);
 }
 
 Destroy(Token);
@@ -1405,7 +1251,7 @@ return(FALSE);
 }
 
 
-int HTTPServerAuthenticate(HTTPSession *Session)
+static int HTTPServerAuthenticate(HTTPSession *Session)
 {
 	int result=FALSE;
 	TPathItem *VPath;
@@ -1413,19 +1259,19 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 	//This handles someone clicking a 'logout' button
 	if (! HTTPServerHandleRegister(Session, LOGIN_CHECK_ALLOWED))
 	{
-		LogToFile(Settings.LogPath,"AUTH: Forcing Relogin for  %s@%s (%s) %s %s",Session->ClientIP,Session->ClientHost,Session->ClientIP,Session->Method,Session->Path);
+		LogToFile(Settings.LogPath,"AUTH: Forcing Relogin for  %s@%s (%s) %s %s", Session->ClientIP, Session->ClientHost, Session->ClientIP, Session->Method, Session->Path);
 		return(FALSE);
 	}
 
 
 	if (Session->Flags & SESSION_AUTHENTICATED) 
 	{
-		if (strcmp(Session->UserName,Session->AuthenticatedUser)==0) 
+		if (strcmp(Session->UserName, Session->AuthenticatedUser)==0) 
 		{
-			LogToFile(Settings.LogPath,"AUTH: Session Keep-Alive active, reusing authentication for %s@%s (%s) %s %s",Session->ClientIP,Session->ClientHost,Session->ClientIP,Session->Method,Session->Path);
+			LogToFile(Settings.LogPath,"AUTH: Session Keep-Alive active, reusing authentication for %s@%s (%s) %s %s", Session->ClientIP, Session->ClientHost, Session->ClientIP, Session->Method, Session->Path);
 			return(TRUE);
 		}
-		else LogToFile(Settings.LogPath,"AUTH: ERROR: Session Keep-Alive active, but user has changed to %s@%s (%s) %s %s. Refusing authentication",Session->ClientIP,Session->ClientHost,Session->ClientIP,Session->Method,Session->Path);
+		else LogToFile(Settings.LogPath,"AUTH: ERROR: Session Keep-Alive active, but user has changed to %s@%s (%s) %s %s. Refusing authentication", Session->ClientIP, Session->ClientHost, Session->ClientIP, Session->Method, Session->Path);
 	}
 
 	//Consider vpath Auhentication
@@ -1447,7 +1293,7 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 
 		//The FLAG_SSL_CERT_REQUIRED flag might have been set by user settings
 		//during authentication, so check it again here
-		if (! HTTPServerCheckCertificate(Session, Session->S)) result=FALSE;
+		if (! auth_client_certificate(Session, Session->S)) result=FALSE;
 
 		if (result) HTTPServerHandleRegister(Session, LOGGED_IN);
 		else HTTPServerHandleRegister(Session, LOGIN_FAIL);
@@ -1455,7 +1301,7 @@ int HTTPServerAuthenticate(HTTPSession *Session)
 
 	if (result==TRUE) 
 	{
-		Session->AuthenticatedUser=CopyStr(Session->AuthenticatedUser,Session->UserName);
+		Session->AuthenticatedUser=CopyStr(Session->AuthenticatedUser, Session->UserName);
 		Session->Flags |= SESSION_AUTHENTICATED;
 	}
 
@@ -1706,7 +1552,7 @@ return(result);
 
 
 
-int HTTPServerValidateURL(HTTPSession *Session, char **Token)
+static int HTTPServerValidateURL(HTTPSession *Session, char **Token)
 {
 const char *ptr;
 
@@ -1716,7 +1562,7 @@ while (ptr)
 	if (strstr(Session->OriginalURL,*Token)) 
 	{
 		Session->Flags |= SESSION_ERR_BADURL;
-		LogToFile(Settings.LogPath,"ERROR: INVALID URL: %s",Session->URL);
+		LogToFile(Settings.LogPath,"ERROR: INVALID URL: %s", Session->URL);
 		return(FALSE);
 	}
 	ptr=GetToken(ptr,",",Token,0);
@@ -1734,24 +1580,14 @@ void HTTPServerFindAndSendDocument(STREAM *S, HTTPSession *Session, int Flags)
 {
 char *Path=NULL;
 const char *ptr;
-TPathItem *PI=NULL;
 ListNode *Curr;
 
 	if (! VPathProcess(S, Session, Flags))
   {
     ptr=Session->StartDir;
     if (*ptr=='.') ptr++;
-    if (strcmp(ptr,"/")==0) Path=CopyStr(Path,Session->Path);
-    else Path=MCopyStr(Path,ptr,Session->Path,NULL);
-
-		PI=VPathFind(PATHTYPE_FILETYPE, Session->Path);
-		if (PI)
-		{
-			if (PI->Flags & PATHITEM_COMPRESS) Session->Flags |= FLAG_COMPRESS;
-			if (PI->Flags & PATHITEM_NO_COMPRESS) Session->Flags &= ~FLAG_COMPRESS;
-			if (PI->CacheTime > 0) Session->CacheTime=PI->CacheTime;
-		}
-		else LogToFile(Settings.LogPath,"WARN: failed to find vpath '%s' \n",Session->Path);
+    if (strcmp(ptr,"/")==0) Path=CopyStr(Path, Session->Path);
+    else Path=MCopyStr(Path,ptr, Session->Path,NULL);
 
 		//One day we will be able to handle scripts inside of chroot using embedded
 		//scripting. But not today.
@@ -1765,15 +1601,11 @@ Destroy(Path);
 
 
 
-void HTTPServerHandleConnection(HTTPSession *Session)
+
+void HTTPServerHandleHTTPConnection(HTTPSession *Session)
 {
 char *Tempstr=NULL, *Method=NULL, *URL=NULL;
-int AuthOkay=TRUE, result;
-
-if (Settings.Flags & FLAG_SSL)
-{
-	if (! HTTPServerActivateSSL(Session,Settings.SSLKeys)) return;
-}
+int AuthOkay=TRUE, result, val;
 
 while (1)
 {
@@ -1781,14 +1613,14 @@ if (! HTTPServerReadHeaders(Session)) break;
 
 ProcessSessionEventTriggers(Session);
 
-if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"PREAUTH: %s against %s %s\n",Session->UserName,Settings.AuthPath,Settings.AuthMethods);
+if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"PREAUTH: %s against %s %s\n", Session->UserName,Settings.AuthPath,Settings.AuthMethods);
 if (Settings.AuthFlags & FLAG_AUTH_REQUIRED)
 {
 	AuthOkay=FALSE;
 
 	if (HTTPServerAuthenticate(Session))
 	{
-		LogToFile(Settings.LogPath,"AUTHENTICATED: %s@%s for '%s %s' against %s %s\n",Session->UserName,Session->ClientIP,Session->Method,Session->Path,Settings.AuthPath,Settings.AuthMethods);
+		LogToFile(Settings.LogPath,"AUTHENTICATED: %s@%s for '%s %s' against %s %s\n", Session->UserName, Session->ClientIP, Session->Method, Session->Path,Settings.AuthPath,Settings.AuthMethods);
 		AuthOkay=TRUE;
 	}
 	else
@@ -1796,7 +1628,7 @@ if (Settings.AuthFlags & FLAG_AUTH_REQUIRED)
 		if (IsProxyMethod(Session->MethodID)) HTTPServerSendHTML(Session->S, Session, "407 UNAUTHORIZED","Proxy server requires authentication.");
 		else HTTPServerSendHTML(Session->S, Session, "401 UNAUTHORIZED","Server requires authentication.");
 
-		if (Session->AuthFlags & FLAG_AUTH_PRESENT) LogToFile(Settings.LogPath,"AUTHENTICATE FAIL: %s@%s for '%s %s' against %s %s\n",Session->UserName,Session->ClientIP,Session->Method,Session->Path,Settings.AuthPath,Settings.AuthMethods);
+		if (Session->AuthFlags & FLAG_AUTH_PRESENT) LogToFile(Settings.LogPath,"AUTHENTICATE FAIL: %s@%s for '%s %s' against %s %s\n", Session->UserName, Session->ClientIP, Session->Method, Session->Path,Settings.AuthPath,Settings.AuthMethods);
 	}
 }
 
@@ -1824,57 +1656,57 @@ if (Session->Flags & SESSION_KEEPALIVE) Session->Flags |= SESSION_REUSE;
 switch (Session->MethodID)
 {
 	case METHOD_POST:
-	if (! VPathProcess(Session->S, Session, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE)) HTTPServerHandlePost(Session->S,Session);
+	if (! VPathProcess(Session->S, Session, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE)) HTTPServerHandlePost(Session->S, Session);
 	break;
 
 	case METHOD_GET:
-		result=HTTPServerProcessActions(Session->S,Session);
-		if (! result) HTTPServerFindAndSendDocument(Session->S,Session,HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
+		result=HTTPServerProcessActions(Session->S, Session);
+		if (! result) HTTPServerFindAndSendDocument(Session->S, Session, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 		break;
 
 	case METHOD_RGET:
 	case METHOD_RPOST:
-		HTTPProxyRGETURL(Session->S,Session);
+		HTTPProxyRGETURL(Session);
 		break;
 
 	case METHOD_HEAD:
-		HTTPServerFindAndSendDocument(Session->S,Session,HEADERS_KEEPALIVE);
+		HTTPServerFindAndSendDocument(Session->S, Session,HEADERS_KEEPALIVE);
 		break;
 
 	case METHOD_PUT:
-		HTTPServerRecieveURL(Session->S,Session);
+		HTTPServerRecieveURL(Session->S, Session);
 		break;
 
 	case METHOD_MKCOL:
-		HTTPServerMkDir(Session->S,Session, DIRTYPE_NORMAL);
+		HTTPServerMkDir(Session->S, Session, DIRTYPE_NORMAL);
 		break;
 
 	case METHOD_DELETE:
-		HTTPServerDelete(Session->S,Session);
+		HTTPServerDelete(Session->S, Session);
 		break;
 
 	case METHOD_MOVE:
-		HTTPServerMove(Session->S,Session);
+		HTTPServerMove(Session->S, Session);
 		break;
 
 	case METHOD_COPY:
-		HTTPServerCopy(Session->S,Session);
+		HTTPServerCopy(Session->S, Session);
 		break;
 
 	case METHOD_PROPFIND:
-		HTTPServerPropFind(Session->S,Session);
+		HTTPServerPropFind(Session->S, Session);
 		break;
 
 	case METHOD_PROPPATCH:
-		HTTPServerPropPatch(Session->S,Session);
+		HTTPServerPropPatch(Session->S, Session);
 		break;
 
 	case METHOD_OPTIONS:
-		HTTPServerOptions(Session->S,Session);
+		HTTPServerOptions(Session->S, Session);
 		break;
 
 	case METHOD_CONNECT:
-		HTTPProxyConnect(Session->S,Session);
+		HTTPProxyConnect(Session);
 		break;
 
 	case METHOD_LOCK:
@@ -1893,7 +1725,7 @@ switch (Session->MethodID)
 
 	case METHOD_WEBSOCKET:
 	case METHOD_WEBSOCKET75:
-		WebsocketConnect(Session->S,Session);
+		WebsocketConnect(Session->S, Session);
 		//we can't reuse websocket connections. They are persistent, but they are opaque to 
 		//the HTTP server
 		Session->Flags &= ~SESSION_REUSE;
@@ -1906,13 +1738,13 @@ switch (Session->MethodID)
 }
 }
 
-LogToFile(Settings.LogPath,"TRANSACTION COMPLETE: %s %s for %s@%s (%s)",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP);
+LogToFile(Settings.LogPath,"TRANSACTION COMPLETE: %s %s for %s@%s (%s)", Session->Method, Session->Path, Session->UserName, Session->ClientHost, Session->ClientIP);
 LogFileFlushAll(TRUE);
 
 STREAMFlush(Session->S);
 if (! (Session->Flags & SESSION_REUSE)) break;
 break;
-//LogToFile(Settings.LogPath,"REUSE: %s %s for %s@%s (%s)",Session->Method, Session->Path, Session->UserName,Session->ClientHost,Session->ClientIP);
+//LogToFile(Settings.LogPath,"REUSE: %s %s for %s@%s (%s)", Session->Method, Session->Path, Session->UserName, Session->ClientHost, Session->ClientIP);
 }
 
 
@@ -1921,3 +1753,83 @@ Destroy(Method);
 Destroy(URL);
 }
 
+
+#define CONNECTION_HTTP   0
+#define CONNECTION_HTTPS  1
+#define CONNECTION_SOCKS4 4
+#define CONNECTION_SOCKS5 5
+
+static int HTTPServerConnectType(HTTPSession *Session)
+{
+int result=CONNECTION_HTTP;
+char byte;
+
+if (! (Settings.Flags & FLAG_SSL)) return(CONNECTION_HTTP);
+
+if (FDSelect(Session->S->in_fd, SELECT_READ, NULL) > 0)
+{
+	recv(Session->S->in_fd, &byte, 1, MSG_PEEK);
+	switch (byte)
+	{
+		case 0x4: result=CONNECTION_SOCKS4; break;
+		case 0x5: result=CONNECTION_SOCKS5; break;
+		case 0x16: result=CONNECTION_HTTPS; break;
+	}
+}
+
+return(result);
+}
+
+
+
+void HTTPServerHandleConnection(HTTPSession *Session)
+{
+int Type, val;
+char *Token=NULL;
+
+Session->ClientHost=CopyStr(Session->ClientHost, "");
+GetSockDetails(Session->S->in_fd,&Session->ServerName,&Session->ServerPort,&Session->ClientIP,&val);
+GetHostARP(Session->ClientIP, &Token, &Session->ClientMAC);
+if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrValid(Session->ClientIP)) Session->ClientHost=CopyStr(Session->ClientHost,IPStrToHostName(Session->ClientIP));
+
+
+Type=HTTPServerConnectType(Session);
+switch (Type)
+{
+case CONNECTION_HTTP:
+	HTTPServerHandleHTTPConnection(Session);
+break;
+
+case CONNECTION_HTTPS:
+	if (! HTTPServerActivateSSL(Session,Settings.SSLKeys))
+	{
+			return;
+	}
+	HTTPServerHandleHTTPConnection(Session);
+break;
+
+
+case CONNECTION_SOCKS4:
+#ifdef USE_SOCKS
+	Session->Method=CopyStr(Session->Method, "SOCKS");
+	if (HTTPMethodAllowed(Session)) SocksProxyConnect(Session);
+#else
+	LogToFile(Settings.LogPath, "ERROR: Attempted SOCKS4 connection from %s %s. But SOCKS proxy support not compiled in.", Session->ClientHost, Session->ClientIP);
+//	fprintf(stderr, "ERROR: %s Attempted SOCKS4 connection from %s %s. But SOCKS proxy support not compiled in.\n", Settings.LogPath, Session->ClientHost, Session->ClientIP);
+#endif
+break;
+
+case CONNECTION_SOCKS5:
+#ifdef USE_SOCKS
+	Session->Method=CopyStr(Session->Method, "SOCKS");
+	if (HTTPMethodAllowed(Session)) SocksProxyConnect(Session);
+#else
+	LogToFile(Settings.LogPath, "ERROR: Attempted SOCKS5 connection from %s %s. But SOCKS proxy support not compiled in.", Session->ClientHost, Session->ClientIP);
+//	fprintf(stderr, "ERROR: %s Attempted SOCKS5 connection from %s %s. But SOCKS proxy support not compiled in.\n", Settings.LogPath, Session->ClientHost, Session->ClientIP);
+#endif
+
+break;
+}
+
+Destroy(Token);
+}

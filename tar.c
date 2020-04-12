@@ -39,7 +39,7 @@ const char *TarItemStrings[]={"file","hardlink","symlink","blkdev","chrdev","dir
 typedef enum {TAR_FILE, TAR_HARDLINK, TAR_SYMLINK, TAR_CHRDEV, TAR_BLKDEV, TAR_DIR, TAR_FIFO} TarItemTypes ;
 
 
-int TarReadHeader(STREAM *S, ListNode *Vars)
+static int TarReadHeader(STREAM *S, ListNode *Vars)
 {
 char *Tempstr=NULL, *ptr;
 int len, result, RetVal=FALSE;
@@ -185,54 +185,8 @@ return(count);
 }
 
 
-/*
-int TarReadHeader(STREAM *S, char **Path, struct stat *FStat)
-{
-char *Tempstr=NULL;
-int len, result, RetVal=FALSE;
-TTarHeader *Head;
 
-len=sizeof(TTarHeader);
-Head=(TTarHeader *) calloc(1,len);
-result=STREAMReadBytes(S,(char *) Head,len);
-printf("HEAD: %d %s\n",result,(char *) Head);
-if (result == len)
-{
-*Path=CopyStr(*Path,Head->prefix);
-*Path=CatStr(*Path,Head->name);
-
-//Convert 'Size' from octal. Yes, octal.
-FStat->st_size=strtol(Head->size,NULL,8);
-FStat->st_mode=strtol(Head->mode,NULL,8);
-FStat->st_mtime=strtol(Head->mtime,NULL,8);
-FStat->st_uid=strtol(Head->uid,NULL,8);
-FStat->st_gid=strtol(Head->gid,NULL,8);
-
-StripTrailingWhitespace(Head->magic);
-if (strcmp(Head->magic,"ustar")==0) 
-{
-switch (Head->typeflag)
-{
-	case '1': FStat->st_mode |= __S_IFREG; break;
-	case '2': FStat->st_mode |= __S_IFLNK; break;
-	case '3': FStat->st_mode |= __S_IFCHR; break;
-	case '4': FStat->st_mode |= __S_IFBLK; break;
-	case '5': FStat->st_mode |= __S_IFDIR; break;
-}
-
-}
-RetVal=TRUE;
-}
-
-Destroy(Tempstr);
-free(Head);
-
-return(RetVal);
-}
-*/
-
-
-TTarHeader *TarGenerateHeader(const char *Path, char TypeFlag, struct stat *FStat)
+static TTarHeader *TarGenerateHeader(const char *Path, char TypeFlag, struct stat *FStat)
 {
 TTarHeader *Head;
 const char *ptr;
@@ -280,7 +234,7 @@ snprintf(Head->chksum,8,"%06o",chksum);
 }
 
 
-int TarWriteHeader(STREAM *S, const char *Path, struct stat *FStat)
+static int TarWriteHeader(STREAM *S, const char *Path, struct stat *FStat)
 {
 char *Tempstr=NULL, *ptr;
 char TypeFlag;
@@ -305,7 +259,7 @@ return(TRUE);
 }
 
 
-int TarWriteParsedHeader(STREAM *S, const char *Info)
+static int TarWriteParsedHeader(STREAM *S, const char *Info)
 {
 char *Name=NULL, *Value=NULL, *Path=NULL;
 char TypeChar='0';
@@ -353,7 +307,7 @@ Destroy(Path);
 }
 
 
-int TarWriteFooter(STREAM *Tar)
+static int TarWriteFooter(STREAM *Tar)
 {
 char *Tempstr=NULL;
 
@@ -369,7 +323,7 @@ return(TRUE);
 }
 
 
-int TarWriteBytes(STREAM *Tar, const char *Bytes, int Len)
+static int TarWriteBytes(STREAM *Tar, const char *Bytes, int Len)
 {
 int blocks, tarlen;
 char *Fill=NULL;
@@ -387,7 +341,7 @@ return(TRUE);
 }
 
 
-int TarAddFile(STREAM *Tar, STREAM *File)
+static int TarAddFile(STREAM *Tar, STREAM *File)
 {
 char *Buffer=NULL;
 int result;
@@ -411,7 +365,7 @@ return(TRUE);
 
 
 
-int TarInternalProcessFiles(STREAM *Tar, const char *FilePattern)
+static int TarInternalProcessFiles(STREAM *Tar, const char *FilePattern)
 {
 glob_t Glob;
 char *Tempstr=NULL;

@@ -6,7 +6,7 @@
 #include "Authenticate.h"
 
 TSettings Settings;
-char *Version="2.3";
+char *Version="3.0";
 
 void SetTimezoneEnv()
 {
@@ -165,7 +165,6 @@ Destroy(Trans->UserName);
 Destroy(Trans->Password);
 Destroy(Trans->RealUser);
 Destroy(Trans->HomeDir);
-Destroy(Trans->AuthType);
 Destroy(Trans->Host);
 Destroy(Trans->ClientIP);
 Destroy(Trans->ClientMAC);
@@ -202,7 +201,6 @@ Trans->ContentType=CopyStr(Trans->ContentType,"");
 Trans->ContentBoundary=CopyStr(Trans->ContentBoundary,"");
 Trans->UserName=CopyStr(Trans->UserName,"");
 Trans->Password=CopyStr(Trans->Password,"");
-Trans->AuthType=CopyStr(Trans->AuthType,"");
 Trans->Host=CopyStr(Trans->Host,"");
 Trans->ClientReferrer=CopyStr(Trans->ClientReferrer,"");
 Trans->UserAgent=CopyStr(Trans->UserAgent,"");

@@ -7,8 +7,8 @@ prefix=/usr/local
 exec_prefix=${prefix}
 bindir=${exec_prefix}/sbin
 sysconfdir=${prefix}/etc
-FLAGS=$(CFLAGS) $(CPPFLAGS) -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DSTDC_HEADERS=1 -D_FILE_OFFSET_BITS=64 -DHAVE_LIBZ=1 -DHAVE_LIBCAP=1 -DUSE_LINUX_CAPABILITIES=1 -DHAVE_LIBPAM=1 -DHAVE_LIBSSL=1 -DHAVE_LIBCRYPTO=1 -DHAVE_LIBCRYPT=1 -DHAVE_SHADOW_H=1 
-OBJ=AccessTokens.o Authenticate.o auth_alaya_native.o auth_unix.o auth_pam.o MimeType.o DavProps.o Settings.o common.o server.o FileProperties.o tar.o directory_listing.o FileDetailsPage.o VPath.o ChrootHelper.o UserAdminScreen.o Events.o ID3.o upload.o proxy.o websocket.o xssi.o libUseful/libUseful.a
+FLAGS=$(CFLAGS) $(CPPFLAGS) -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DSTDC_HEADERS=1 -D_FILE_OFFSET_BITS=64 -DHAVE_LIBZ=1 -DUSE_SOCKS=1 -DHAVE_LIBCAP=1 -DUSE_LINUX_CAPABILITIES=1 -DHAVE_LIBPAM=1 -DHAVE_LIBSSL=1 -DHAVE_LIBCRYPTO=1 -DHAVE_LIBCRYPT=1 -DHAVE_SHADOW_H=1 
+OBJ=auth_access_token.o Authenticate.o auth_client_certificate.o auth_alaya_native.o auth_unix.o auth_pam.o MimeType.o DavProps.o Settings.o common.o server.o cgi.o FileProperties.o tar.o directory_listing.o FileDetailsPage.o VPath.o ChrootHelper.o UserAdminScreen.o Events.o ID3.o upload.o proxy.o websocket.o icecast.o xssi.o libUseful/libUseful.a
 EXE=alaya
 
 all: $(OBJ)
@@ -17,11 +17,14 @@ all: $(OBJ)
 libUseful/libUseful.a: 
 	@cd libUseful; $(MAKE)
 
-AccessTokens.o: AccessTokens.c AccessTokens.h
-	$(CC) $(FLAGS) -c AccessTokens.c
+auth_access_token.o: auth_access_token.c auth_access_token.h
+	$(CC) $(FLAGS) -c auth_access_token.c
 
 Authenticate.o: Authenticate.c Authenticate.h
 	$(CC) $(FLAGS) -c Authenticate.c
+
+auth_client_certificate.o: auth_client_certificate.c auth_client_certificate.h
+	$(CC) $(FLAGS) -c auth_client_certificate.c
 
 auth_alaya_native.o: auth_alaya_native.c auth_alaya_native.h
 	$(CC) $(FLAGS) -c auth_alaya_native.c
@@ -49,6 +52,9 @@ common.o: common.c common.h
 
 server.o: server.c server.h
 	$(CC) $(FLAGS) -c server.c 
+
+cgi.o: cgi.c cgi.h
+	$(CC) $(FLAGS) -c cgi.c 
 
 Events.o: Events.c Events.h
 	$(CC) $(FLAGS) -c Events.c 
@@ -79,6 +85,9 @@ upload.o: upload.c upload.h
 
 proxy.o: proxy.c proxy.h
 	$(CC) $(FLAGS) -c proxy.c
+
+icecast.o: icecast.c icecast.h
+	$(CC) $(FLAGS) -c icecast.c
 
 xssi.o: xssi.c xssi.h
 	$(CC) $(FLAGS) -c xssi.c

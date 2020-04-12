@@ -1,11 +1,12 @@
-#ifndef WEBSERV_PROXY_H
-#define WEBSERV_PROXY_H
+#ifndef ALAYA_PROXY_H
+#define ALAYA_PROXY_H
 
 #include "common.h"
 
 int IsProxyMethod(int Method);
-void HTTPProxyRGETURL(STREAM *S,HTTPSession *Session);
-void HTTPProxyConnect(STREAM *S,HTTPSession *ClientHeads);
+void HTTPProxyRGETURL(HTTPSession *Session);
+void HTTPProxyConnect(HTTPSession *Session);
+void SocksProxyConnect(HTTPSession *Session);
 
 #endif
 

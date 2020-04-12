@@ -4,7 +4,7 @@
 #include "common.h"
 #include "MimeType.h"
 #include "FileProperties.h"
-#include "AccessTokens.h"
+#include "auth_access_token.h"
 
 
 char *FormatFileProperties(char *HTML, HTTPSession *Session, int FType, const char *URL, const char *Path, ListNode *Vars, int Flags)

@@ -1,6 +1,7 @@
 #include "ChrootHelper.h"
 #include "server.h"
 #include "proxy.h"
+#include "cgi.h"
 
 //These functions relate to requests for data from outside of the current
 //path and possibly outside of chroot. These scripts/documents are served 
@@ -460,7 +461,7 @@ HTTPSession *Response;
 			//must use write because stream is embargoed
 			write(1,"READY\n",6);
 
-			HTTPServerExecCGI(ClientCon, Response, ScriptPath);
+			CGIExecProgram(ClientCon, Response, ScriptPath);
 
 			//exit whether script ran or not!
 			_exit(0);
@@ -649,12 +650,13 @@ pid=fork();
 if (pid==0)
 {
 	Response=ParseSessionInfo(Data);
+	Response->S=ClientCon;
 	STREAMWriteLine("READY\n",ClientCon); STREAMFlush(ClientCon);
 
 	if (strcmp(Response->Method,"POST")==0) Response->MethodID=METHOD_RPOST;
 	else Response->MethodID=METHOD_RGET;
 
-	HTTPProxyRGETURL(ClientCon,Response);
+	HTTPProxyRGETURL(Response);
 	//void HTTPProxyConnect(STREAM *S,HTTPSession *ClientHeads);
 
 	LogFileFlushAll(TRUE);
@@ -964,6 +966,8 @@ if (Session->ContentSize > 0)
 STREAMWriteLine("\r\n",ParentProcessPipe); 
 STREAMFlush(ParentProcessPipe);
 }
+
+STREAMSetTimeout(ParentProcessPipe, 0);
 
 //Handle Headers from CGI script
 Headers=CopyStr(Headers,"");

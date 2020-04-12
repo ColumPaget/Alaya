@@ -170,6 +170,8 @@ else
 
 if (StrValid(PassType) && StrValid(ProvidedPass))
 {
+	//this is used when a client authenticates using HTTP Basic authentication, but the
+	//password is stored in HTTP Digest format
 	if (strcmp(PassType,"htdigest-md5")==0)
 	{
 		Tempstr=MCopyStr(Tempstr,Name,":",Settings.AuthRealm,":",ProvidedPass,NULL);
@@ -220,28 +222,31 @@ if (
 	) return(FALSE);
 	
 
-	p_AuthDetails=GetToken(Session->AuthDetails,":",&URI,0);
-	p_AuthDetails=GetToken(p_AuthDetails,":",&Algo,0);
+	p_AuthDetails=GetToken(Session->AuthDetails," ",&URI, 0);
+	p_AuthDetails=GetToken(p_AuthDetails," ",&Algo,0);
+
 	if (! StrValid(URI)) URI=CopyStr(URI,Session->Path);
+
+	if (! StrValid(Algo)) Algo=CopyStr(Algo, "md5"); 
 
 	if (strcmp(PasswordType,"htdigest-md5")==0) Digest1=CopyStr(Digest1, Password);
 	else
 	{
 		//Calc 'HA1'
 		Tempstr=MCopyStr(Tempstr,Session->UserName,":",Settings.AuthRealm,":",Password,NULL);
-		HashBytes(&Digest1,"md5",Tempstr,StrLen(Tempstr),ENCODE_HEX);
+		HashBytes(&Digest1,Algo,Tempstr,StrLen(Tempstr),ENCODE_HEX);
 	}
 
 
 	//Calc 'HA2'
 
 	Tempstr=MCopyStr(Tempstr,Session->Method,":",URI,NULL);
-	HashBytes(&Digest2,"md5",Tempstr,StrLen(Tempstr),ENCODE_HEX);
+	HashBytes(&Digest2,Algo,Tempstr,StrLen(Tempstr),ENCODE_HEX);
 
 	Tempstr=MCopyStr(Tempstr,Digest1,":",p_AuthDetails,":",Digest2,NULL);
 	Digest1=CopyStr(Digest1,"");
-	HashBytes(&Digest1,"md5",Tempstr,StrLen(Tempstr),ENCODE_HEX);
-		
+	HashBytes(&Digest1,Algo,Tempstr,StrLen(Tempstr),ENCODE_HEX);
+	
 	if (strcasecmp(ProvidedPass,Digest1)==0) result=TRUE;
 
 

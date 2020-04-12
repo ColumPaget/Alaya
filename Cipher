@@ -1,0 +1,583 @@
+Authenticate.c:if (! Session->S) return(FALSE);
+Authenticate.c:  ptr=STREAMGetValue(Session->S, "SSL-Certificate-Verify");
+Authenticate.c:  	ptr=STREAMGetValue(Session->S, "SSL-Certificate-CommonName");
+Authenticate.c:if (StrValid(Token) && (strcmp(Session->UserName, Token)==0))
+Authenticate.c:	if (strcmp(Session->Password, ptr)==0) result=TRUE;
+Authenticate.c:	Session->RealUserUID=uid;
+Authenticate.c:	Session->RealUser=CopyStr(Session->RealUser, pwent->pw_name);
+Authenticate.c:if (! StrValid(Session->RealUser))
+Authenticate.c:	AuthNativeCheck(Session, FALSE, &Session->RealUser, &Session->HomeDir, &Session->UserSettings);
+Authenticate.c:if (! StrValid(Session->RealUser)) 
+Authenticate.c:	Session->RealUser=CopyStr(Session->RealUser,Session->UserName);
+Authenticate.c:	pwent=getpwnam(Session->RealUser);
+Authenticate.c:	if (! pwent) Session->RealUser=CopyStr(Session->RealUser,Settings.DefaultUser);
+Authenticate.c:pwent=getpwnam(Session->RealUser);
+Authenticate.c:	Session->RealUserUID=pwent->pw_uid;
+Authenticate.c:	if (! StrValid(Session->HomeDir)) Session->HomeDir=CopyStr(Session->HomeDir,pwent->pw_dir);
+Authenticate.c:	//grent=getgrnam(Session->Group);
+Authenticate.c:if (! CheckServerAllowDenyLists(Session->UserName)) 
+Authenticate.c:	LogToFile(Settings.LogPath, "AUTH: Authentication failed for UserName '%s'. User not allowed to log in",Session->UserName);
+Authenticate.c:  LogToFile(Settings.LogPath, "AUTH: Client Authenticated as AdminUser for %s@%s", Session->UserName,Session->ClientIP);
+Authenticate.c:	Session->AuthFlags |= FLAG_AUTH_ADMIN;
+Authenticate.c:	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath, "AUTH: Try to authenticate '%s' via '%s'. Remaining authentication types: %s",Session->UserName, Token, ptr);
+Authenticate.c:		result=AuthNativeCheck(Session,FALSE, &Session->RealUser, &Session->HomeDir, &Session->UserSettings);
+Authenticate.c:		result=AuthNativeCheck(Session,TRUE, &Session->RealUser, &Session->HomeDir, &Session->UserSettings);
+Authenticate.c:		result=AuthPasswdFile(Session, &Session->RealUser, &Session->HomeDir);
+Authenticate.c:		result=CheckSSLAuthentication(Session, Session->UserName);
+Authenticate.c:		result=CheckSSLAuthentication(Session, Session->UserName);
+Authenticate.c:		result=AuthAccessToken(Session, Session->Password);
+Authenticate.c:    LogToFile(Settings.LogPath, "AUTH: Client Authenticated with %s for %s@%s", Token, Session->UserName,Session->ClientIP);
+Authenticate.c:if (Session->RealUserUID==0)
+Authenticate.c:	LogToFile(Settings.LogPath, "AUTH: No 'RealUser' for '%s'. Login Denied",Session->UserName);
+Authenticate.c:if (! StrValid(Session->HomeDir)) 
+Authenticate.c:	LogToFile(Settings.LogPath, "AUTH: No 'HomeDir' set for '%s'. Login Denied",Session->UserName);
+Authenticate.c:    LogToFile(Settings.LogPath, "PAM Account invalid for '%s'. Login Denied",Session->UserName);
+Authenticate.c:	LogToFile(Settings.LogPath, "AUTH: Authentication failed for UserName '%s'. User Unknown. Tried methods: %s ",Session->UserName,AuthenticationsTried); 
+Authenticate.c:	LogToFile(Settings.LogPath, "AUTH: Authentication failed for UserName '%s'. Bad Password/Credentials. Tried methods: %s ",Session->UserName,AuthenticationsTried);
+Authenticate.c:	Session->UserName=CopyStr(Session->UserName,Possibilities[i]);
+Authenticate.c:	Session->Password=CopyStr(Session->Password, "");
+Authenticate.c:Session->UserName=CopyStr(Session->UserName,UserName);
+Authenticate.c:Session->Password=CopyStr(Session->Password, "");
+Authenticate.c:Destroy(Session->UserName);
+Authenticate.c:Destroy(Session->Password);
+ChrootHelper.c:	SetEnvironmentVariable("REMOTE_USER",Session->UserName);
+ChrootHelper.c:	SetEnvironmentVariable("REMOTE_HOST",Session->ClientHost);
+ChrootHelper.c:	SetEnvironmentVariable("REMOTE_ADDR",Session->ClientIP);
+ChrootHelper.c:	SetEnvironmentVariable("REMOTE_MAC",Session->ClientMAC);
+ChrootHelper.c:	SetEnvironmentVariable("SERVER_NAME",Session->ServerName);
+ChrootHelper.c:	Tempstr=FormatStr(Tempstr,"%d",Session->ServerPort);
+ChrootHelper.c:	Tempstr=FormatStr(Tempstr,"%d",Session->ContentSize);
+ChrootHelper.c:	Tempstr=CopyStr(Tempstr, Session->ContentType);
+ChrootHelper.c:	if (StrValid(Session->ContentBoundary)) Tempstr=MCatStr(Tempstr, "; boundary=", Session->ContentBoundary, NULL);
+ChrootHelper.c:	ptr=strrchr(Session->Path,'/');
+ChrootHelper.c:	else ptr=Session->Path;
+ChrootHelper.c:	SetEnvironmentVariable("QUERY_STRING",Session->Arguments);
+ChrootHelper.c:	SetEnvironmentVariable("HTTP_USER_AGENT",Session->UserAgent);
+ChrootHelper.c:	SetEnvironmentVariable("HTTP_REFERER",Session->ClientReferrer);
+ChrootHelper.c:	SetEnvironmentVariable("HTTP_COOKIE",Session->Cookies);
+ChrootHelper.c:	SetEnvironmentVariable("HTTP_COOKIES",Session->Cookies);
+ChrootHelper.c:	SetEnvironmentVariable("REQUEST_METHOD",Session->Method);
+ChrootHelper.c:	SetEnvironmentVariable("REQUEST_URI",Session->URL);
+ChrootHelper.c:	if (StrValid(Session->Cipher)) SetEnvironmentVariable("SSL",Session->Cipher);
+ChrootHelper.c:ContentLengthStr=FormatStr(ContentLengthStr,"%d",Session->ContentSize);
+ChrootHelper.c:Tempstr=MCopyStr(Tempstr,Type," Host='",Session->Host, "' ClientIP='",Session->ClientIP, "' ClientMAC='",Session->ClientMAC,"'",NULL);
+ChrootHelper.c:Quoted=QuoteCharsInStr(Quoted,Session->URL,"'&");
+ChrootHelper.c:Tempstr=MCatStr(Tempstr," Method=",Session->Method," UserAgent='",Session->UserAgent,"' ContentLength='",ContentLengthStr,"'",NULL);
+ChrootHelper.c:if (StrValid(Session->ContentBoundary)) Tempstr=MCatStr(Tempstr, " ContentType='",Session->ContentType, "; boundary=",Session->ContentBoundary, "'",NULL);
+ChrootHelper.c:else Tempstr=MCatStr(Tempstr, " ContentType='",Session->ContentType,"'", NULL);
+ChrootHelper.c:Quoted=FormatStr(Quoted,"%d",Session->ServerPort);
+ChrootHelper.c:Tempstr=MCatStr(Tempstr," ServerName=",Session->ServerName," ServerPort=",Quoted,NULL);
+ChrootHelper.c:if (StrValid(Session->Cipher)) Tempstr=MCatStr(Tempstr," Cipher='",Session->Cipher,"'",NULL);
+ChrootHelper.c:if (StrValid(Session->Cookies)) Tempstr=MCatStr(Tempstr," Cookies='",Session->Cookies,"'",NULL);
+ChrootHelper.c:Quoted=QuoteCharsInStr(Quoted,Session->HomeDir,"'&");
+ChrootHelper.c:Quoted=QuoteCharsInStr(Quoted,Session->ClientReferrer,"'&");
+ChrootHelper.c:if (Session->Flags & SESSION_KEEPALIVE) Tempstr=CatStr(Tempstr," KeepAlive=Y");
+ChrootHelper.c:if (Session->Flags & SESSION_UPLOAD) Tempstr=CatStr(Tempstr," Upload=Y");
+ChrootHelper.c:if (Session->AuthFlags & FLAG_AUTH_HASCOOKIE) Tempstr=CatStr(Tempstr," AuthCookie=Y");
+ChrootHelper.c:if (Session->CacheTime > 0)
+ChrootHelper.c:	Quoted=FormatStr(Quoted," Cache=%d",Session->CacheTime);
+ChrootHelper.c:if (StrValid(Session->UserName)) Tempstr=MCatStr(Tempstr," User='",Session->UserName,"'",NULL);
+ChrootHelper.c:if (StrValid(Session->RealUser)) Tempstr=MCatStr(Tempstr," RealUser='",Session->RealUser,"'",NULL);
+ChrootHelper.c:if (StrValid(Session->Group)) Tempstr=MCatStr(Tempstr," Group='",Session->Group,"'",NULL);
+ChrootHelper.c:if (StrValid(Session->RemoteAuthenticate)) Tempstr=MCatStr(Tempstr," RemoteAuthenticate='",Session->RemoteAuthenticate,"'",NULL);
+ChrootHelper.c:Quoted=QuoteCharsInStr(Quoted,Session->Arguments,"'&");
+ChrootHelper.c:if (strcmp(Session->Method,"POST") ==0) 
+ChrootHelper.c:if (Session->ContentSize > 0) 
+ChrootHelper.c:	LogToFile(Settings.LogPath,"PUSH POST: [%d]",Session->ContentSize);
+ChrootHelper.c:	STREAMSendFile(S, ParentProcessPipe, Session->ContentSize, SENDFILE_KERNEL|SENDFILE_LOOP);
+ChrootHelper.c:	LogToFile(Settings.LogPath,"PUSH POST:DONE [%d]",Session->ContentSize);
+ChrootHelper.c:		ResponseLine=MCopyStr(ResponseLine, Session->Protocol, " ", ptr, NULL);
+ChrootHelper.c:if (KeepAlive) Session->Flags |= SESSION_KEEPALIVE | SESSION_REUSE;
+ChrootHelper.c:else Session->Flags &= ~(SESSION_KEEPALIVE | SESSION_REUSE);
+ChrootHelper.c:	Tempstr=MCopyStr(Tempstr,"REG ",Session->ClientIP,":",FlagChar,"\n",NULL);
+ChrootHelper.c:	if (Flags & LOGIN_CHANGE) Tempstr=MCopyStr(Tempstr,"REG ",Session->Path,":C\n",NULL);
+ChrootHelper.c:		ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
+Events.c:Curr=ListGetNext(Session->Headers);
+Events.c:			if (StrValid(Session->ResponseCode))
+Events.c:			if (strncmp(Token,Session->ResponseCode,3) ==0) 
+Events.c:				*MatchStr=MCatStr(*MatchStr, "Response: ",Session->ResponseCode,", ",NULL);
+Events.c:			if (strcmp(Token,Session->Method) ==0) 
+Events.c:				*MatchStr=MCatStr(*MatchStr, "Method: ",Session->Method,", ",NULL);
+Events.c:			if (fnmatch(Token,Session->Path,0) ==0)
+Events.c:				*MatchStr=MCatStr(*MatchStr, "URL: ",Session->Path,", ",NULL);
+Events.c:			if (fnmatch(Token,Session->UserName,0) ==0) 
+Events.c:				*MatchStr=MCatStr(*MatchStr, "User: ",Session->UserName,", ",NULL);
+Events.c:			if (fnmatch(Token,Session->ClientIP,0) ==0)
+Events.c:				*MatchStr=MCatStr(*MatchStr, "Peer: ",Session->ClientIP,", ",NULL);
+Events.c:			if (Session->Flags & SESSION_ERR_BADURL)
+Events.c:				*MatchStr=MCatStr(*MatchStr, "Bad URL: ",Session->Path,", ",NULL);
+Events.c:		LogToFile(Settings.LogPath, "EVENT TRIGGERED: Source='%s@%s (%s)' REQUEST='%s' TriggeredScript='%s' MatchInfo='%s'",Session->UserName, Session->ClientHost, Session->ClientIP, URL, TriggerScript, ExtraInfo);
+Events.c:SetVar(Vars,"URL",Session->URL);
+Events.c:SetVar(Vars,"Method",Session->Method);
+Events.c:SetVar(Vars,"UserName",Session->UserName);
+Events.c:SetVar(Vars,"ClientIP",Session->ClientIP);
+Events.c:SetVar(Vars,"UserAgent",Session->UserAgent);
+Events.c:	Tempstr=MCopyStr(Tempstr,Session->Method," ",Session->URL,NULL);
+FileDetailsPage.c:		Tempstr=MakeAccessToken(Tempstr, Session->UserName, Salt, Session->ClientIP, URL);
+FileDetailsPage.c://Path is the ACTUAL path to the item, not it's VPath or URL. Thus, use Session->URL
+FileDetailsPage.c:HTML=MCopyStr(HTML,"<html>\r\n<head><title>Editing ",Session->URL,"</title></head>\r\n<body>\r\n<form>\r\n",NULL);
+FileDetailsPage.c:URL=FormatURL(URL, Session, Session->URL);
+FileDetailsPage.c:HTML=MCatStr(HTML,"<tr bgcolor=#CCCCFF><td>Path</td><td colspan=2>",Session->URL,"</td></tr>",NULL);
+FileDetailsPage.c:URL=FormatURL(URL,Session,Session->URL);
+FileDetailsPage.c:ptr=GetNameValuePair(Session->Arguments,"&","=",&QuotedName,&QuotedValue);
+UserAdminScreen.c:ptr=GetNameValuePair(Session->Arguments,"&","=",&QName,&QValue);
+VPath.c:ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
+VPath.c:DocName=VPathSubstituteArgs(DocName, Session->Path + StrLen(VPath->URL), Session);
+VPath.c:	if (strcmp(Session->Method,"POST")==0)
+VPath.c:		LogToFile(Settings.LogPath,"%s@%s (%s) uploading to %s in VPATH %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
+VPath.c:			LogToFile(Settings.LogPath,"%s@%s (%s) uploading DENIED to %s in VPATH %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
+VPath.c:		LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
+VPath.c:	LogToFile(Settings.LogPath,"%s@%s (%s) asking for external document %s in Search path %s", Session->UserName,Session->ClientHost,Session->ClientIP,"",VPath->Path);
+VPath.c:	if (VPath->CacheTime) Session->CacheTime=VPath->CacheTime;
+VPath.c:	PI=VPathFind(PATHTYPE_NONE, Session->Path);
+VPath.c:		if (PI->CacheTime) VPathSession->CacheTime=PI->CacheTime;
+VPath.c:		if (StrValid(PI->User)) VPathSession->RealUser=CopyStr(VPathSession->RealUser, PI->User);
+VPath.c:		if (StrValid(PI->Group)) VPathSession->Group=CopyStr(VPathSession->Group, PI->Group);
+VPath.c:		VPathSession->Flags &= ~SESSION_UPLOAD;
+VPath.c:		if (! (PI->Flags & PATHITEM_READONLY)) VPathSession->Flags |= SESSION_UPLOAD;
+VPath.c:		LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s] %d",PI->Type,Session->Path,PI->Path,VPathSession->Flags & SESSION_UPLOAD);
+VPath.c:			LogToFile(Settings.LogPath,"CGI EXEC REQUEST: Script='%s' Path='%s'",GetBasename(Session->Path), PI->Path);
+VPath.c:			ChrootProcessRequest(S, VPathSession, "EXEC", GetBasename(VPathSession->Path), PI->Path);
+VPath.c:	    Session->Flags &= ~SESSION_REUSE;
+VPath.c:			VPathSession->Path=FormatStr(VPathSession->Path,"%d-%d-%d",getpid(),time(NULL),rand());
+VPath.c:			Path=MCatStr(Path,"?Logout=",VPathSession->Path,NULL);
+VPath.c:			VPathSession->Flags &= ~SESSION_KEEPALIVE; 
+VPath.c:			if (StrValid(VPathSession->UserName)) 
+VPath.c:				if (StrValid(PI->Password)) VPathSession->Password=CopyStr(VPathSession->Password, Session->Password);
+VPath.c:				else VPathSession->Password=CopyStr(VPathSession->Password, Session->Password);
+VPath.c:				Path=MCopyStr(Path,VPathSession->UserName,":",VPathSession->Password,NULL);
+VPath.c:				VPathSession->RemoteAuthenticate=MCopyStr(VPathSession->RemoteAuthenticate,"Basic ",Tempstr,NULL);	
+VPath.c:			Path=MCopyStr(Path,PI->Path,VPathSession->Path+StrLen(PI->URL),NULL);
+auth_access_token.c:    ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
+auth_access_token.c:    Session->Password=CopyStr(Session->Password,Token);
+auth_access_token.c:if (strcmp(Session->Method, "PUT")==0) return(FALSE);
+auth_access_token.c:if (strcmp(Session->Method, "POST")==0) return(FALSE);
+auth_access_token.c://if (! (Session->Flags & FLAG_AUTH_ACCESS_TOKEN)) return(FALSE);
+auth_access_token.c:URL=FormatURL(URL,Session,Session->Path);
+auth_access_token.c:if (! StrValid(Session->UserName)) Session->UserName=CopyStr(Session->UserName,User);
+auth_access_token.c:	if (strncmp(Session->ClientIP,"::ffff:",7)==0) ipptr=Session->ClientIP+7;
+auth_access_token.c:	else ipptr=Session->ClientIP;
+auth_access_token.c:Tempstr=CopyStr(Tempstr, Session->Cookies);
+auth_access_token.c:Session->Cookies=CopyStr(Session->Cookies, "");
+auth_access_token.c:	if (result) Session->AuthFlags |= FLAG_AUTH_HASCOOKIE;
+auth_access_token.c:else Session->Cookies=MCatStr(Session->Cookies, Name, "=", Value, "; ", NULL);
+auth_access_token.c:AccessToken=MakeAccessToken(AccessToken, Session->UserName, Salt, Session->ClientIP, "*");
+auth_access_token.c:RetStr=MCopyStr(RetStr, "AlayaAccessToken=",AccessToken," domain=",Session->Host, NULL);
+auth_alaya_native.c:	p_AuthDetails=GetToken(Session->AuthDetails," ",&URI, 0);
+auth_alaya_native.c:	if (! StrValid(URI)) URI=CopyStr(URI,Session->Path);
+auth_alaya_native.c:		Tempstr=MCopyStr(Tempstr,Session->UserName,":",Settings.AuthRealm,":",Password,NULL);
+auth_alaya_native.c:	Tempstr=MCopyStr(Tempstr,Session->Method,":",URI,NULL);
+auth_alaya_native.c:  if (strcmp(Name,Session->UserName)==0)
+auth_alaya_native.c:		if (HTTPDigest) RetVal=NativeFileCheckHTTPDigestAuth(Session, PasswordType, Pass, Session->Password);
+auth_alaya_native.c:		else RetVal=NativeFileCheckPassword(Name, PasswordType,Pass,Session->Password);
+auth_alaya_native.c:		if ((RetVal==TRUE) && (Settings.Flags & FLAG_LOG_VERBOSE)) LogToFile(Settings.LogPath,"AUTH: UserName '%s' Authenticated via native file: %s.",Session->UserName, Path);
+auth_client_certificate.c:		LogToFile(Settings.LogPath,"AUTH SSL Certificate Provided by '%s@%s'. Subject=%s Issuer=%s", Session->UserName, Session->ClientIP,STREAMGetValue(S,"SSL-Certificate-Subject"), STREAMGetValue(S,"SSL-Certificate-Issuer"));
+auth_client_certificate.c:				LogToFile(Settings.LogPath,"AUTH: ERROR: SSL Certificate REQUIRED from client '%s@%s'. Invalid Certificate. Error was: %s", Session->UserName, Session->ClientIP, ptr);
+auth_client_certificate.c:			else LogToFile(Settings.LogPath,"AUTH: SSL Certificate Optional for client '%s@%s'. Invalid Certificate. Error was: %s", Session->UserName, Session->ClientIP, ptr);
+auth_client_certificate.c:	else if (Settings.AuthFlags & FLAG_AUTH_CERT_REQUIRED) LogToFile(Settings.LogPath,"AUTH: ERROR: SSL Certificate REQUIRED from client '%s@%s'. Missing Certificate.", Session->UserName, Session->ClientIP);
+auth_pam.c:  PAMConvStruct.appdata_ptr=(void *)Session->Password;
+auth_pam.c:  pam_set_item(pamh,PAM_RUSER,Session->UserName);
+auth_pam.c:  if (StrLen(Session->ClientHost) > 0) pam_set_item(pamh,PAM_RHOST,Session->ClientHost);
+auth_pam.c:  else if (StrLen(Session->ClientIP) > 0) pam_set_item(pamh,PAM_RHOST,Session->ClientIP);
+auth_pam.c:result=PAMStart(Session, Session->UserName);
+auth_pam.c:	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"AUTH: UserName '%s' Authenticated via PAM.",Session->UserName);
+auth_pam.c:  if (! PAMStart(Session, Session->RealUser)) return(FALSE);
+auth_unix.c:pass_struct=getpwnam(Session->UserName);
+auth_unix.c:		StrLen(Session->Password)
+auth_unix.c:		ptr=crypt(Session->Password,pass_struct->pw_passwd);
+auth_unix.c:			if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"AUTH: UserName '%s' Authenticated via /etc/passwd.",Session->UserName);
+auth_unix.c:			if (RealUser) *RealUser=CopyStr(*RealUser,Session->UserName);
+auth_unix.c:pass_struct=getspnam(Session->UserName);
+auth_unix.c:  Digest=CopyStr(Digest, crypt(Session->Password,Salt));
+auth_unix.c:   sptr=crypt(Session->Password,pass_struct->sp_pwdp);
+auth_unix.c:	LogToFile(Settings.LogPath,"AUTH: UserName '%s' Authenticated via /etc/shadow.",Session->UserName);
+cgi.c:      if (StrValid(Session->Group) && (! SwitchGroup(Session->Group)))
+cgi.c:        LogToFile(Settings.LogPath,"WARN: Failed to switch to group '%s' to execute script: %s", Session->Group, ScriptPath);
+cgi.c:      if ((geteuid()==0) && (! SwitchUser(Session->RealUser)))
+cgi.c:        LogToFile(Settings.LogPath,"ERROR: Failed to switch to user '%s' to execute script: %s", Session->RealUser, ScriptPath);
+cgi.c:        LogToFile(Settings.LogPath, "Failed to switch user to '%s' for running a .cgi program. Will not run programs as 'root'. Set 'DefaultUser' in config file or command line.", Session->RealUser);
+cgi.c:        Session->ResponseCode=CopyStr(Session->ResponseCode,"200 OK");
+common.c:Session->Protocol=CopyStr(Session->Protocol,"HTTP/1.1");
+common.c:Session->ServerName=CopyStr(Session->ServerName,"");
+common.c:Session->UserAgent=CopyStr(Session->UserAgent,"");
+common.c:Session->UserName=CopyStr(Session->UserName,"");
+common.c:Session->RealUser=CopyStr(Session->RealUser,"");
+common.c:Session->ContentType=CopyStr(Session->ContentType,"");
+common.c:Session->Host=CopyStr(Session->Host,"");
+common.c:Session->Path=CopyStr(Session->Path,"");
+common.c:Session->Arguments=CopyStr(Session->Arguments,"");
+common.c:Session->ClientHost=CopyStr(Session->ClientHost,"");
+common.c:Session->ClientIP=CopyStr(Session->ClientIP,"");
+common.c:Session->ClientMAC=CopyStr(Session->ClientMAC,"");
+common.c:Session->ClientReferrer=CopyStr(Session->ClientReferrer,"");
+common.c:Session->StartDir=CopyStr(Session->StartDir,"");
+common.c:Session->Depth=1;
+common.c:Session->CacheTime=Settings.DocumentCacheTime;
+common.c:Session->Headers=ListCreate();
+common.c:Session->Flags |= SESSION_UPLOAD;
+common.c:Session->Protocol=CopyStr(Session->Protocol, Src->Protocol);
+common.c:Session->Method=CopyStr(Session->Method, Src->Method);
+common.c:Session->URL=CopyStr(Session->URL, Src->URL);
+common.c:Session->ServerName=CopyStr(Session->ServerName, Src->ServerName);
+common.c:Session->UserAgent=CopyStr(Session->UserAgent, Src->UserAgent);
+common.c:Session->UserName=CopyStr(Session->UserName, Src->UserName);
+common.c:Session->RealUser=CopyStr(Session->RealUser, Src->RealUser);
+common.c:Session->Group=CopyStr(Session->Group, Src->Group);
+common.c:Session->HomeDir=CopyStr(Session->HomeDir, Src->HomeDir);
+common.c:Session->RemoteAuthenticate=CopyStr(Session->RemoteAuthenticate, Src->RemoteAuthenticate);
+common.c:Session->ContentType=CopyStr(Session->ContentType, Src->ContentType);
+common.c:Session->ContentBoundary=CopyStr(Session->ContentBoundary, Src->ContentBoundary);
+common.c:Session->Host=CopyStr(Session->Host, Src->Host);
+common.c:Session->Path=CopyStr(Session->Path, Src->Path);
+common.c:Session->Arguments=CopyStr(Session->Arguments, Src->Arguments);
+common.c:Session->ClientHost=CopyStr(Session->ClientHost, Src->ClientHost);
+common.c:Session->ClientIP=CopyStr(Session->ClientIP, Src->ClientIP);
+common.c:Session->ClientMAC=CopyStr(Session->ClientMAC, Src->ClientMAC);
+common.c:Session->ClientReferrer=CopyStr(Session->ClientReferrer, Src->ClientReferrer);
+common.c:Session->StartDir=CopyStr(Session->StartDir, Src->StartDir);
+common.c:Session->Cookies=CopyStr(Session->Cookies, Src->Cookies);
+common.c:Session->Cipher=CopyStr(Session->Cipher, Src->Cipher);
+common.c:Session->Depth=Src->Depth;
+common.c:Session->ContentSize=Src->ContentSize;
+common.c:Session->CacheTime=Src->CacheTime;
+common.c:Session->Flags=Src->Flags;
+common.c:Session->AuthFlags=Src->AuthFlags;
+common.c:Session->Headers=ListCreate();
+common.c:CopyVars(Session->Headers, Src->Headers);
+common.c:Session->Protocol=CopyStr(Session->Protocol, Src->Protocol);
+common.c:Session->Method=CopyStr(Session->Method, Src->Method);
+common.c:Session->URL=CopyStr(Session->URL, Src->URL);
+common.c:Session->ServerName=CopyStr(Session->ServerName, Src->ServerName);
+common.c:Session->UserAgent=CopyStr(Session->UserAgent, Src->UserAgent);
+common.c:Session->UserName=CopyStr(Session->UserName, Src->UserName);
+common.c:Session->RealUser=CopyStr(Session->RealUser, Src->RealUser);
+common.c:Session->Group=CopyStr(Session->Group, Src->Group);
+common.c:Session->RemoteAuthenticate=CopyStr(Session->RemoteAuthenticate, Src->RemoteAuthenticate);
+common.c:Session->ContentType=CopyStr(Session->ContentType, Src->ContentType);
+common.c:Session->Host=CopyStr(Session->Host, Src->Host);
+common.c:Session->Path=CopyStr(Session->Path, Src->Path);
+common.c:Session->Arguments=CopyStr(Session->Arguments, Src->Arguments);
+common.c:Session->ClientHost=CopyStr(Session->ClientHost, Src->ClientHost);
+common.c:Session->ClientIP=CopyStr(Session->ClientIP, Src->ClientIP);
+common.c:Session->ClientMAC=CopyStr(Session->ClientMAC, Src->ClientMAC);
+common.c:Session->StartDir=CopyStr(Session->StartDir, Src->StartDir);
+common.c:Session->Depth=Src->Depth;
+common.c:Session->CacheTime=Src->CacheTime;
+common.c:Session->Flags=Src->Flags & (SESSION_KEEPALIVE | SESSION_REUSE | SESSION_AUTHENTICATED | SESSION_SSL | SESSION_ICECAST | SESSION_UPLOAD) ;
+common.c:Session->AuthFlags=Src->AuthFlags;
+common.c:Session->Headers=ListCreate();
+common.c:ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
+common.c:if (StrValid(Session->Host))
+common.c:if (Settings.Flags & FLAG_SSL) Tempstr=MCopyStr(Buff,"https://",Session->Host,"/",NULL);
+common.c:else Tempstr=MCopyStr(Buff,"http://",Session->Host,"/",NULL);
+common.c:if (StrValid(Session->StartDir)) sd_ptr=Session->StartDir;
+common.c:ptr=GetNameValuePair(Session->Arguments, "&", "=", &Name, &Value);
+common.c:len=StrLen(Session->Host);
+common.c:	ptr=strchr(Session->Host, ':');
+common.c:	if (ptr) len=ptr-Session->Host;
+common.c:if (strncasecmp(Session->Host,Host,len)==0) return(TRUE);
+common.c:if ((access(ToPath,F_OK)==0) && (! (Session->Flags & SESSION_OVERWRITE))) RetVal=EEXIST;
+directory_listing.c:Dir=CopyStr(Dir,Session->URL);
+directory_listing.c:Tempstr=ParentDirectory(Tempstr, Session->URL);
+directory_listing.c:	if (strcmp(Path,Session->StartDir)==0)
+directory_listing.c:HTML=MCatStr(HTML,"</select><input type=submit name='pack:",Session->URL,"' value='Pack'>",NULL);
+directory_listing.c:  HTML=MCatStr(HTML, "<form method=\"post\" enctype=\"multipart/form-data\" action=\"",Session->URL,"\">\n",NULL);
+directory_listing.c:	HTML=MCatStr(HTML,"<form><td align=left bgcolor='yellow'>New Folder:<input type=text name=mkdir><input type=submit name='mkdir:",Session->URL,"' value='MkDir'></td></form>",NULL);
+directory_listing.c:		HTML=MCatStr(HTML,"<td bgcolor=\"#FFAAFF\"><input type=submit name='m3u:",Session->URL,"' value='M3U Playlist'></td>",NULL);
+directory_listing.c:	HTML=MCatStr(HTML,"<td align=center bgcolor='green'><input type=submit name='move-selected:",Session->URL,"' value='Move Selected'></td>",NULL);
+directory_listing.c:	HTML=MCatStr(HTML,"<td align=center bgcolor='red'><input type=submit name='delete-selected:",Session->URL,"' value='Delete Selected'></td>",NULL);
+directory_listing.c:	HTML=MCopyStr(Buffer, "<html>\r\n<head><title>/", Session->Host, Session->URL, "</title></head>\r\n<body>\r\n", NULL);
+directory_listing.c:		HTML=MCatStr(HTML,"<tr><td colspan=3 align=center><b>",Session->URL,"</b> at ",Session->Host,  " ", NULL);
+directory_listing.c:		if (Settings.Flags & FLAG_SSL) HTML=MCatStr(HTML,"<font color=green size=-1>SECURE:",Session->Cipher,"</font>",NULL);
+directory_listing.c:		HTML=MCatStr(HTML, "User: ", Session->UserName,"<br/>",NULL);
+directory_listing.c:Tempstr=CopyStr(Tempstr,Session->URL);
+directory_listing.c:	HTML=MCatStr(HTML,"<th align=center><a href=\"",Session->URL,"?format=html&all-selected=true\" onclick=\"setCheckboxes(1); return(false);\">all</a> - <a href=\"",Session->URL,"\" onclick=\"setCheckboxes(0); return(false);\">none</a></th>",NULL);
+directory_listing.c:			AccessToken=MakeAccessToken(AccessToken, Session->UserName, Salt, Session->ClientIP, Files[i]->URL);
+directory_listing.c:SetVar(Session->Headers,"Content-disposition",Tempstr);
+directory_listing.c:SetVar(Session->Headers,"Content-disposition",Tempstr);
+directory_listing.c:if (DirectorySendPackedDirExtractArgs(Session->Arguments, &PackType, &PackList))
+directory_listing.c:	Session->Flags &= ~SESSION_REUSE;
+directory_listing.c:	FileName=MCopyStr(FileName,Session->Host,"-",Session->UserName,"-",ptr,Extn,NULL);
+directory_listing.c:		Session->Path=CopyStr(Session->Path,Tempstr);
+directory_listing.c:	ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
+directory_listing.c:			Path=ParentDirectory(Path, Session->URL);
+directory_listing.c:	LogToFile(Settings.LogPath,"DeleteSelected: [%s]\n",Session->Arguments);
+directory_listing.c:	ptr=GetNameValuePair(Session->Arguments, "&","=",&Name,&Value);
+directory_listing.c:if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->LastModified <= Session->IfModifiedSince))
+directory_listing.c:	if (HTTPServerDecideToCompress(Session,NULL)) Session->Flags |= SESSION_ENCODE_GZIP;
+directory_listing.c:      	HTTPServerSendResponse(S, Session, "302", "", Session->URL);
+directory_listing.c:      	HTTPServerSendResponse(S, Session, "302", "", Session->URL);
+directory_listing.c:				Tempstr=MCopyStr(Tempstr,Session->URL,"?format=edit",NULL);
+icecast.c:  Session->ResponseCode=CopyStr(Session->ResponseCode,"200 OK");
+icecast.c:  Session->ContentType=CopyStr(Session->ContentType,GetVar(Vars,"ContentType"));
+icecast.c:  Session->LastModified=atoi(GetVar(Vars,"MTime-secs"));
+icecast.c:  Session->ContentSize=atoi(GetVar(Vars,"FileSize"));
+icecast.c:  Session->Flags |= SESSION_ICECAST;
+icecast.c:  Session->Protocol=CopyStr(Session->Protocol,"ICY");
+icecast.c:  SetVar(Session->Headers,"icy-metaint",Tempstr);
+main.c:		Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
+main.c:		STREAMSetFlushType(Session->S,FLUSH_FULL,0,4096);
+main.c:		STREAMSetTimeout(Session->S,Settings.ActivityTimeout);
+main.c:		STREAMClose(Session->S);
+main.c:		Session->S=STREAMServerAccept(Serv);
+main.c:		STREAMSetFlushType(Session->S, FLUSH_FULL,0,0);
+main.c:	STREAMClose(Session->S);
+proxy.c:if (StrValid(Session->Arguments)) Tempstr=MCopyStr(Tempstr,Session->Path,"?",Session->Arguments,NULL);
+proxy.c:else Tempstr=CopyStr(Tempstr,Session->Path);
+proxy.c:if (Session->MethodID==METHOD_RPOST) 
+proxy.c:	Info->PostContentLength=Session->ContentSize;
+proxy.c:	if (StrValid(Session->ContentType))
+proxy.c:	Info->PostContentType=CopyStr(Info->PostContentType,Session->ContentType);
+proxy.c:	if (StrValid(Session->ContentBoundary)) Info->PostContentType=MCatStr(Info->PostContentType, "; boundary=", Session->ContentBoundary, NULL);
+proxy.c:if (StrValid(Session->RemoteAuthenticate))
+proxy.c:	SetVar(Info->CustomSendHeaders,"Authorization",Session->RemoteAuthenticate);
+proxy.c:Curr=ListGetNext(Session->Headers);
+proxy.c:	LogToFile(Settings.LogPath,"PROXY: Connected To %s",Session->Path);
+proxy.c:	if (Session->ContentSize > 0)
+proxy.c:  STREAMSendFile(Session->S, TargetS, Session->ContentSize, SENDFILE_LOOP);
+proxy.c:	STREAMWriteLine("HTTP/1.1 200 OK Connection Established\r\n", Session->S);
+proxy.c:		STREAMWriteLine(Tempstr, Session->S);
+proxy.c:	STREAMWriteLine("Connection: close\r\n",Session->S);
+proxy.c:	STREAMWriteLine("\r\n",Session->S);
+proxy.c:	HTTPProxyCopyData( Session->S, TargetS);
+proxy.c:else HTTPProxySendResponse( Session->S, "HTTP/1.1 502 Connection Failed\r\n");
+proxy.c:	LogToFile(Settings.LogPath,"HTTP CONNECT: [%s]", Session->Path);
+proxy.c:	Tempstr=MCopyStr(Tempstr, "tcp:", Session->Path);
+proxy.c:		HTTPProxySendResponse(Session->S, "HTTP/1.1 200 OK Connection Established\r\n");
+proxy.c:		HTTPProxyCopyData(Session->S,TargetS);
+proxy.c:	else HTTPProxySendResponse(Session->S, "HTTP/1.1 502 Connection Failed\r\n");
+proxy.c:else HTTPProxySendResponse(Session->S, "HTTP/1.1 502 Connection Not Permitted\r\n");
+server.c:if (Session->ContentSize > 0)
+server.c:	*Data=SetStrLen(*Data, Session->ContentSize+10);
+server.c:  while (bytes_read < Session->ContentSize)
+server.c:  len=STREAMReadBytes(Session->S, (*Data) + bytes_read, Session->ContentSize-bytes_read);
+server.c:  Tempstr=STREAMReadLine(Tempstr, Session->S);
+server.c:    Tempstr=STREAMReadLine(Tempstr, Session->S);
+server.c:if (! (Session->Flags & SESSION_ENCODE_GZIP)) return(FALSE);
+server.c:if (IsProxyMethod(Session->MethodID)) return(FALSE);
+server.c:STREAMSetValue(Session->S,Curr->Tag,(char *) Curr->Item);
+server.c:if (DoSSLServerNegotiation(Session->S,Flags))
+server.c:	Session->Flags |= HTTP_SSL;
+server.c:LogToFile(Settings.LogPath,"ERROR: SSL negotiation failed with %s %s. Error was %s", Session->ClientHost, Session->ClientIP,STREAMGetValue(Session->S,"SSL-Error"));
+server.c:ptr=GetToken(Data,";",&Session->ContentType,0);
+server.c:	if (strcmp(Name,"boundary")==0) Session->ContentBoundary=CopyStr(Session->ContentBoundary,Value);
+server.c:GetSockDetails(S->in_fd,&Session->ServerName,&Session->ServerPort,&Session->ClientIP,&val);
+server.c:GetHostARP(Session->ClientIP, &Token, &Session->ClientMAC);
+server.c:if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrValid(Session->ClientIP)) Session->ClientHost=CopyStr(Session->ClientHost,IPStrToHostName(Session->ClientIP));
+server.c:Token=MCopyStr(Token, "NEW REQUEST: ", Session->ClientHost," (", Session->ClientIP,") ", Command, NULL);
+server.c:	Session->Cipher=CopyStr(Session->Cipher,STREAMGetValue(S,"SSL-Cipher"));
+server.c:	Token=MCatStr(Token,"  SSL-CIPHER=", Session->Cipher, NULL);
+server.c:	Session->UserName=CopyStr(Session->UserName,STREAMGetValue(Session->S,"SSL-Certificate-CommonName"));
+server.c:		if (StrValid(Session->UserName)) Session->AuthFlags |= FLAG_AUTH_PRESENT;
+server.c:ptr=GetToken(Command,"\\S",&Session->Method,0);
+server.c:Session->MethodID=MatchTokenFromList(Session->Method,HTTPMethods,0);
+server.c:ptr=GetToken(ptr,"\\S",&Session->Protocol,0);
+server.c:if (! StrValid(Session->Protocol)) Session->Protocol=CopyStr(Session->Protocol,"HTTP/1.0");
+server.c://	Session->Arguments=HTTPUnQuote(Session->Arguments,tmp_ptr);
+server.c:	Session->Arguments=CopyStr(Session->Arguments,tmp_ptr);
+server.c:Session->OriginalURL=CopyStr(Session->OriginalURL,Token);
+server.c:if (! StrValid(Session->OriginalURL)) Session->OriginalURL=CopyStr(Session->OriginalURL,"/");
+server.c:	(strncasecmp(Session->OriginalURL,"http:",5)==0) ||
+server.c:	(strncasecmp(Session->OriginalURL,"https:",6)==0)
+server.c:	if (Session->MethodID==METHOD_GET) 
+server.c:		Session->Method=CopyStr(Session->Method,"RGET");
+server.c:		Session->MethodID=METHOD_RGET;
+server.c:	if (Session->MethodID==METHOD_POST)
+server.c:		Session->Method=CopyStr(Session->Method,"RPOST");
+server.c:		Session->MethodID=METHOD_RPOST;
+server.c:Tempstr=STREAMReadLine(Tempstr, Session->S);
+server.c:HTTPServerParseCommand(Session, Session->S, Tempstr);
+server.c:Tempstr=STREAMReadLine(Tempstr, Session->S);
+server.c:	ListAddNamedItem(Session->Headers,Token,CopyStr(NULL,ptr));
+server.c:			if (IsProxyMethod(Session->MethodID))
+server.c:			Session->AuthFlags |= FLAG_AUTH_PRESENT;
+server.c:			if (IsProxyMethod(Session->MethodID))
+server.c:				Session->RemoteAuthenticate=CopyStr(Session->RemoteAuthenticate,ptr);
+server.c:			if (! StrValid(Session->UserName))
+server.c:				Session->AuthFlags |= FLAG_AUTH_PRESENT;
+server.c:		Session->Host=CopyStr(Session->Host,ptr);
+server.c:		ptr=strchr(Session->Host,':');
+server.c:			Session->Host=CatStr(Session->Host,Token);
+server.c:		Session->Destination=HTTPUnQuote(Session->Destination,ptr);
+server.c:		Session->ContentSize=atoi(ptr);
+server.c:		if (strcasecmp(ptr,"infinity")==0) Session->Depth=INT_MAX;
+server.c:		else Session->Depth=atoi(ptr);
+server.c:		if (*ptr=='T') Session->Flags |= SESSION_OVERWRITE;
+server.c:		if ((Settings.Flags & FLAG_KEEPALIVES) && (strcasecmp(ptr,"Keep-Alive")==0)) Session->Flags |= SESSION_KEEPALIVE;
+server.c:		Session->UserAgent=CopyStr(Session->UserAgent,ptr);
+server.c:		if (fnmatch(Curr->Tag, Session->UserAgent,0)==0) 
+server.c:			if (StrValid(Session->Cookies)) Session->Cookies=MCopyStr(Session->Cookies,"; ",ptr,NULL);
+server.c:			else Session->Cookies=CopyStr(Session->Cookies,ptr);
+server.c:			Session->AuthFlags |= FLAG_AUTH_PRESENT;
+server.c:		Session->ClientReferrer=CopyStr(Session->ClientReferrer,ptr);
+server.c:			if (strcmp(Token,"gzip")==0) Session->Flags|=SESSION_ENCODE_GZIP;
+server.c:			if (strcmp(Token,"x-gzip")==0) Session->Flags|=SESSION_ENCODE_GZIP | SESSION_ENCODE_XGZIP;
+server.c:		if (atoi(ptr)) Session->Flags |= SESSION_ICECAST;
+server.c:		Session->IfModifiedSince=DateStrToSecs("%a, %d %b %Y %H:%M:%S %Z",ptr,NULL);
+server.c:		else if (strcasecmp(ptr,"websocket")==0) Session->MethodID = METHOD_WEBSOCKET;
+server.c:		Session->ContentBoundary=CopyStr(Session->ContentBoundary, ptr);
+server.c:		Session->ContentBoundary=CopyStr(Session->ContentBoundary, ptr);
+server.c:		if (Session->MethodID==METHOD_WEBSOCKET) Session->MethodID = METHOD_WEBSOCKET75;
+server.c:		Session->ContentType=CopyStr(Session->ContentType, ptr);
+server.c:		if (Session->MethodID==METHOD_WEBSOCKET) Session->MethodID = METHOD_WEBSOCKET75;
+server.c:		Session->ContentType=CopyStr(Session->ContentType, ptr);
+server.c:Tempstr=STREAMReadLine(Tempstr, Session->S);
+server.c:if (strstr(Session->Arguments,"AccessToken")) Session->AuthFlags |= FLAG_AUTH_PRESENT | FLAG_AUTH_ACCESS_TOKEN;
+server.c:Session->URL=HTTPUnQuote(Session->URL, Session->OriginalURL);
+server.c:if (*Session->URL=='/') Session->Path=CopyStr(Session->Path, Session->URL);
+server.c:else Session->Path=MCopyStr(Session->Path,"/", Session->URL,NULL);
+server.c:Tempstr=MCopyStr(Tempstr, Session->Protocol," ", Session->ResponseCode,"\r\n",NULL);
+server.c:if (Session->LastModified > 0) HTTPServerSendHeader(S,"Last-Modified",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z", Session->LastModified,NULL));
+server.c:	if (IsProxyMethod(Session->MethodID) ) AuthType=CopyStr(AuthType, "Proxy-Authenticate");
+server.c:Curr=ListGetNext(Session->Headers);
+server.c:if (Session->MethodID==METHOD_WEBSOCKET)
+server.c:	Tempstr=FormatStr(Tempstr,"max-age=%d", Session->CacheTime);
+server.c:	HTTPServerSendHeader(S,"Expires",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",time(NULL) + Session->CacheTime,NULL));
+server.c:	if ((! Session->Flags & HTTP_SSL) &&  SSLAvailable()) 
+server.c:	if ((Session->Flags & SESSION_KEEPALIVE) && (Flags & HEADERS_KEEPALIVE))
+server.c:		Session->Flags |= SESSION_REUSE;
+server.c:		Session->Flags &= ~SESSION_REUSE;
+server.c:	if ((Settings.AuthFlags & FLAG_AUTH_COOKIE) && (Session->Flags & SESSION_AUTHENTICATED) && (! (Session->AuthFlags & FLAG_AUTH_HASCOOKIE)))
+server.c:		if (StrValid(Session->UserName)) 
+server.c:	if (StrValid(Session->ContentType)) HTTPServerSendHeader(S,"Content-Type", Session->ContentType);
+server.c:	if ((Session->Flags & SESSION_REUSE) || (Session->ContentSize > 0))
+server.c:		Tempstr=FormatStr(Tempstr,"%d", Session->ContentSize);
+server.c:	if (Session->Flags & SESSION_ENCODE_XGZIP) HTTPServerSendHeader(S,"Content-Encoding","x-gzip");
+server.c:	else if (Session->Flags & SESSION_ENCODE_GZIP) HTTPServerSendHeader(S,"Content-Encoding", "gzip");
+server.c:LogToFile(Settings.LogPath,"RESPONSE: '%s' to %s@%s for '%s %s'",ResponseLine, Session->UserName, Session->ClientIP, Session->Method, Session->Path);
+server.c:	Response->MethodID=Session->MethodID;
+server.c:	Response->LastModified=Session->LastModified;
+server.c:	Response->Flags |= Session->Flags & (SESSION_KEEPALIVE | SESSION_AUTHENTICATED);
+server.c:	Response->ClientIP=CopyStr(Response->ClientIP, Session->ClientIP);
+server.c:	Response->Path=CopyStr(Response->Path, Session->Path);
+server.c:	Response->Method=CopyStr(Response->Method, Session->Method);
+server.c:	Response->URL=CopyStr(Response->URL, Session->URL);
+server.c:	Response->UserName=CopyStr(Response->UserName, Session->UserName);
+server.c://if (Response->Flags & SESSION_REUSE) Session->Flags |= SESSION_REUSE;
+server.c://else Session->Flags &= ~SESSION_REUSE;
+server.c:	Session->ResponseCode=CopyStr(Session->ResponseCode,"200 OK");
+server.c:	Session->ContentType=CopyStr(Session->ContentType,GetVar(Vars,"ContentType"));
+server.c:	Session->LastModified=atoi(GetVar(Vars,"MTime-secs"));
+server.c:	Session->ContentSize=atoi(GetVar(Vars,"FileSize"));
+server.c:		Session->ContentSize=0;
+server.c:		Session->Flags |= SESSION_ENCODE_GZIP;
+server.c:		SetVar(Session->Headers,Tempstr,Curr->Item);
+server.c:			LogToFile(Settings.LogPath,"%s@%s (%s) downloading %s (%s bytes)", Session->UserName, Session->ClientHost, Session->ClientIP,Path,GetVar(Vars,"FileSize"));
+server.c://			if (Session->Flags & SESSION_ICECAST) IcecastSendData(Doc, S);
+server.c:	if (Response->Flags & SESSION_REUSE) Session->Flags |= SESSION_REUSE;
+server.c:	else Session->Flags &= ~SESSION_REUSE;
+server.c:  PI=VPathFind(PATHTYPE_FILETYPE, Session->Path);
+server.c:     if (PI->Flags & PATHITEM_COMPRESS) Session->Flags |= FLAG_COMPRESS;
+server.c:     if (PI->Flags & PATHITEM_NO_COMPRESS) Session->Flags &= ~FLAG_COMPRESS;
+server.c:     if (PI->CacheTime > 0) Session->CacheTime=PI->CacheTime;
+server.c:	  Session->LastModified=atoi(GetVar(Vars,"MTime-secs"));
+server.c:		if ((result & FILE_DIR) || (strstr(Session->Arguments,"format=")))
+server.c:      LogToFile(Settings.LogPath, "Directory Send: path=%s args=%s", Path, Session->Arguments);
+server.c:	LogToFile(Settings.LogPath,"HANDLE POST: %s", Session->ContentType);
+server.c:	if (strcmp(Session->ContentType,"application/x-www-form-urlencoded")==0) HTTPServerReadBody(Session, &Session->Arguments);
+server.c:	else if (strncmp(Session->ContentType,"multipart/",10)==0) UploadMultipartPost(S, Session);
+server.c:	HTTPServerSendResponse(S, Session, "302", "", Session->URL);
+server.c:LogToFile(Settings.LogPath,"%s@%s (%s) DeleteCollection: %s", Session->UserName, Session->ClientHost, Session->ClientIP,Path);
+server.c:	if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,"%s@%s (%s) DeleteSubItem: %s", Session->UserName, Session->ClientHost, Session->ClientIP,myGlob.gl_pathv[i]);
+server.c:Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
+server.c:if (IsProxyMethod(Session->MethodID))
+server.c:	if (Settings.Flags & FLAG_CHHOME) ChrootDir=CopyStr(ChrootDir, Session->HomeDir);
+server.c:	LogToFile(Settings.LogPath,"ChRoot to: %s home=%s",ChrootDir, Session->HomeDir);
+server.c:		HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to home-directory");
+server.c:	Session->StartDir=CopyStr(Session->StartDir,ChrootDir);
+server.c:			Session->StartDir=CopyStr(Session->StartDir,"/");
+server.c:	if (strncmp(Session->StartDir,Settings.DefaultDir,StrLen(Settings.DefaultDir))==0)
+server.c:		Tempstr=MCopyStr(Tempstr,"/", Session->StartDir+StrLen(Settings.DefaultDir),NULL);
+server.c:		Session->StartDir=CopyStr(Session->StartDir,Tempstr);
+server.c:Session->StartDir=SlashTerminateDirectoryPath(Session->StartDir);
+server.c:LogToFile(Settings.LogPath,"User Context: Chroot: %s, StartDir: %s, HomeDir: %s, UserID: %d, GroupID: %d,",ChrootDir, Session->StartDir, Session->HomeDir, Session->RealUserUID, Session->GroupID);
+server.c:if (Session->GroupID > 0)
+server.c:	if (setgid(Session->GroupID) != 0)
+server.c:		HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user-group");
+server.c:	  LogToFile(Settings.LogPath,"ERROR: Failed to switch group to %s/%d. Exiting", Session->RealUser, Session->RealUserUID);
+server.c:		HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user-group");
+server.c:		LogToFile(Settings.LogPath,"ERROR: Failed to switch group to %s/%d. Exiting", Session->RealUser, Session->RealUserUID);
+server.c:	if (setresuid(Session->RealUserUID, Session->RealUserUID, Session->RealUserUID)!=0)
+server.c:		HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user");
+server.c: 		LogToFile(Settings.LogPath,"ERROR: Failed to switch user to %s/%d. Exiting", Session->RealUser, Session->RealUserUID);
+server.c:if (strcmp(Token, Session->Method)==0) 
+server.c:		LogToFile(Settings.LogPath,"AUTH: Forcing Relogin for  %s@%s (%s) %s %s", Session->ClientIP, Session->ClientHost, Session->ClientIP, Session->Method, Session->Path);
+server.c:	if (Session->Flags & SESSION_AUTHENTICATED) 
+server.c:		if (strcmp(Session->UserName, Session->AuthenticatedUser)==0) 
+server.c:			LogToFile(Settings.LogPath,"AUTH: Session Keep-Alive active, reusing authentication for %s@%s (%s) %s %s", Session->ClientIP, Session->ClientHost, Session->ClientIP, Session->Method, Session->Path);
+server.c:		else LogToFile(Settings.LogPath,"AUTH: ERROR: Session Keep-Alive active, but user has changed to %s@%s (%s) %s %s. Refusing authentication", Session->ClientIP, Session->ClientHost, Session->ClientIP, Session->Method, Session->Path);
+server.c:	VPath=VPathFind(PATHTYPE_LOCAL, Session->Path);
+server.c:	if (VPath && (VPath->Flags & PATHITEM_NOAUTH)) Session->Flags |= SESSION_AUTHENTICATED;
+server.c:	if ((! (Session->Flags & SESSION_AUTHENTICATED)) && (Session->AuthFlags & FLAG_AUTH_ACCESS_TOKEN)) ParseAccessToken(Session);
+server.c:	if (Session->AuthFlags & FLAG_AUTH_PRESENT)
+server.c:		if ((Authenticate(Session)==TRUE) && StrValid(Session->UserName)) result=TRUE;
+server.c:		if (StrValid(Session->UserSettings)) ParseConfigItemList(Session->UserSettings);
+server.c:		if (! auth_client_certificate(Session, Session->S)) result=FALSE;
+server.c:		Session->AuthenticatedUser=CopyStr(Session->AuthenticatedUser, Session->UserName);
+server.c:		Session->Flags |= SESSION_AUTHENTICATED;
+server.c:	ptr=GetNameValuePair(Session->Arguments,"&","=",&QName,&QValue);
+server.c:		Session->LastModified=0;
+server.c:		Session->LastModified=0;
+server.c:		Session->LastModified=0;
+server.c:		Session->LastModified=0;
+server.c:			Session->LastModified=0;
+server.c:			Session->LastModified=0;
+server.c:		Session->LastModified=0;
+server.c:		Session->LastModified=0;
+server.c:	if (strstr(Session->OriginalURL,*Token)) 
+server.c:		Session->Flags |= SESSION_ERR_BADURL;
+server.c:		LogToFile(Settings.LogPath,"ERROR: INVALID URL: %s", Session->URL);
+server.c:    ptr=Session->StartDir;
+server.c:    if (strcmp(ptr,"/")==0) Path=CopyStr(Path, Session->Path);
+server.c:    else Path=MCopyStr(Path,ptr, Session->Path,NULL);
+server.c:if (FDSelect(Session->S->in_fd, SELECT_READ, NULL) > 0)
+server.c:	recv(Session->S->in_fd, &byte, 1, MSG_PEEK);
+server.c:if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"PREAUTH: %s against %s %s\n", Session->UserName,Settings.AuthPath,Settings.AuthMethods);
+server.c:		LogToFile(Settings.LogPath,"AUTHENTICATED: %s@%s for '%s %s' against %s %s\n", Session->UserName, Session->ClientIP, Session->Method, Session->Path,Settings.AuthPath,Settings.AuthMethods);
+server.c:		if (IsProxyMethod(Session->MethodID)) HTTPServerSendHTML(Session->S, Session, "407 UNAUTHORIZED","Proxy server requires authentication.");
+server.c:		else HTTPServerSendHTML(Session->S, Session, "401 UNAUTHORIZED","Server requires authentication.");
+server.c:		if (Session->AuthFlags & FLAG_AUTH_PRESENT) LogToFile(Settings.LogPath,"AUTHENTICATE FAIL: %s@%s for '%s %s' against %s %s\n", Session->UserName, Session->ClientIP, Session->Method, Session->Path,Settings.AuthPath,Settings.AuthMethods);
+server.c:if (! HTTPMethodAllowed(Session)) HTTPServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
+server.c:	HTTPServerSendHTML(Session->S, Session, "403 Forbidden","Bad pattern found in URL");
+server.c:	LogToFile(Settings.LogPath,"ERROR: Bad pattern '%s' found in URL '%s' from %s@%s (%s)", Tempstr, Session->URL, Session->UserName, Session->ClientHost, Session->ClientIP);
+server.c:if (! (Session->Flags & SESSION_REUSE)) HTTPServerSetUserContext(Session);
+server.c:if (Session->Flags & SESSION_KEEPALIVE) Session->Flags |= SESSION_REUSE;
+server.c:switch (Session->MethodID)
+server.c:	if (! VPathProcess(Session->S, Session, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE)) HTTPServerHandlePost(Session->S, Session);
+server.c:		result=HTTPServerProcessActions(Session->S, Session);
+server.c:		if (! result) HTTPServerFindAndSendDocument(Session->S, Session, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
+server.c:		HTTPServerFindAndSendDocument(Session->S, Session,HEADERS_KEEPALIVE);
+server.c:		HTTPServerRecieveURL(Session->S, Session);
+server.c:		HTTPServerMkDir(Session->S, Session, DIRTYPE_NORMAL);
+server.c:		HTTPServerDelete(Session->S, Session);
+server.c:		HTTPServerMove(Session->S, Session);
+server.c:		HTTPServerCopy(Session->S, Session);
+server.c:		HTTPServerPropFind(Session->S, Session);
+server.c:		HTTPServerPropPatch(Session->S, Session);
+server.c:		HTTPServerOptions(Session->S, Session);
+server.c:		HTTPServerHandleLock(Session->S, Session);
+server.c:		HTTPServerHandleLock(Session->S, Session);
+server.c:		HTTPServerMkDir(Session->S, Session, DIRTYPE_CALDAV);
+server.c:		WebsocketConnect(Session->S, Session);
+server.c:		Session->Flags &= ~SESSION_REUSE;
+server.c:	HTTPServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
+server.c:LogToFile(Settings.LogPath,"TRANSACTION COMPLETE: %s %s for %s@%s (%s)", Session->Method, Session->Path, Session->UserName, Session->ClientHost, Session->ClientIP);
+server.c:STREAMFlush(Session->S);
+server.c:if (! (Session->Flags & SESSION_REUSE)) break;
+server.c://LogToFile(Settings.LogPath,"REUSE: %s %s for %s@%s (%s)", Session->Method, Session->Path, Session->UserName, Session->ClientHost, Session->ClientIP);
+upload.c://if (! (Session->Flags & SESSION_UPLOAD)) return;
+upload.c:Boundary=MCopyStr(Boundary,"--",Session->ContentBoundary, NULL);
+upload.c:LogToFile(Settings.LogPath,"HANDLE UPLOAD: %s %s %d",Session->URL, Boundary, Session->ContentSize);
+upload.c:			Tempstr=MCopyStr(Tempstr,Session->Path,"/",FileName,NULL);
+upload.c:				Session->Arguments=MCatStr(Session->Arguments,"&",QName,"=",QValue,NULL);
+upload.c:Session->Arguments=CatStr(Session->Arguments,"&");
+upload.c:Session->ContentSize=StrLen(Session->Arguments);
+upload.c:if (Session->ContentSize > 0) Session->ContentType=CopyStr(Session->ContentType,"application/x-www-form-urlencoded");
+upload.c:  HTML=MCopyStr(HTML,"<html>\r\n<head><title>Upload files to: ",Session->URL,"</title></head>\r\n<body><form method=\"post\" enctype=\"multipart/form-data\" action=\"",Session->URL,"\">\r\n",NULL);
+upload.c:  HTML=MCatStr(HTML,"<p align=center>Upload files to: ",Session->URL,"</p>\r\n",NULL);
+websocket.c:v1=htonl(WebsocketProcessKeyPart(Session->ContentBoundary));
+websocket.c:v2=htonl(WebsocketProcessKeyPart(Session->ContentType));
+websocket.c:Helper=CopyStr(Helper, WebsocketFindMatchingHelper(Session->Path, Session->ContentType, &Proto));
+websocket.c:	if (Session->MethodID==METHOD_WEBSOCKET75) 
+websocket.c:	Tempstr=MCopyStr(Tempstr, Session->ContentBoundary, WEBSOCKET_GUID, NULL);
+websocket.c:	if (Session->MethodID==METHOD_WEBSOCKET75)

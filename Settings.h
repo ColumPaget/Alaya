@@ -11,8 +11,7 @@
 #define FLAG_CHSHARE 8
 #define FLAG_SSL 16
 #define FLAG_SSL_PFS 32
-#define FLAG_LOG_VERBOSE 64
-#define FLAG_LOG_MORE_VERBOSE 128
+#define FLAG_PFS_GENERATE 64
 #define FLAG_COMPRESS 256
 #define FLAG_PARTIAL_COMPRESS 512
 #define FLAG_CHECK_SCRIPTS 4096
@@ -20,19 +19,22 @@
 #define FLAG_LOOKUP_CLIENT 16384
 #define FLAG_KEEPALIVES 32768
 #define FLAG_SIGHUP_RECV 65536
+#define FLAG_LOG_VERBOSE 131072
+#define FLAG_LOG_MORE_VERBOSE 262144
 
 
 //Flag values for Settings->AuthFlags and Session->AuthFlags
 #define FLAG_AUTH_REQUIRED 1
 #define FLAG_AUTH_PRESENT  2
-#define FLAG_AUTH_DIGEST   4
-#define FLAG_AUTH_ACCESS_TOKEN  8
-#define FLAG_AUTH_COOKIE 16
-#define FLAG_AUTH_HASCOOKIE 32
-#define FLAG_AUTH_CERT_ASK 64
-#define FLAG_AUTH_CERT_SUFFICIENT 128
-#define FLAG_AUTH_CERT_REQUIRED 256
-#define FLAG_AUTH_ADMIN 512
+#define FLAG_AUTH_BASIC    4
+#define FLAG_AUTH_DIGEST   8
+#define FLAG_AUTH_ACCESS_TOKEN  16
+#define FLAG_AUTH_COOKIE 32
+#define FLAG_AUTH_HASCOOKIE 64
+#define FLAG_AUTH_CERT_ASK 128
+#define FLAG_AUTH_CERT_SUFFICIENT 256
+#define FLAG_AUTH_CERT_REQUIRED 512
+#define FLAG_AUTH_ADMIN 1024
 
 typedef struct
 {
@@ -72,6 +74,7 @@ ListNode *CustomHeaders;
 ListNode *HostConnections;
 ListNode *UserAgents;
 ListNode *Events;
+ListNode *ProxyConfig;
 char *PackFormats;
 char *LogPath;
 int MaxLogSize;
@@ -83,7 +86,7 @@ extern TSettings Settings;
 
 void InitSettings();
 void PostProcessSettings(TSettings *Settings);
-void ReadConfigFile(TSettings *Settings);
+void ReadConfigFile(const char *Path);
 void ParseConfigItem(const char *ConfigLine);
 void ParseConfigItemList(const char *Settings);
 void ParseSettings(int argc, char *argv[], TSettings *Settings);

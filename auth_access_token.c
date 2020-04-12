@@ -1,4 +1,21 @@
-#include "AccessTokens.h"
+#include "auth_access_token.h"
+
+static char *MakeAccessDigest(char *Buffer, const char *User, const char *Salt, const char *RequestingHost, const char *RequestURL)
+{
+char *Tempstr=NULL, *RetStr=NULL;
+
+RetStr=CopyStr(Buffer,"");
+
+if (StrValid(Settings.AccessTokenKey))
+{
+  Tempstr=MCopyStr(Tempstr,Salt,":",User,":",Settings.AccessTokenKey,":",RequestingHost,":",RequestURL,NULL);
+  HashBytes(&RetStr,"sha1",Tempstr,StrLen(Tempstr),ENCODE_HEX);
+
+}
+Destroy(Tempstr);
+
+return(RetStr);
+}
 
 
 void ParseAccessToken(HTTPSession *Session)
@@ -19,24 +36,6 @@ const char *ptr;
   Destroy(Name);
   Destroy(Value);
   Destroy(Token);
-}
-
-
-char *MakeAccessDigest(char *Buffer, const char *User, const char *Salt, const char *RequestingHost, const char *RequestURL)
-{
-char *Tempstr=NULL, *RetStr=NULL;
-
-RetStr=CopyStr(Buffer,"");
-
-if (StrValid(Settings.AccessTokenKey))
-{
-  Tempstr=MCopyStr(Tempstr,Salt,":",User,":",Settings.AccessTokenKey,":",RequestingHost,":",RequestURL,NULL);
-  HashBytes(&RetStr,"sha1",Tempstr,StrLen(Tempstr),ENCODE_HEX);
-
-}
-Destroy(Tempstr);
-
-return(RetStr);
 }
 
 

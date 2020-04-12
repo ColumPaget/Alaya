@@ -51,7 +51,7 @@ free(Tag);
 */
 
 
-int ID3v1ReadTag(STREAM *S, ListNode *Vars)
+static int ID3v1ReadTag(STREAM *S, ListNode *Vars)
 {
 char *Tempstr=NULL;
 TID3v1_TAG *Tag;
@@ -80,7 +80,8 @@ free(Tag);
 return(result);
 }
 
-int ConvertSyncsafeBytes(uint8_t Top, uint8_t High, uint8_t Low)
+
+static int ConvertSyncsafeBytes(uint8_t Top, uint8_t High, uint8_t Low)
 {
 return((Top * 65536) + (High * 256) + Low);
 }
@@ -116,7 +117,7 @@ Picture type:  $00  Other
                   $14  Publisher/Studio logotype
 */
 
-void ID3v2ReadPicture(char *Data, int Len, ListNode *Vars)
+static void ID3v2ReadPicture(char *Data, int Len, ListNode *Vars)
 {
 char *ptr, *imgtype;
 int offset;
@@ -152,7 +153,7 @@ Destroy(Encoded);
 }
 
 
-int ID3v2ReadTag(STREAM *S, ListNode *Vars)
+static int ID3v2ReadTag(STREAM *S, ListNode *Vars)
 {
 char *Tempstr=NULL, *TagName=NULL, *ptr;
 uint8_t Version, Revision;
@@ -241,7 +242,7 @@ return(TRUE);
 
 
 
-int ID3v3ReadTag(STREAM *S, ListNode *Vars)
+static int ID3v3ReadTag(STREAM *S, ListNode *Vars)
 {
 //WPUB	Publishers official webpage
 const char *ID3v3Fields[]={"TCOM","TALB","TIT2","COMM","TBPM","TPE1","TPE2","TYER","TLEN","TCON","TRCK","WCOM","WCOP","WOAF","WOAR","WOAS","WORS","WPUB","WXXX",NULL};
@@ -332,31 +333,9 @@ return(TRUE);
 
 
 
-int ReadTagType(STREAM *S)
-{
-char *Tempstr=NULL;
-int result=-1, i;
-	
-Tempstr=SetStrLen(Tempstr,20);
-memset(Tempstr,0,20);
-STREAMReadBytes(S,Tempstr,20);
-
-for (i=0; TagTypes[i] !=NULL; i++)
-{
-	if (memcmp(Tempstr, TagTypes[i], StrLen(TagTypes[i]))==0) result=i;
-}
-STREAMSeek(S,(double) 0, SEEK_SET); 
 
 
-Destroy(Tempstr);
-	
-return(result);
-}
-
-
-
-
-int OggReadHeader(STREAM *S, uint8_t *SegTable)
+static int OggReadHeader(STREAM *S, uint8_t *SegTable)
 {
 char *Tempstr=NULL;
 uint8_t NoOfSegments=0;
@@ -380,7 +359,7 @@ return(NoOfSegments);
 
 
 
-int OggReadData(STREAM *S, char **Data)
+static int OggReadData(STREAM *S, char **Data)
 {
 uint8_t *SegTable=NULL;
 uint8_t NoOfSegments;
@@ -410,7 +389,7 @@ return(len);
 }
 
 
-void OggInterpretComment(const char *Data, int MaxLen, ListNode *Vars)
+static void OggInterpretComment(const char *Data, int MaxLen, ListNode *Vars)
 {
 uint32_t flen, NoOfFields, i;
 char *Tempstr=NULL, *Name=NULL, *Token=NULL, *Value=NULL;
@@ -468,7 +447,7 @@ Destroy(Name);
 
 
 
-int OggReadTag(STREAM *S, ListNode *Vars)
+static int OggReadTag(STREAM *S, ListNode *Vars)
 {
 char *Data=NULL;
 int len;
@@ -485,7 +464,7 @@ return(TRUE);
 
 
 
-int TIFFParseHeader(char *Data,int len, ListNode *Vars)
+static int TIFFParseHeader(char *Data,int len, ListNode *Vars)
 {
 char *ptr;
 int offset, NoOfTags;
@@ -508,7 +487,9 @@ else
 return(NoOfTags);
 }
 
-const char *JPEGParseAPP0(const char *Data, ListNode *Vars)
+
+
+static const char *JPEGParseAPP0(const char *Data, ListNode *Vars)
 {
 const char *ptr;
 unsigned int len, x, y;
@@ -545,7 +526,7 @@ return(Data+len);
 
 
 
-int JPEGReadHeader(STREAM *S, ListNode *Vars)
+static int JPEGReadHeader(STREAM *S, ListNode *Vars)
 {
 char *Data=NULL;
 const char *ptr;
@@ -582,7 +563,7 @@ return(TRUE);
 
 
 
-int PNGReadHeader(STREAM *S, ListNode *Vars)
+static int PNGReadHeader(STREAM *S, ListNode *Vars)
 {
 char *Data=NULL, *Type=NULL;
 int val, w, l, d;
@@ -637,7 +618,7 @@ uint32_t NoOfColors;
 uint32_t NoOfImportantColors;
 */
 
-int BMPReadHeader(STREAM *S, ListNode *Vars)
+static int BMPReadHeader(STREAM *S, ListNode *Vars)
 {
 char *Data=NULL, *Tempstr=NULL;
 const char *ptr;
@@ -666,6 +647,28 @@ return(TRUE);
 }
 
 
+static int MediaReadTagType(STREAM *S)
+{
+char *Tempstr=NULL;
+int result=-1, i;
+	
+Tempstr=SetStrLen(Tempstr,20);
+memset(Tempstr,0,20);
+STREAMReadBytes(S,Tempstr,20);
+
+for (i=0; TagTypes[i] !=NULL; i++)
+{
+	if (memcmp(Tempstr, TagTypes[i], StrLen(TagTypes[i]))==0) result=i;
+}
+STREAMSeek(S,(double) 0, SEEK_SET); 
+
+
+Destroy(Tempstr);
+	
+return(result);
+}
+
+
 
 
 int MediaReadDetails(STREAM *S, ListNode *Vars)
@@ -673,11 +676,11 @@ int MediaReadDetails(STREAM *S, ListNode *Vars)
 TTagType TagType=TAG_NONE;
 int result=0;
 
-TagType=ReadTagType(S);
+TagType=MediaReadTagType(S);
 if (TagType==-1)
 {
 	STREAMSeek(S,(double) 0 - ID3v1_LEN,SEEK_END);
-	TagType=ReadTagType(S);
+	TagType=MediaReadTagType(S);
 	if (TagType==TAG_ID3) TagType=TAG_ID3_END;
 	else TagType=TAG_NONE;
 }

@@ -16,12 +16,13 @@ of chroot. Finally some values, like cache time, can be set on a VPath.
 #include "ChrootHelper.h"
 #include "UserAdminScreen.h"
 #include "server.h"
+#include "icecast.h"
 
 void VPathParse(ListNode *List, const char *PathType, const char *Data)
 {
 const char *PathTypes[]={"", "Local", "Files","Cgi","Websocket","Stream","Logout","Proxy","Redirect","Calendar","MimeIcons","FileType","UserAdmin",NULL};
 char *URL=NULL, *Path=NULL, *Tempstr=NULL;
-char *User=NULL, *Group=NULL, *Password=NULL;
+char *User=NULL, *Group=NULL, *Password=NULL, *MimeType=NULL;
 const char *ptr;
 TPathItem *PI=NULL;
 int Type, Flags=PATHITEM_READONLY;
@@ -33,7 +34,10 @@ if (Type > -1)
   ptr=GetToken(Data,",",&Tempstr,0);
 
   StripLeadingWhitespace(Tempstr);
-  if (*Tempstr !='/') URL=MCopyStr(URL,"/",Tempstr,NULL);
+	if ((Type != PATHTYPE_FILETYPE)	&& (*Tempstr !='/'))
+	{
+		URL=MCopyStr(URL,"/",Tempstr,NULL);
+	}
   else URL=CopyStr(URL,Tempstr);
 
 
@@ -47,6 +51,7 @@ if (Type > -1)
   else if (strncasecmp(Tempstr,"passwd=",7)==0) Password=CopyStr(Password, Tempstr+7);
   else if (strncasecmp(Tempstr,"password=",9)==0) Password=CopyStr(Password, Tempstr+9);
   else if (strncasecmp(Tempstr,"group=",6)==0) Group=CopyStr(Group, Tempstr+6);
+  else if (strncasecmp(Tempstr,"mimetype=",9)==0) MimeType=CopyStr(MimeType, Tempstr+9);
   else if (strcasecmp(Tempstr,"auth=open")==0) Flags |= PATHITEM_NOAUTH;
   else if ( (strncasecmp(Tempstr,"exec=",5)==0) && strtobool(Tempstr+5)) Flags |= PATHITEM_EXEC;
   else if ( (strncasecmp(Tempstr,"upload=",7)==0) && strtobool(Tempstr+7))  Flags &= ~PATHITEM_READONLY;
@@ -71,13 +76,12 @@ if (Type > -1)
   PI->User=CopyStr(PI->User, User);
   PI->Password=CopyStr(PI->Password, Password);
   PI->Group=CopyStr(PI->Group, Group);
+  PI->ContentType=CopyStr(PI->ContentType, MimeType);
   switch (PI->Type)
   {
     case PATHTYPE_LOGOUT: Settings.Flags |= FLAG_LOGOUT_AVAILABLE; break;
     case PATHTYPE_FILETYPE:
-      ptr=PI->URL;
-      if (*ptr=='/') ptr++;
-      PI->Path=CopyStr(PI->Path, ptr);
+      PI->Path=CopyStr(PI->Path, PI->URL);
     break;
   }
   ListAddNamedItem(List,PI->URL,PI);
@@ -86,6 +90,7 @@ else LogToFile(Settings.LogPath,"ERROR: Unknown Path type '%s' in Config File",T
 
 
 Destroy(Tempstr);
+Destroy(MimeType);
 Destroy(Password);
 Destroy(Group);
 Destroy(User);
@@ -95,7 +100,7 @@ Destroy(URL);
 
 
 
-TPathItem *VPathFind(int Type, char *Match)
+TPathItem *VPathFind(int Type, const char *Match)
 {
 TPathItem *VPath=NULL, *Default=NULL;
 ListNode *Curr, *Best=NULL;
@@ -105,10 +110,10 @@ while (Curr)
 {
 	VPath=(TPathItem *) Curr->Item;
 
-	switch (VPath->Type)
+	switch (Type)
 	{
 	case PATHTYPE_MIMEICONS: if (Type==VPath->Type) return(VPath); break;
-	case PATHTYPE_FILETYPE:  if ((Type==VPath->Type) && (fnmatch(Curr->Tag, Match, 0)==0)) return(VPath); break;
+	case PATHTYPE_FILETYPE:  if ((Type==VPath->Type) && (fnmatch(Curr->Tag, GetBasename(Match), 0)==0)) return(VPath); break;
 	default:
 	if (StrLen(Curr->Tag) < 2) Default=VPath;
 	if (
@@ -267,11 +272,11 @@ int result=FALSE;
 			break;
 
 			case PATHTYPE_EXTFILE:
-			result=VPathHandleFilePath(S,VPathSession,PI,Flags);
+			result=VPathHandleFilePath(S, VPathSession, PI, Flags);
 			break;
 
 			case PATHTYPE_STREAM:
-			HTTPServerHandleStream(S,VPathSession,PI->Path,Flags);
+			IcecastHandleStream(S, VPathSession, PI->Path);
 			break;
 
 			case PATHTYPE_LOGOUT:

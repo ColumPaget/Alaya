@@ -6,7 +6,7 @@
 #include "upload.h"
 #include "FileDetailsPage.h"
 #include "FileProperties.h"
-#include "AccessTokens.h"
+#include "auth_access_token.h"
 #include "VPath.h"
 #include "ID3.h"
 #include "tar.h"
@@ -492,7 +492,8 @@ char *HTML=NULL;
 			HTML=CatStr(HTML, "</td></tr>\n");	
 
 		HTML=CatStr(HTML, "<tr><td>\n");
-		HTML=MCatStr(HTML, "User: ", Session->UserName,"<br/>",NULL);
+		//UserName might be blank if we are running without authentication
+		if (StrValid(Session->UserName)) HTML=MCatStr(HTML, "User: ", Session->UserName,"<br/>",NULL);
 		HTML=MCatStr(HTML, "Date: ", GetDateStrFromSecs("%Y/%m/%d", Now, NULL), "<br/>", NULL);
 		HTML=MCatStr(HTML, "Time: ", GetDateStrFromSecs("%H:%M:%S", Now, NULL), "<br/>", NULL);
 		if (Settings.Flags & FLAG_LOGOUT_AVAILABLE) HTML=MCatStr(HTML,"<a href=\"",GetLogoutPath(),"\">( Logout )</a>",NULL);

@@ -24,6 +24,12 @@ then
 AC_CHECK_HEADER(sys/xattr.h,AC_DEFINE([USE_XATTR]),,)
 fi
 
+cf_use_socks=no
+AC_ARG_ENABLE(socks, [  --enable-socks       enable socks proxy support (default=no)], cf_use_socks=$enableval )
+if test "$cf_use_socks" != "no"
+then
+AC_DEFINE([USE_SOCKS])
+fi
 
 cf_have_capabilities=no
 AC_ARG_ENABLE(capabilities, [  --enable-capabilities       enable linux capabilities support (default=no)], cf_use_capabilities=$enableval )

@@ -1,5 +1,5 @@
 #include "Authenticate.h"
-#include "AccessTokens.h"
+#include "auth_access_token.h"
 #include "auth_unix.h"
 #include "auth_pam.h"
 #include "auth_alaya_native.h"
@@ -19,10 +19,10 @@ const char *ptr;
 if (! Session->S) return(FALSE);
 if (Settings.AuthFlags & FLAG_AUTH_CERT_SUFFICIENT)
 {
-  ptr=STREAMGetValue(Session->S, "SSL-Certificate-Verify");
+  ptr=STREAMGetValue(Session->S, "SSL:Certificate-Verify");
   if (StrValid(ptr) && (strcmp(ptr, "OK")==0))
   {
-  	ptr=STREAMGetValue(Session->S, "SSL-Certificate-CommonName");
+  	ptr=STREAMGetValue(Session->S, "SSL:CertificateCommonName");
 		if (StrValid(ptr) && (strcmp(ptr,UserName)==0))
 		{
 			LogToFile(Settings.LogPath, "AUTH: SSL-Certificate Authentication sufficient for User '%s'",UserName);
@@ -69,22 +69,27 @@ while (ptr)
 
 		case AUTHTOK_NATIVE:
 			MethodsFound |= AUTH_NATIVE;
+			Settings.AuthFlags |= FLAG_AUTH_BASIC;
 		break;
 
 		case AUTHTOK_PAM:
 			MethodsFound |= AUTH_PAM;
+			Settings.AuthFlags |= FLAG_AUTH_BASIC;
 		break;
 
 		case AUTHTOK_PASSWD:
 			MethodsFound |= AUTH_PASSWD;
+			Settings.AuthFlags |= FLAG_AUTH_BASIC;
 		break;
 
 		case AUTHTOK_SHADOW:
 			MethodsFound |= AUTH_SHADOW;
+			Settings.AuthFlags |= FLAG_AUTH_BASIC;
 		break;
 
 		case AUTHTOK_DIGEST:
 			MethodsFound |= AUTH_DIGEST;
+			Settings.AuthFlags |= FLAG_AUTH_DIGEST;
 		break;
 
 		case AUTHTOK_ACCESSTOKEN:

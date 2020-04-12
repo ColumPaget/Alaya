@@ -547,7 +547,7 @@ void OpenSSLSetupDH(SSL_CTX *ctx)
     if (CachedDH) dh=CachedDH;
     else
     {
-        ptr=LibUsefulGetValue("SSL:DHParams-File");
+        ptr=LibUsefulGetValue("SSL:DHParamsFile");
         if (StrValid(ptr)) Tempstr=CopyStr(Tempstr,ptr);
 
         paramfile = fopen(Tempstr, "r");

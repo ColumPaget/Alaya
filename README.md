@@ -6,7 +6,7 @@ SYNOPSIS
 
 Alaya is a chrooting webserver with basic webdav extensions. It can serve both http and https and is intended to provide a simple means for people to share directories with webdav. Although it chroots it supports running CGI programs outside of the chroot via a trusted-path method. Alaya aims at ease of use, so all options can be configured via command-line args, though a config file is also supported.
 
-
+As of version 3.0 Alaya is able to serve HTTP and HTTPS connections on the same port, and if support is compiled in and configured, also SOCKS4a proxy connections on the same port as HTTP and HTTPS.
 
 
 AUTHOR
@@ -135,6 +135,7 @@ There should be an example config file in the source distribution. It's worth lo
 Config file entries are:
 
 ```
+include=<path>    Include another config file in this config.
 Chroot=<dir>			Specifies directory to serve requests out of
 ChHome						Serve requests out of users home directory
 AllowUsers=<list>			Only allow these users access.
@@ -154,6 +155,7 @@ SSLVerifyPath=<path>		Path to file or directory containing Certificate Authority
 SSLClientCertificate=<type>		'required', 'sufficient' or 'required+sufficient' (See 'Client Certificates' below)
 SSLDHParams=<path>		Path to an openssl generated Diffie Helman parameters file.
 Path=<type>,<alias>,<path>	Path to a trusted directory outside of a chroot jail, which is made accessible as a 'virtual' directory under the top-level of the chroot. Currently there are two types of path 'cgi', for cgi programs, and 'files' for a standard directory made available in this way. (See 'VPaths' below)
+FileType=<pattern>,<settings>  Settings for files that match 'pattern'. See 'SETTINGS FOR FILE TYPES' below.
 Event=<type>:<match string>,<match str>,<match str>...:Script
 LogVerbose			More information in log file
 MaxLogSize=<max bytes>		Max log file size. A suffix can be used to express size, e.g.  1G, 2M, 900k. When max size is reached the logfile is renamed to have a '-' suffix, and a new file opened.
@@ -173,6 +175,8 @@ MaxMemory=<max bytes>			Maximum amount of memory per alaya process. A suffix can
 MaxStack=<max bytes>			Maximum Stack Size. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
 PackFormats=<list>	List of 'pack formats' to offer in the 'download as packed' item on the directory page.
 WebsocketHandler:<path>:<protocol>=<script path>   Specify a program that handles websockets requests to a particular path and protocol.
+DenyProxy=<host>:<port>   Configuration for proxy systems, see 'PROXY' section below
+AllowProxy=<host>:<port> [redirect=<host>:<port>] [ssl]   Configuration for proxy systems, see 'PROXY' section below
 ```
 
 
@@ -371,6 +375,7 @@ Examples:
 
 	DirListType=Fancy,Media      Show 'fancy' directory listings, and offer .m3u playlists in directories with media files.
 ```
+
 
 PACK FORMATS
 ============
@@ -707,8 +712,9 @@ FileType=*.jpg,cache=3600
 Currently supported settings are:
 
 ```
-cache=<seconds>    The number of seconds that items under this path can be cached for.
-compress=<Y/n>     Should the server use compression (TransferEncoding: gzip) when sending documents from this path?
+cache=<seconds>       The number of seconds that items under this path can be cached for.
+compress=<Y/n>        Should the server use compression (TransferEncoding: gzip) when sending documents from this path?
+mimetype=<mimetype>   Mimetype (HTTP Content-Type) for matching files.
 ```
 
 
@@ -717,9 +723,9 @@ compress=<Y/n>     Should the server use compression (TransferEncoding: gzip) wh
 PROXY SUPPORT
 =============
 
-Alaya has very rudimentary proxy support. The CONNECT method is supported, as are GET requests that specify a full URL rather than a file path. I find this is enough for me to use alaya to get to internet radio stations from behind corporate firewalls.
+Alaya has very rudimentary proxy support. The CONNECT method is supported, as are GET requests that specify a full URL rather than a file path. If compiled with `--enable-socks` then alaya will support SOCKS4a connections on the same port as HTTP/HTTPS (SOCKS5 is planned for a future release). 
 
-These proxy functions are not enabled by default, you'll have to enable them by using the '-m' command line arg or 'HttpMethods' config file entry. For example:
+HTTP and SOCKS4a proxy functions are not enabled by default, you'll have to enable them by using the '-m' command line arg or 'HttpMethods' config file entry. 'RGET' and 'RPOST' are the http methods for HTTP proxing. 'CONNECT' is the method for https proxying. 'SOCKS' is the method name for SOCKS4a proxing. For example:
 
 ```
 	alaya -m CONNECT,RGET
@@ -733,7 +739,7 @@ You could also use
 	alaya -m PROXY
 ```
 
-as 'PROXY' expands to CONNECT,RGET
+as 'PROXY' expands to CONNECT,RGET,SOCKS
 
 If you want to allow remote GETS but not CONNECT then 
 
@@ -753,6 +759,27 @@ All this also works with the 'HttpMethods' config-file entry, so
 
 ```
 HttpMethods=DAV,PROXY
+```
+
+Allowed connections can be defined in the config file using the 'DenyProxy' and 'AllowProxy' settings. These settings take fnmatch/shell style wildcard patterns that define the hosts and ports they apply two. For example:
+
+```
+DenyProxy=*
+AllowProxy=freshcode.club:*
+AllowProxy=*duckduckgo.com:80
+AllowProxy=github.com:443 redirect=github.com:80 ssl
+```
+
+This config denys all connections except for: connection to 'freshcode.club' (not www.freshcode.club, just freshcode.club) on any port, connections to duckduckgo.com (including www.duckduckgo.com, note leading '*') on port 80, and connections to 'github.com' on port 443, although these connections are redirected to another port.
+
+The final line, for 'github.com' on port 443, illustrates both the 'redirect' and 'ssl' features. By adding `redirect=<host>:<port>` any requested host and port can be redirected to another host and port. The 'ssl' feature activates TLS/SSL BETWEEN ALAYA AND THE CLIENT. This can be used to add TLS encryption to a connection that isn't encrypted by the destination host. This is particularlly useful if alaya is being used as a reverse proxy allowing access to services behind a firewall.
+
+This config applies to all proxy methods that are enabled.
+
+If you want to have alaya serve up a proxy autoconfig PAC file, you'll likely need to specify the mime type for such files with:
+
+```
+FileType=*.pac,mimetype=application/x-ns-proxy-autoconfig
 ```
 
 
@@ -783,7 +810,6 @@ Similarly cache time can be set for file VPaths like so:
 ```
 Path=files,/Docs/,/usr/local/share/documents,cache=3600
 ```
-
 
 
 EVENTS

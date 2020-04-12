@@ -24,7 +24,7 @@ while (ptr)
 {
 if (strcmp(Token,"BASE")==0) Tempstr=CatStr(Tempstr,"GET,POST,HEAD,OPTIONS,");
 else if (strcmp(Token,"DAV")==0) Tempstr=CatStr(Tempstr,"GET,POST,HEAD,OPTIONS,DELETE,MKCOL,MOVE,COPY,PUT,PROPFIND,PROPPATCH,");
-else if (strcmp(Token,"PROXY")==0) Tempstr=CatStr(Tempstr,"CONNECT,RGET,RPOST");
+else if (strcmp(Token,"PROXY")==0) Tempstr=CatStr(Tempstr,"CONNECT,RGET,RPOST,SOCKS");
 else Tempstr=MCatStr(Tempstr,Token,",",NULL);
 
 ptr=GetToken(ptr,",",&Token,0);
@@ -48,7 +48,7 @@ Destroy(Token);
 
 
 
-void ParseDirListType(const char *Data)
+static void ParseDirListType(const char *Data)
 {
 char *Token=NULL;
 const char *ptr;
@@ -80,7 +80,7 @@ Destroy(Token);
 
 
 
-void ParseEventConfig(const char *ConfigLine)
+static void ParseEventConfig(const char *ConfigLine)
 {
 const char *EventTypeStrings[]={"Method","Path","User","ClientIP","BadURL","Header","ResponseCode",NULL};
 char *Token=NULL;
@@ -103,7 +103,7 @@ Destroy(Token);
 
 //Parse a list of packing formats and their associated commands so we can offer the user
 //'download as zip' in the directory webpage
-char *ParsePackFormats(char *RetStr, const char *Config)
+static char *ParsePackFormats(char *RetStr, const char *Config)
 {
 char *Name=NULL, *Value=NULL;
 char *Path=NULL;
@@ -142,14 +142,32 @@ Destroy(Value);
 return(RetStr);
 }
 
+
+static void SettingsParseProxyConf(int Allow, const char *Config)
+{
+char *URL=NULL, *Token=NULL;
+const char *ptr;
+
+ptr=GetToken(Config, "\\S", &URL, 0);
+while (ptr != NULL)
+{
+if (! Settings.ProxyConfig) Settings.ProxyConfig=ListCreate();
+ListAddTypedItem(Settings.ProxyConfig, Allow, URL, CopyStr(NULL, ptr));
+ptr=GetToken(ptr, "\\S", &URL, 0);
+}
+
+Destroy(Token);
+Destroy(URL);
+}
+
 void ParseConfigItem(const char *ConfigLine)
 {
-const char *ConfTokens[]={"Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","Path","FileType","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","WebsocketHandler","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings",
+const char *ConfTokens[]={"include","Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","Path","FileType","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","WebsocketHandler","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings",
 "SSLKey","SSLCert","SSLCiphers","SSLDHParams","SSLClientCertificate","SSLVerifyPath", "SSLVersion",
-"Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats","Admin",NULL};
-typedef enum {CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_PATH, CT_FILETYPE, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, 
+"Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats","Admin","AllowProxy", "DenyProxy", NULL};
+typedef enum {CT_INCLUDE,CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_PATH, CT_FILETYPE, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, 
 CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_SSL_VERSION, 
-CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS, CT_ADMIN} TConfigTokens;
+CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS, CT_ADMIN, CT_ALLOWPROXY, CT_DENYPROXY} TConfigTokens;
 
 char *Token=NULL;
 const char *ptr;
@@ -166,6 +184,10 @@ TokType=MatchTokenFromList(Token,ConfTokens,0);
 
 switch(TokType)
 {
+	case CT_INCLUDE:
+		ReadConfigFile(ptr);
+	break;
+
 	case CT_PORT:
 		Settings.Port=atoi(ptr);
 	break;
@@ -236,15 +258,15 @@ switch(TokType)
 	break;
 	
 	case CT_SSLCIPHERS:
-		LibUsefulSetValue("SSL-Permitted-Ciphers",ptr);
+		LibUsefulSetValue("SSL:PermittedCiphers",ptr);
 	break;
 
 	case CT_SSLDHPARAMS:
-		LibUsefulSetValue("SSL-DHParams-File",ptr);
+		LibUsefulSetValue("SSL:DHParamsFile",ptr);
 	break;
 
 	case CT_SSL_VERSION:
-		LibUsefulSetValue("SSL-Level",ptr);
+		LibUsefulSetValue("SSL:Level",ptr);
 	break;
 
 	case CT_AUTH_REALM:
@@ -338,8 +360,8 @@ switch(TokType)
 	case CT_SSLVERIFY_PATH:
 		if (stat(ptr,&Stat)==0)
 		{
-		if (S_ISDIR(Stat.st_mode)) LibUsefulSetValue("SSL_VERIFY_CERTDIR",ptr);
-		else if (S_ISREG(Stat.st_mode)) LibUsefulSetValue("SSL_VERIFY_CERTFILE",ptr);
+		if (S_ISDIR(Stat.st_mode)) LibUsefulSetValue("SSL:VerifyCertdir",ptr);
+		else if (S_ISREG(Stat.st_mode)) LibUsefulSetValue("SSL:VerifyCertfile",ptr);
 		}
 		else HandleError(ERR_PRINT|ERR_LOG|ERR_EXIT, "ERROR: Can't access SSL certificate verify data at '%s'",ptr);
 	break;
@@ -392,6 +414,15 @@ switch(TokType)
 	case CT_ADMIN:
 		Settings.AuthFlags |= FLAG_AUTH_ADMIN;
 	break;
+
+	case CT_ALLOWPROXY:
+		SettingsParseProxyConf(TRUE, ptr);
+	break;
+
+	case CT_DENYPROXY:
+		SettingsParseProxyConf(FALSE, ptr);
+	break;
+
 }
 
 Destroy(Token);
@@ -497,7 +528,6 @@ void PrintUsage()
 fprintf(stdout,"\nAlaya Webdav Server: version %s\n",Version);
 fprintf(stdout,"Author: Colum Paget\n");
 fprintf(stdout,"Email: colums.projects@gmail.com\n");
-fprintf(stdout,"Blog: http://idratherhack.blogspot.com \n");
 fprintf(stdout,"Credits: Thanks to Gregor Heuer, Helmut Schmid, and Maurice R Volaski for bug reports.\n");
 fprintf(stdout,"\n");
 
@@ -634,6 +664,7 @@ for (i=1; i < argc; i++)
 		Token=MCopyStr(Token,"SSLDHParams=",argv[++i],NULL);
 		ParseConfigItem(Token);
 	}
+	else if (strcmp(argv[i],"-dhgenerate")==0) Settings->Flags |= FLAG_SSL_PFS | FLAG_PFS_GENERATE;
 	else if (strcmp(argv[i],"-ciphers")==0) 
 	{
 		Token=MCopyStr(Token,"SSLCiphers=",argv[++i],NULL);
@@ -698,7 +729,7 @@ for (i=1; i < argc; i++)
 		fprintf(stdout,"version: %s\n",Version); 
 		fprintf(stdout,"\nBuilt: %s %s\n",__DATE__,__TIME__);
 		fprintf(stdout,"libUseful: Version %s BuildTime: %s\n",LibUsefulGetValue("LibUsefulVersion"), LibUsefulGetValue("LibUsefulBuildTime"));
-		if (SSLAvailable()) fprintf(stdout,"SSL Library: %s\n",LibUsefulGetValue("SSL-Library"));
+		if (SSLAvailable()) fprintf(stdout,"SSL Library: %s\n",LibUsefulGetValue("SSL:Library"));
 		else fprintf(stdout,"%s\n","SSL Library: None, not compiled with --enable-ssl");
 
 		exit(1);
@@ -757,6 +788,7 @@ Settings.AuthRealm=CopyStr(Settings.AuthRealm,UnameData.nodename);
 Settings.IndexFiles=CopyStr(Settings.IndexFiles,"index.html,dir.html");
 Settings.M3UFileTypes=CopyStr(Settings.M3UFileTypes,".mp3,.ogg,.mp4,.flv,.webm,.m4v,.m4a,.aac,.wma,.wmv");
 Settings.ForbiddenURLStrings=CopyStr(Settings.ForbiddenURLStrings,"..,%00,%2e%2e");
+Settings.HttpMethods=CopyStr(Settings.HttpMethods,"GET,POST,HEAD,OPTIONS,DELETE,MKCOL,MOVE,COPY,PUT,PROPFIND,PROPPATCH,");
 Settings.VPaths=ListCreate();
 Settings.HostConnections=ListCreate();
 Settings.ScriptHandlers=ListCreate();
@@ -775,13 +807,13 @@ Settings.Port=0;
 
 
 
-void ReadConfigFile(TSettings *Settings)
+void ReadConfigFile(const char *Path)
 {
 STREAM *S;
 char *Tempstr=NULL;
 
 
-S=STREAMFileOpen(Settings->ConfigPath,SF_RDONLY);
+S=STREAMOpen(Path, "r");
 if (S)
 {
 Tempstr=STREAMReadLine(Tempstr,S);
