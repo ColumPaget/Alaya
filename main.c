@@ -328,10 +328,11 @@ openlog("alaya",LOG_PID, LOG_DAEMON);
 
 Connections=ListCreate();
 
-
-ParseSettings(argc,argv,&Settings);
+//do this initially to pick up -c <config file> option
+SettingsParseCommandLine(argc,argv,&Settings);
 ReadConfigFile(Settings.ConfigPath);
-ParseSettings(argc,argv,&Settings);
+//do it again to override anything read from the config file
+SettingsParseCommandLine(argc,argv,&Settings);
 PostProcessSettings(&Settings);
 
 SetResourceLimits();

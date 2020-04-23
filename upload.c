@@ -1,6 +1,8 @@
 #include "upload.h"
 #include "server.h"
+#include "Events.h"
 
+#define UPLOAD_FAILED -1
 #define UPLOAD_DONE 1
 #define UPLOAD_UNPACK 2
 
@@ -60,8 +62,9 @@ STREAM *FOut=NULL;
 off_t fsize;
 
 FOut=STREAMFileOpen(FName,SF_CREAT | SF_TRUNC | SF_WRONLY);
-if (FOut)
-{
+if (! FOut) return(UPLOAD_FAILED);
+STREAMLock(FOut, LOCK_EX);
+
 	Tempstr=SetStrLen(Tempstr,4096);
 	result=STREAMReadBytesToTerm(S, Tempstr, 4096, '\n');
 	while (result > -1)
@@ -88,7 +91,6 @@ fsize=(off_t) STREAMTell(FOut);
 if (fsize > 0) ftruncate(FOut->out_fd,fsize-2);
 
 STREAMClose(FOut);
-}
 
 if (result==-1) RetVal=UPLOAD_DONE;
 
@@ -98,13 +100,13 @@ return(RetVal);
 }
 
 
-void UploadMultipartPost(STREAM *S, HTTPSession *Session)
+int UploadMultipartPost(STREAM *S, HTTPSession *Session)
 {
-char *Tempstr=NULL, *Name=NULL, *FileName=NULL, *QName=NULL, *QValue=NULL;
-char *Boundary;
-int blen=0;
+char *Tempstr=NULL, *Name=NULL, *FileName=NULL, *QName=NULL, *QValue=NULL, *Boundary=NULL;
+const char *ptr;
+int blen=0, UploadResult=FALSE;
 
-//if (! (Session->Flags & SESSION_UPLOAD)) return;
+//if (! (Session->Flags & SESSION_ALLOW_UPLOAD)) return;
 Boundary=MCopyStr(Boundary,"--",Session->ContentBoundary, NULL);
 blen=StrLen(Boundary);
 
@@ -122,13 +124,26 @@ while (Tempstr)
 		{
 			if (StrValid(FileName))
 			{
-			Tempstr=MCopyStr(Tempstr,Session->Path,"/",FileName,NULL);
-			if (MultipartReadFile(S,Tempstr,Boundary, blen)==UPLOAD_DONE) break;
+			//this dance is solely to prevent creating double or triple '/' in the path
+			Tempstr=CopyStr(Tempstr, "/");
+			ptr=Session->StartDir;
+			while (*ptr=='/') ptr++;	
+			Tempstr=CatStr(Tempstr, ptr);
+			Tempstr=SlashTerminateDirectoryPath(Tempstr);
+			ptr=Session->Path;
+			while (*ptr=='/') ptr++;	
+			Tempstr=CatStr(Tempstr, ptr);
+			Tempstr=SlashTerminateDirectoryPath(Tempstr);
+			Tempstr=CatStr(Tempstr, FileName);
+
+			UploadResult=MultipartReadFile(S, Tempstr, Boundary, blen);
+			Session->Path=CopyStr(Session->Path, Tempstr);
+			if ((UploadResult==UPLOAD_DONE) || (UploadResult==UPLOAD_FAILED)) break;
 			else 
 			{
 				//we must have found a content boundary in ReadMultipartHeaders,
 				//so don't read another line, deal with the content boundary
-				Tempstr=CopyStr(Tempstr,Boundary);
+				Tempstr=CopyStr(Tempstr, Boundary);
 				continue;
 			}
 			}
@@ -152,12 +167,23 @@ Session->Arguments=CatStr(Session->Arguments,"&");
 Session->ContentSize=StrLen(Session->Arguments);
 if (Session->ContentSize > 0) Session->ContentType=CopyStr(Session->ContentType,"application/x-www-form-urlencoded");
 
+
+
 Destroy(Boundary);
 Destroy(FileName);
 Destroy(Tempstr);
 Destroy(Name);
 Destroy(QName);
 Destroy(QValue);
+
+if (UploadResult==UPLOAD_DONE)
+{
+	Session->Flags |= SESSION_UPLOAD_DONE;
+	ProcessSessionEventTriggers(Session);
+	return(TRUE);
+}
+
+return(FALSE);
 }
 
 

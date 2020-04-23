@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-void UploadMultipartPost(STREAM *S, HTTPSession *Session);
+int UploadMultipartPost(STREAM *S, HTTPSession *Session);
 void UploadSelectPage(STREAM *S, HTTPSession *Session, const char *Path);
 
 #endif 

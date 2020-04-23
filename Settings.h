@@ -89,7 +89,7 @@ void PostProcessSettings(TSettings *Settings);
 void ReadConfigFile(const char *Path);
 void ParseConfigItem(const char *ConfigLine);
 void ParseConfigItemList(const char *Settings);
-void ParseSettings(int argc, char *argv[], TSettings *Settings);
+void SettingsParseCommandLine(int argc, char *argv[], TSettings *Settings);
 
 #endif
 

@@ -151,9 +151,6 @@ int i, val, fcount=0;
 Tempstr=MCopyStr(Tempstr,Path,"/*",NULL);
 glob(Tempstr,0,0,&Glob);
 
-
-Dir=CopyStr(Dir,Session->URL);
-Dir=SlashTerminateDirectoryPath(Dir);
 //Allocate As Many Items As glob found, plus VPaths, plus one for '..'
 
 val=Glob.gl_pathc+1;
@@ -165,8 +162,7 @@ Files=*fl_ptr;
 //if we are at '/' then don't offer a parent directory
 if (StrLen(Path) > 1)
 {
-Tempstr=ParentDirectory(Tempstr, Session->URL);
-URL=FormatURL(URL, Session, Tempstr);
+URL=ParentDirectory(URL, Session->Path);
 Files[0]=PathItemCreate(PATHTYPE_DIR, URL, "..");
 fcount++;
 }
@@ -191,12 +187,15 @@ if (Settings.DirListFlags & DIR_SHOW_VPATHS)
 	}
 }
 
+
+Dir=CopyStr(Dir,Session->Path);
+Dir=SlashTerminateDirectoryPath(Dir);
+
 for (i=0; i < Glob.gl_pathc; i++)
 {
   if (stat(Glob.gl_pathv[i], &Stat) > -1)
 	{
-  Tempstr=MCopyStr(Tempstr,Dir,GetBasename(Glob.gl_pathv[i]),NULL);
-	URL=FormatURL(URL, Session, Tempstr);
+  URL=MCopyStr(URL, Dir,GetBasename(Glob.gl_pathv[i]),NULL);
   if (S_ISDIR(Stat.st_mode)) File=PathItemCreate(PATHTYPE_DIR, URL, Glob.gl_pathv[i]);
   else File=PathItemCreate(PATHTYPE_FILE, URL, Glob.gl_pathv[i]);
   File->Mtime=Stat.st_mtime;
@@ -500,10 +499,9 @@ char *HTML=NULL;
 		HTML=CatStr(HTML, "</td><td>\n");
 
 
-		HTML=CatStr(HTML, "<table>\n");
 		if (Flags & DIR_INTERACTIVE) 
 		{
-
+			HTML=CatStr(HTML, "<table>\n");
 			HTML=CatStr(HTML, "<tr>\n");
 			HTML=DisplayDirUpload(HTML, Session);
 			HTML=CatStr(HTML, "</tr><tr>\n");
@@ -513,14 +511,18 @@ char *HTML=NULL;
 			HTML=CatStr(HTML, "</tr><tr>\n");
 			HTML=DisplayPackAction(HTML, Session);
 			}
+			HTML=CatStr(HTML, "</tr></table>\n");
+
+			//from here on out everything is in the same form
+			HTML=CatStr(HTML, "<form>\n");
+			HTML=DisplaySelectedItemsActions(HTML, Session, Flags);
+
+			HTML=CatStr(HTML,"</td></tr></table>\n");
 		}
-		HTML=CatStr(HTML, "</tr></table>\n");
-
-		//from here on out everything is in the same form
-		HTML=CatStr(HTML, "<form>\n");
-		HTML=DisplaySelectedItemsActions(HTML, Session, Flags);
-
+		else
+		{
 		HTML=CatStr(HTML,"</td></tr></table>\n");
+		}
 	}
 	HTML=MCatStr(HTML,DirItemsHtml,"<br />&nbsp;<br />",NULL);
 	if (Flags & DIR_INTERACTIVE) HTML=CatStr(HTML,"</form>\r\n");
@@ -916,9 +918,8 @@ void DirectorySendToParentDir(STREAM *S, HTTPSession *Session)
 {
 	char *Path=NULL, *Tempstr=NULL;
 
-			Path=ParentDirectory(Path, Session->URL);
-			Tempstr=FormatURL(Tempstr, Session, Path);
-      HTTPServerSendResponse(S, Session, "302", "", Tempstr);
+			Path=ParentDirectory(Path, Session->Path);
+      HTTPServerSendResponse(S, Session, "302", "", Path);
 
 		Destroy(Tempstr);
 		Destroy(Path);
@@ -1024,7 +1025,7 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 				Tempstr=CatStr(Tempstr,Token);	
 				LogToFile(Settings.LogPath,"MKDIR: [%s] [%s] [%s]\n",Path,Token,Tempstr);
 				mkdir(Tempstr, 0770); 
-      	HTTPServerSendResponse(S, Session, "302", "", Session->URL);
+      	HTTPServerSendResponse(S, Session, "302", "", Session->Path);
 			break;
 
 			case ACTION_DELETE:
@@ -1034,7 +1035,7 @@ if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->L
 
 			case ACTION_DELETE_SELECTED:
 				DirectoryDeleteSelected(S, Session, Path);
-      	HTTPServerSendResponse(S, Session, "302", "", Session->URL);
+      	HTTPServerSendResponse(S, Session, "302", "", Session->Path);
 			break;
 
 			case ACTION_RENAME:

@@ -156,7 +156,7 @@ const char *ptr;
 	//if we got as far as calling this function, then the original session must be
 	//authenticated.
 	Response->Flags |= SESSION_AUTHENTICATED;
-	Response->Flags &= ~SESSION_UPLOAD;
+	Response->Flags &= ~SESSION_ALLOW_UPLOAD;
 
 	ptr=GetNameValuePair(Data," ","=",&Name,&Tempstr);
 	while (ptr)
@@ -188,7 +188,7 @@ const char *ptr;
 		else if (strcmp(Name,"Cipher")==0) Response->Cipher=CopyStr(Response->Cipher,Value);
 		else if (strcmp(Name,"Cookies")==0) Response->Cookies=CopyStr(Response->Cookies,Value);
 		else if (strcmp(Name,"KeepAlive")==0) Response->Flags |= SESSION_KEEPALIVE;
-		else if (strcmp(Name,"Upload")==0) Response->Flags |= SESSION_UPLOAD;
+		else if (strcmp(Name,"Upload")==0) Response->Flags |= SESSION_ALLOW_UPLOAD;
 		else if (strcmp(Name,"AuthCookie")==0) Response->AuthFlags |= FLAG_AUTH_HASCOOKIE;
 		else if (strcmp(Name,"Cache")==0) Response->CacheTime=atoi(Value);
 		else if (strcmp(Name,"Admin")==0) Response->UserSettings=MCatStr(Response->UserSettings, Name, "='",Value,"' ",NULL);
@@ -878,7 +878,7 @@ Quoted=QuoteCharsInStr(Quoted,Session->ClientReferrer,"'&");
 Tempstr=MCatStr(Tempstr, " ClientReferrer='",Quoted,"'",NULL);
 
 if (Session->Flags & SESSION_KEEPALIVE) Tempstr=CatStr(Tempstr," KeepAlive=Y");
-if (Session->Flags & SESSION_UPLOAD) Tempstr=CatStr(Tempstr," Upload=Y");
+if (Session->Flags & SESSION_ALLOW_UPLOAD) Tempstr=CatStr(Tempstr," Upload=Y");
 if (Session->AuthFlags & FLAG_AUTH_HASCOOKIE) Tempstr=CatStr(Tempstr," AuthCookie=Y");
 if (Session->CacheTime > 0)
 {

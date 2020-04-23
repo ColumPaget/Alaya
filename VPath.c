@@ -256,12 +256,12 @@ int result=FALSE;
 		if (PI->CacheTime) VPathSession->CacheTime=PI->CacheTime;
 		if (StrValid(PI->User)) VPathSession->RealUser=CopyStr(VPathSession->RealUser, PI->User);
 		if (StrValid(PI->Group)) VPathSession->Group=CopyStr(VPathSession->Group, PI->Group);
-		VPathSession->Flags &= ~SESSION_UPLOAD;
-		if (! (PI->Flags & PATHITEM_READONLY)) VPathSession->Flags |= SESSION_UPLOAD;
+		VPathSession->Flags &= ~SESSION_ALLOW_UPLOAD;
+		if (! (PI->Flags & PATHITEM_READONLY)) VPathSession->Flags |= SESSION_ALLOW_UPLOAD;
 	
 
 //		if (Flags & HEADERS_POST) HTTPServerHandlePost(S,Session,PI->Type);
-		LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s] %d",PI->Type,Session->Path,PI->Path,VPathSession->Flags & SESSION_UPLOAD);
+		LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s] %d",PI->Type,Session->Path,PI->Path,VPathSession->Flags & SESSION_ALLOW_UPLOAD);
 		switch (PI->Type)
 		{
 			case PATHTYPE_CGI:

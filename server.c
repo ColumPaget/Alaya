@@ -361,7 +361,7 @@ while (StrValid(Tempstr) )
 	break;
 
 	case HEAD_CONNECTION:
-		if ((Settings.Flags & FLAG_KEEPALIVES) && (strcasecmp(ptr,"Keep-Alive")==0)) Session->Flags |= SESSION_KEEPALIVE;
+		//if ((Settings.Flags & FLAG_KEEPALIVES) && (strcasecmp(ptr,"Keep-Alive")==0)) Session->Flags |= SESSION_KEEPALIVE;
 	break;
 
 	case HEAD_AGENT:
@@ -848,7 +848,10 @@ int bytes_read=0, result;
 
 	LogToFile(Settings.LogPath,"HANDLE POST: %s", Session->ContentType);
 	if (strcmp(Session->ContentType,"application/x-www-form-urlencoded")==0) HTTPServerReadBody(Session, &Session->Arguments);
-	else if (strncmp(Session->ContentType,"multipart/",10)==0) UploadMultipartPost(S, Session);
+	else if (strncmp(Session->ContentType,"multipart/",10)==0) 
+	{
+		UploadMultipartPost(S, Session);
+	}
 	HTTPServerSendResponse(S, Session, "302", "", Session->URL);
 
 Destroy(Tempstr);

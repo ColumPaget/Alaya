@@ -89,6 +89,16 @@ while (ptr)
 			case EVENT_HEADER:
 			if (EventHeadersMatch(Token,Session,MatchStr)) result=TRUE;
 			break;
+
+			case EVENT_UPLOAD:
+			if ( (Session->Flags & SESSION_UPLOAD_DONE) && (fnmatch(Token,Session->Path,0)==0) )
+			{
+			*MatchStr=MCatStr(*MatchStr, "Dest: ",Session->Path,", ",NULL);
+			result=TRUE;
+			}
+			break;
+
+
 	}
 	ptr=GetToken(ptr,",",&Token,0);
 }
@@ -101,7 +111,7 @@ return(result);
 
 
 
-void ProcessEventScript(HTTPSession *Session, char *URL, char *TriggerScript, char *ExtraInfo, ListNode *Vars)
+void ProcessEventScript(HTTPSession *Session, const char *URL, const char *TriggerScript, const char *ExtraInfo, ListNode *Vars)
 {
 	char *Tempstr=NULL, *Command=NULL, *ptr;
 	int result;
@@ -110,7 +120,7 @@ void ProcessEventScript(HTTPSession *Session, char *URL, char *TriggerScript, ch
 
 		if (ParentProcessPipe)
 		{
-			Tempstr=MCopyStr(Tempstr, "EVENT ",TriggerScript,"\n",NULL);
+			Tempstr=MCopyStr(Tempstr, "EVENT ", TriggerScript,"\n",NULL);
 			STREAMWriteLine(Tempstr,ParentProcessPipe);
 			STREAMFlush(ParentProcessPipe);
 			Tempstr=STREAMReadLine(Tempstr,ParentProcessPipe);
@@ -138,13 +148,13 @@ void ProcessEventScript(HTTPSession *Session, char *URL, char *TriggerScript, ch
 
 
 
-void ProcessEventTrigger(HTTPSession *Session, char *URL, char *Trigger, char *ExtraInfo, ListNode *Vars)
+void ProcessEventTrigger(HTTPSession *Session, const char *URL, const char *Trigger, const char *ExtraInfo, ListNode *Vars)
 {
 char *Type=NULL, *Token=NULL, *Tempstr=NULL, *LogStr=NULL;
 const char *ptr;
 
 	LogToFile(Settings.LogPath,"TRIGGER: %s\n",Trigger);
-		Tempstr=SubstituteVarsInString(Tempstr,Trigger,Vars,0);
+		Tempstr=SubstituteVarsInString(Tempstr, Trigger, Vars, 0);
 		StripTrailingWhitespace(Tempstr);
 		ptr=GetToken(Tempstr,"\\S",&Type,GETTOKEN_QUOTES);
 
@@ -193,6 +203,7 @@ ListNode *Vars;
 
 Vars=ListCreate();
 SetVar(Vars,"URL",Session->URL);
+SetVar(Vars,"Path",Session->Path);
 SetVar(Vars,"Method",Session->Method);
 SetVar(Vars,"UserName",Session->UserName);
 SetVar(Vars,"ClientIP",Session->ClientIP);
@@ -206,9 +217,12 @@ while (Curr)
 	if (EventTriggerMatch(Curr, Session, &MatchStr))
 	{
 		SetVar(Vars,"Match",MatchStr);
+
+		//get actions for event. There are a comma-separated list. process each one thorugh ProcessEventTrigger
 		ptr=GetToken((char *) Curr->Item,",",&Token,GETTOKEN_QUOTES);
 		while (ptr)
 		{
+			//if we hit an ignore, don't continue
 	    if (strcasecmp(Token,"ignore")==0)
 			{
 				Curr=NULL;

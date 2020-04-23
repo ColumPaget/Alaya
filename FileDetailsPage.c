@@ -91,15 +91,12 @@ HTML=MCopyStr(HTML,"<html>\r\n<head><title>Editing ",Session->URL,"</title></hea
 
 HTML=CatStr(HTML,"<table align=center width=90%% border=0>");
 	
-URL=FormatURL(URL, Session, Session->URL);
-
 Vars=ListCreate();	
 FType=LoadFileProperties(Path, Vars);
 
 
 //Parent Directory Link
-Tempstr=CopyStr(Tempstr,URL);
-StrRTruncChar(Tempstr, '?');
+Tempstr=CopyStr(Tempstr, Session->Path);
 StrRTruncChar(Tempstr, '/');
 			
 HTML=MCatStr(HTML,"<tr><td colspan=3><a href=\"",Tempstr,"\">.. (Parent Directory)</a></td><td> &nbsp; </td></tr>",NULL);
@@ -107,10 +104,9 @@ HTML=MCatStr(HTML,"<tr><td colspan=3><a href=\"",Tempstr,"\">.. (Parent Director
 
 HTML=MCatStr(HTML,"<tr bgcolor=#CCCCFF><td>Path</td><td colspan=2>",Session->URL,"</td></tr>",NULL);
 
-HTML=MCatStr(HTML,"<tr bgcolor=#FFCCCC><td>Actions</td><td colspan=2><input type=submit name='get:",URL,"' value=Get /> <input type=submit name='del:",URL,"' value=Del /> <input type=text name=renameto /><input type=submit name='renm:",URL,"' value=Rename /><input type=submit name='genaccess:",URL,"' value='Access Token'></td></tr>",NULL);
+HTML=MCatStr(HTML,"<tr bgcolor=#FFCCCC><td>Actions</td><td colspan=2><input type=submit name='get:",Session->Path,"' value=Get /> <input type=submit name='del:",Session->Path,"' value=Del /> <input type=text name=renameto /><input type=submit name='renm:",Session->Path,"' value=Rename /><input type=submit name='genaccess:",Session->Path,"' value='Access Token'></td></tr>",NULL);
 	
-
-URL=FormatURL(URL,Session,Session->URL);
+URL=FormatURL(URL,Session, Session->URL);
 HTML=FormatFileProperties(HTML, Session, FType, URL, Path, Vars, Flags);
 
 	//We must use the URL that this file was asked under, not its directory path. The directory path may not be

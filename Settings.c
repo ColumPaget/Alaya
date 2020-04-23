@@ -82,7 +82,7 @@ Destroy(Token);
 
 static void ParseEventConfig(const char *ConfigLine)
 {
-const char *EventTypeStrings[]={"Method","Path","User","ClientIP","BadURL","Header","ResponseCode",NULL};
+const char *EventTypeStrings[]={"Method","Path","User","ClientIP","BadURL","Header","ResponseCode","Upload",NULL};
 char *Token=NULL;
 const char *ptr;
 ListNode *Node;
@@ -578,7 +578,7 @@ fprintf(stdout," List Users : alaya -user list\n\n");
 
 
 
-void ParseSettings(int argc, char *argv[], TSettings *Settings)
+void SettingsParseCommandLine(int argc, char *argv[], TSettings *Settings)
 {
 int i;
 char *Token=NULL;
@@ -617,6 +617,7 @@ for (i=1; i < argc; i++)
 	else if (strcmp(argv[i],"-t")==0) Settings->ActivityTimeout=atoi(argv[++i]);
 	else if (strcmp(argv[i],"-p")==0) Settings->Port=atoi(argv[++i]);
 	else if (strcmp(argv[i],"-O")==0) Settings->AuthFlags &= ~FLAG_AUTH_REQUIRED;
+	else if (strcmp(argv[i],"-U")==0) Settings->DirListFlags |= DIR_SHOWFILES | DIR_FANCY | DIR_INTERACTIVE | DIR_MEDIA_EXT | DIR_SHOW_VPATHS | DIR_TARBALLS;
 	else if (strcmp(argv[i],"-compress")==0) 
 	{
 		Token=MCopyStr(Token,"Compression=",argv[++i],NULL);

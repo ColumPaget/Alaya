@@ -668,7 +668,7 @@ int STREAMLock(STREAM *S, int val)
 {
     int result;
 
-    result=flock(S->in_fd,val);
+    result=flock(S->in_fd, val);
 
     if (result==0) return(TRUE);
     return(FALSE);

@@ -824,7 +824,7 @@ Some example config-file entries for events:
 The 'Event' entry in the config file has the format
 
 ```
-Event=<type>:<matches>:<action>
+Event=<type>:<matches>:<action> <args>
 ```
 
 where <type> is one of:
@@ -837,6 +837,7 @@ where <type> is one of:
 	Header      Match a particular header supplied by the client
 	Response    Match a response code
 	BadURL			Match any URL that breaks alaya's inbuilt 'valid url' rules
+	Upload			Match a URL has just been uploaded
 ```
 
 and <matches> is a comma-separated list of things that the rule matches. Shell/fnmatch wildcards are allowed in these lists.
@@ -849,24 +850,45 @@ and <matches> is a comma-separated list of things that the rule matches. Shell/f
 	deny:      refuse access to the requested url
 ```
 
-any other entry is treated as a script to run. The script will be passed 3 arguments, client IP, URL and a 'comment' that describes the data that the match happened against. However, other arguments can be inserted before these by specifiying a script with initial arguments. So, for instance:
+any other entry is treated as a script to run. 
+
+Log, syslog and any script actions be passed any arguments that are supplied after the 'action' section of the script. These arguments can contain variables in the form '$(name)'. Supported variable are:
 
 ```
-	Event=Header:*() {*:deny,/usr/local/sbin/BlockHTTPHacker.sh ShellShock
+$(URL)          URL of the request
+$(Path)         The path of the URL. For 'Upload' events this will be the path on disk (from chroot directory if chroot used).
+$(Method)       HTTP Method of the request (GET, POST, HEAD, etc, etc)
+$(UserName)     UserName of remote user
+$(ClientIP)     IP Address of remote host
+$(UserAgent)    User-agent string for remote browser
+$(Match)        This is a 'comment' string that describes the event.
 ```
 
-Will run the script '/usr/local/sbin/BlockHTTPHacker.sh' with argument 1 being 'ShellShock', argument 2 being the client IP, argument 3 being the URL asked for, and argument 4 being details of what was matched (in these case the particular client header that had the shellshock code).
+Please note that these variables are not handled by the shell, alaya subsitutes them before running a script, so in order to coerce a variable that may contain spaces to be a single argument, you can just put single or double quotes around it.
+
+example:
+
+```
+	Event=Header:*() {*:deny,/usr/local/sbin/BlockHTTPHacker.sh ShellShock '$(UserName)@$(ClientIP)' '$(URL)'
+```
+
+This would trigger if any header contains `() {`, which is a string used in shellshock attacks. The request will be denied, and the script `/usr/local/sbin/BlockHTTPHacker.sh` will be run. The script will be passed a static argument 'ShellShock' and two dynamically generated arguments, one specifying the UserName and ClientIP that the request came from, and the other specifying the URL that the request was sent to.
+
+Upload events trigger at the end of a file upload. For these events the main variable you'll want to use is '$(Path)'. This variable gives the path to the uploaded file, relative to the chroot directory if ChRoot or ChHome is in use for the session.
 
 examples:
 
 ```
-Event=Path:*/setup.php,*/xmlrpc.php,/vtigercrm/,/cgi-bin/php*,/sql*,/manager/html,/mysql*,/HNAP1/:/usr/local/sbin/BlockHTTPHacker.sh
-Event=Method:PUT:/usr/local/sbin/AlayaFilePut.sh
+Event=Path:*/myScript.php:ignore
+Event=Path:*/setup.php,*/xmlrpc.php,/vtigercrm/,/cgi-bin/php*,/sql*,/manager/html,/mysql*,/HNAP1/:/usr/local/sbin/BlockHTTPHacker.sh InvalidScript '$(UserName)@$(ClientIP)' '$(URL)'
+Event=Method:PUT:/usr/local/sbin/AlayaFilePut.sh '$(URL)'
 Event=User:fred:syslog,/usr/local/sbin/Flintstone.sh
 Event=Peer:192.168.*.*:syslog
 Event=BadURL::deny,syslog
-Event=Header:*() {*:deny,/usr/local/sbin/BlockHTTPHacker.sh ShellShock
+Event=Header:*() {*:deny,/usr/local/sbin/BlockHTTPHacker.sh ShellShock '$(UserName)@$(ClientIP)'
 Event=Path:/favicon.ico:ignore
 Event=ResponseCode:404:/usr/local/sbin/HTTPError.sh "nonexistent path"
+Event=Upload:*:/usr/local/sbin/ProcessUpload.sh '$(Path)'
 ```
+
 

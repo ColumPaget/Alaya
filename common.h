@@ -20,7 +20,8 @@
 #define SESSION_SSL 128
 #define SESSION_ICECAST 256
 #define SESSION_ERR_BADURL 4096
-#define SESSION_UPLOAD 8192
+#define SESSION_ALLOW_UPLOAD 8192
+#define SESSION_UPLOAD_DONE 16384
 
 
 
@@ -156,7 +157,6 @@ char *FormatURL(char *Buff, HTTPSession *Session, const char *ItemPath);
 char *ParentDirectory(char *RetBuff, const char *Path);
 char *SessionGetArgument(char *RetBuff, HTTPSession *Session, const char *ReqName);
 int CopyURL(HTTPSession *Session, char *From, char *To);
-int ProcessEventTriggers(HTTPSession *Session);
 char *FindScriptHandlerForScript(char *RetStr, const char *ScriptPath);
 
 void DropCapabilities(int Level);

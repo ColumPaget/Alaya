@@ -6,7 +6,7 @@
 #include "Authenticate.h"
 
 TSettings Settings;
-char *Version="3.0";
+char *Version="3.1";
 
 void SetTimezoneEnv()
 {
@@ -51,7 +51,7 @@ Session->StartDir=CopyStr(Session->StartDir,"");
 Session->Depth=1;
 Session->CacheTime=Settings.DocumentCacheTime;
 Session->Headers=ListCreate();
-Session->Flags |= SESSION_UPLOAD;
+Session->Flags |= SESSION_ALLOW_UPLOAD;
 
 return(Session);
 }
@@ -134,7 +134,7 @@ Session->Depth=Src->Depth;
 Session->CacheTime=Src->CacheTime;
 
 //only copy certain flags!
-Session->Flags=Src->Flags & (SESSION_KEEPALIVE | SESSION_REUSE | SESSION_AUTHENTICATED | SESSION_SSL | SESSION_ICECAST | SESSION_UPLOAD) ;
+Session->Flags=Src->Flags & (SESSION_KEEPALIVE | SESSION_REUSE | SESSION_AUTHENTICATED | SESSION_SSL | SESSION_ICECAST | SESSION_ALLOW_UPLOAD) ;
 Session->AuthFlags=Src->AuthFlags;
 Session->Headers=ListCreate();
 
@@ -189,7 +189,7 @@ if (! p_Trans) return;
 Trans=(HTTPSession *) p_Trans;
 
 //Clear everything but SESSION_REUSE, SESSION_AUTHENTICATED and HTTP_SSL, which are persistent
-Trans->Flags &= (SESSION_REUSE | SESSION_AUTHENTICATED | SESSION_UPLOAD | HTTP_SSL);
+Trans->Flags &= (SESSION_REUSE | SESSION_AUTHENTICATED | SESSION_ALLOW_UPLOAD | HTTP_SSL);
 
 Trans->Method=CopyStr(Trans->Method,"");
 Trans->ResponseCode=CopyStr(Trans->ResponseCode,"");
