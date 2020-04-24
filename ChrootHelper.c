@@ -163,7 +163,6 @@ const char *ptr;
 	{
 		Value=UnQuoteStr(Value,Tempstr);
 
-
 		if (strcmp(Name,"User")==0) Response->UserName=CopyStr(Response->UserName,Value);
 		else if (strcmp(Name,"Password")==0) Response->Password=CopyStr(Response->Password,Value);
 		else if (strcmp(Name,"RealUser")==0) Response->RealUser=CopyStr(Response->RealUser,Value);

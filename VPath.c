@@ -168,6 +168,8 @@ int result=FALSE, Flags=0;
 //Document name here is whatever part of the Path is *beyond* the VPath component
 DocName=VPathSubstituteArgs(DocName, Session->Path + StrLen(VPath->URL), Session);
 
+//search through all paths that the vpath applies to to see if the document exists in any of them
+//this allows us to have a vpath map to more than one directory
 ptr=GetToken(VPath->Path,":",&Tempstr,0);
 while (ptr)
 {
@@ -180,9 +182,11 @@ while (ptr)
 	ptr=GetToken(ptr,":",&Tempstr,0);
 }
 
+
 Tempstr=CopyStr(Tempstr,"");
 if (StrValid(LocalPath)) Tempstr=FindFileInPath(Tempstr,DocName,LocalPath);
 
+//if we found a file matching the request, handle it
 if (StrValid(Tempstr)) 
 {
 	Flags = HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE;

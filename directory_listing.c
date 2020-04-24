@@ -30,6 +30,34 @@ typedef enum {ACTION_HTML,ACTION_CSV,ACTION_M3U,ACTION_RSS,ACTION_PACK,ACTION_UP
 
 time_t Now;
 
+
+static char *DirectoryGetTopLevel(char *RetStr, const char *URL)
+{
+const char *ptr;
+
+ptr=URL;
+//if URL lacks a protocol, then we can just use it as is
+if (*ptr != '/') 
+{
+	//if we have a full url , we have to turn it into a relative url, so we remove the
+	//protocol and the host/port etc
+	if (strncasecmp(ptr, "http:", 5)==0) ptr+=5;
+	if (strncasecmp(ptr, "https:", 6)==0) ptr+=6;
+	while (*ptr=='/') ptr++;
+
+	ptr=strchr(ptr, '/');
+}
+
+//yes, ptr can be null, because the url lacks any '/' path, like 'http://myhost'. In that case this copy string
+//will create an empty string, and then SlashTerminateDirectoryPath will turn that into '/'
+RetStr=CopyStr(RetStr, ptr);
+StrRTruncChar(RetStr, '?');
+RetStr=SlashTerminateDirectoryPath(RetStr);
+
+return(RetStr);
+}
+
+
 static int InFileTypeList(char *FilePath, char *FileTypes)
 {
 char *Token=NULL;
@@ -148,6 +176,8 @@ TPathItem *File, **Files;
 ListNode *Curr;
 int i, val, fcount=0;
 
+
+Dir=DirectoryGetTopLevel(Dir, Session->URL);
 Tempstr=MCopyStr(Tempstr,Path,"/*",NULL);
 glob(Tempstr,0,0,&Glob);
 
@@ -162,9 +192,9 @@ Files=*fl_ptr;
 //if we are at '/' then don't offer a parent directory
 if (StrLen(Path) > 1)
 {
-URL=ParentDirectory(URL, Session->Path);
-Files[0]=PathItemCreate(PATHTYPE_DIR, URL, "..");
-fcount++;
+	URL=ParentDirectory(URL, Dir);
+	Files[0]=PathItemCreate(PATHTYPE_DIR, URL, "..");
+	fcount++;
 }
 
 
@@ -188,14 +218,11 @@ if (Settings.DirListFlags & DIR_SHOW_VPATHS)
 }
 
 
-Dir=CopyStr(Dir,Session->Path);
-Dir=SlashTerminateDirectoryPath(Dir);
-
 for (i=0; i < Glob.gl_pathc; i++)
 {
   if (stat(Glob.gl_pathv[i], &Stat) > -1)
 	{
-  URL=MCopyStr(URL, Dir,GetBasename(Glob.gl_pathv[i]),NULL);
+  URL=MCopyStr(URL, Dir, GetBasename(Glob.gl_pathv[i]),NULL);
   if (S_ISDIR(Stat.st_mode)) File=PathItemCreate(PATHTYPE_DIR, URL, Glob.gl_pathv[i]);
   else File=PathItemCreate(PATHTYPE_FILE, URL, Glob.gl_pathv[i]);
   File->Mtime=Stat.st_mtime;

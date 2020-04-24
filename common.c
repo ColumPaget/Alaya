@@ -6,7 +6,7 @@
 #include "Authenticate.h"
 
 TSettings Settings;
-char *Version="3.1";
+char *Version="3.2";
 
 void SetTimezoneEnv()
 {

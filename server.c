@@ -810,6 +810,7 @@ TPathItem *PI=NULL;
 	{
 
 	//filetype VPATHS can override some settings
+	//note, this vpath check is ONLY for settings. We are not mapping a VPath here, that's already beendone
   PI=VPathFind(PATHTYPE_FILETYPE, Session->Path);
   if (PI)
   {
@@ -818,8 +819,6 @@ TPathItem *PI=NULL;
      if (PI->CacheTime > 0) Session->CacheTime=PI->CacheTime;
      if (StrValid(PI->ContentType)) SetVar(Vars, "ContentType", PI->ContentType);
   }
-
-
 		//Set 'LastModified' so we can use it if the server sends 'If-Modified-Since'
 	  Session->LastModified=atoi(GetVar(Vars,"MTime-secs"));
 
@@ -1585,6 +1584,7 @@ char *Path=NULL;
 const char *ptr;
 ListNode *Curr;
 
+//THIS IS WHERE WE MAP VPATHS!! If a document is a VPATH, it's handled in VPathProcess
 	if (! VPathProcess(S, Session, Flags))
   {
     ptr=Session->StartDir;
