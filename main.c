@@ -32,6 +32,11 @@ ListNode *MimeTypes=NULL;
 ListNode *Connections=NULL;
 STREAM *ParentProcessPipe=NULL;
 
+
+//used in order to overwrite argc and argv to display connection info in 'ps' listings
+int alaya_argc=0;
+char *alaya_argv[];
+
 void SigHandler(int sig)
 {
 if (sig==SIGHUP) Settings.Flags |= FLAG_SIGHUP_RECV;
@@ -52,6 +57,7 @@ signal(SIGCHLD, SigHandler);
 int ChildFunc(void *Data, int Flags)
 {
 HTTPSession *Session;
+int i;
 
 		//go back to the default behavior for SIGPIPE. If a child process gets disconnected
 		//from anything we don't want to keep sending to it.
@@ -63,7 +69,16 @@ HTTPSession *Session;
 		Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 		STREAMSetFlushType(Session->S,FLUSH_FULL,0,4096);
 		STREAMSetTimeout(Session->S,Settings.ActivityTimeout);
+		/*
+		for (i=2; i < 1024; i++) 
+		{
+			if (i != Session->S->in_fd) close(i);
+		}
+		*/
 
+		ListDestroy(Connections, STREAMClose);
+
+		ProcessSetTitle("alaya peer=%s", STREAMGetValue(Session->S, "PeerIP"));
 		HTTPServerHandleConnection(Session);
 
 		STREAMClose(Session->S);
@@ -307,6 +322,7 @@ char *Tempstr=NULL;
 int result, i;
 pid_t pid;
 
+ProcessTitleCaptureBuffer(argv);
 
 SetTimezoneEnv();
 

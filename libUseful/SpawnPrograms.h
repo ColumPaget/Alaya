@@ -65,6 +65,10 @@ fsize=value      resource limit for filesize
 files=value      resource limit for open files
 coredumps=value  resource limit for max size of coredump files
 procs=value      resource limit for max number of processes ON A PER USER BASIS.
+
++stderr          combine spawned programs stderr and stdout on the pipe/STREAM used to talk to it
+stderr2null      send spawned programs stderr to /dev/null
+stdout2null      send spawned programs stdout to /dev/null
 */
 
 #ifdef __cplusplus

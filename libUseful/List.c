@@ -471,18 +471,31 @@ ListNode *ListFindTypedItem(ListNode *Root, int Type, const char *Name)
 
 		if (Head)
 		{
-    if (Head->Flags & LIST_FLAG_CASE) result=strcmp(Node->Tag,Name);
-    else result=strcasecmp(Node->Tag,Name);
+	    if (Head->Flags & LIST_FLAG_CASE) result=strcmp(Node->Tag,Name);
+	    else result=strcasecmp(Node->Tag,Name);
+	
+			while (Node)
+			{
+		    if (
+	 	       (result==0) &&
+	 	       ( (Type==ANYTYPE) || (Type==Node->ItemType) )
+	 	   )
+	 	   {
+	 	       if (Head->Flags & LIST_FLAG_CACHE) Head->Side=Node;
+	 	       if (Node->Stats) Node->Stats->Hits++;
+	 	       return(Node);
+	 	   }
 
-    if (
-        (result==0) &&
-        ( (Type==ANYTYPE) || (Type==Node->ItemType) )
-    )
-    {
-        if (Head->Flags & LIST_FLAG_CACHE) Head->Side=Node;
-        if (Node->Stats) Node->Stats->Hits++;
-        return(Node);
-    }
+			//if this is set then there's at most one instance of an item with a given name
+			if (Head->Flags & LIST_FLAG_UNIQ) break;
+
+			//if it's an ordered list and the strcmp didn't match, then give up as there will be no more matching items
+			//past this point
+			if ((Head->Flags & LIST_FLAG_ORDERED) && (result !=0)) break;
+
+
+			Node=ListGetNext(Node);
+			}
 		}
     return(NULL);
 }
@@ -511,7 +524,7 @@ ListNode *InsertItemIntoSortedList(ListNode *List, void *Item, int (*LessThanFun
 }
 
 //list get next is just a macro that either calls this for maps, or returns Node->next
-ListNode *MapGetNext(ListNode *CurrItem)
+ListNode *MapChainGetNext(ListNode *CurrItem)
 {
     ListNode *SubNode, *Head;
 
@@ -544,6 +557,18 @@ ListNode *MapGetNext(ListNode *CurrItem)
         if (CurrItem->Next) return(CurrItem->Next);
     }
 
+    return(NULL);
+}
+
+
+ListNode *MapGetNext(ListNode *CurrItem)
+{
+    ListNode *SubNode, *Head;
+
+    if (! CurrItem) return(NULL);
+		SubNode=MapChainGetNext(CurrItem);
+		if (SubNode) return(SubNode);
+
 //'Head' here points to a BUCKET HEADER. These are marked with this flag, except the last one
 //so we know when we've reached the end
     Head=ListGetHead(CurrItem);
@@ -556,6 +581,7 @@ ListNode *MapGetNext(ListNode *CurrItem)
     return(NULL);
 }
 
+ 
 
 ListNode *ListGetPrev(ListNode *CurrItem)
 {

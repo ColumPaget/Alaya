@@ -19,6 +19,7 @@ S=STREAMOpen("/tmp/myfile.txt", "w");
 The first argument can be any of the following types:
 
 /tmp/myfile.txt                          file
+file:///tmp/myfile.txt                   file, web-browser style. Note 3 '/' symbols. 
 mmap:/tmp/myfile.txt                     memory mapped file
 tty:/dev/ttyS0:38400                     open a serial device, in this case at 38400 baud
 udp:192.168.2.1:53                       udp network connection
@@ -31,6 +32,27 @@ http:user:password@www.google.com        http network connection
 https:www.google.com                     https network connection
 cmd:cat /etc/hosts                       run command 'cat /etc/hosts' and read/write to/from it
 ssh:192.168.2.1:1022/cat /etc/hosts      ssh connect, running the command 'cat /etc/hosts'
+stdin:                                   standard in
+stdout:                                  standard out
+stdio:                                   both standard in and standard out
+
+'file://' is provided for compatiblity with web-browser environments. In this url format the protocol part is 'file://'. If a third '/' is present, like so 'file:///etc/services' then the url is a full path from the filesystem root. Any lesser number of '/' indicates a relative path from the current directory
+
+in the case of SSH stream the default action, if no 'config' flags are passed, is to run a command. 'x' config flag will also explictly run a command. 'r' will cat a file from the remote server. 'w' will cat from the stream TO a file on the remote server. 
+
+S=STREAMOpen("ssh:192.168.2.1/myfile.txt", "r");  //read from 'myfile.txt' in current directory
+
+S=STREAMOpen("ssh:192.168.2.1//tmp/myfile.txt", "r");  //read from 'myfile.txt' in /tmp (note double '/' for '/tmp')
+
+S=STREAMOpen("ssh:192.168.2.1/myfile.txt", "w");  //WRITE to 'myfile.txt' in current directory. THIS ONLY WORKS FOR ASCII TEXT, NOT BINARY FILES.
+S=STREAMOpen("ssh:192.168.2.1/myfile.txt", "a");  //APPEND to 'myfile.txt' in current directory. THIS ONLY WORKS FOR ASCII TEXT, NOT BINARY FILES.
+
+"r", "w" and "a" modes use the 'cat' command on the remote server, so obviously that must exist
+
+
+S=STREAMOpen("ssh:192.168.2.1/ls *", "");  //RUN COMMAND 'ls *'
+S=STREAMOpen("ssh:192.168.2.1/ls *", "x");  //RUN COMMAND 'ls *'
+
 
 
 The 'config' argument has different meanings for some of the different URL types.
@@ -50,9 +72,10 @@ L     lock/unlock file on each write
 i     allow this file to be inherited across an exec (default is close-on-exec)
 t     make a unique temporary file name. the file path must be a mktemp style template, with the last six characters being 'XXXXXX'
 S     file contents are sorted
+x     treat file path as a command to execute (currently on in ssh: streams) 
 z     compress/uncompress with gzip
 
-for 'http' and 'https' URLs the first argument is a haracter list (though only one character long) with the following values
+for 'http' and 'https' URLs the first argument is a character list (though only one character long) with the following values
 
 r    GET method (default if no method specified)
 w    POST method
@@ -83,7 +106,7 @@ For 'tty' type URLs the config options are those detailed in "Pty.h" for "TTYCon
 
 
 //the 'Type' variable in the STREAM object is set to one of thse values and is used internally for knowing how to handle a given stream
-typedef enum {STREAM_TYPE_FILE, STREAM_TYPE_PIPE, STREAM_TYPE_TTY, STREAM_TYPE_UNIX, STREAM_TYPE_UNIX_DGRAM, STREAM_TYPE_TCP, STREAM_TYPE_UDP, STREAM_TYPE_SSL, STREAM_TYPE_HTTP, STREAM_TYPE_CHUNKED_HTTP, STREAM_TYPE_MESSAGEBUS, STREAM_TYPE_UNIX_SERVER, STREAM_TYPE_TCP_SERVER, STREAM_TYPE_UNIX_ACCEPT, STREAM_TYPE_TCP_ACCEPT, STREAM_TYPE_TPROXY, STREAM_TYPE_UPROXY } ESTREAMType;
+typedef enum {STREAM_TYPE_FILE, STREAM_TYPE_PIPE, STREAM_TYPE_TTY, STREAM_TYPE_UNIX, STREAM_TYPE_UNIX_DGRAM, STREAM_TYPE_TCP, STREAM_TYPE_UDP, STREAM_TYPE_SSL, STREAM_TYPE_HTTP, STREAM_TYPE_CHUNKED_HTTP, STREAM_TYPE_MESSAGEBUS, STREAM_TYPE_UNIX_SERVER, STREAM_TYPE_TCP_SERVER, STREAM_TYPE_UNIX_ACCEPT, STREAM_TYPE_TCP_ACCEPT, STREAM_TYPE_TPROXY, STREAM_TYPE_UPROXY, STREAM_TYPE_SSH } ESTREAMType;
 
 
 
@@ -114,8 +137,13 @@ typedef enum {STREAM_TYPE_FILE, STREAM_TYPE_PIPE, STREAM_TYPE_TTY, STREAM_TYPE_U
 
 
 //Flags that alter stream behavior, the first block can be passed to 'STREAMFileOpen' only
+//These days it's better to use 'STREAMOpen' with a character string that defines stream options, rather
+//than STREAMFileOpen and these flags. These flags are used internally though.
+
 #define SF_RDWR 0 //open stream for read and write. This is the default
+
 //FLUSH_ flags go in this gap
+
 #define SF_RDONLY 16       //open stream read only 
 #define SF_WRONLY 32       //open stream write only
 #define SF_CREAT 64        //create stream if it doesn't exist
@@ -127,7 +155,7 @@ typedef enum {STREAM_TYPE_FILE, STREAM_TYPE_PIPE, STREAM_TYPE_TTY, STREAM_TYPE_U
 #define SF_RDLOCK 2048     //lock file on every read
 #define SF_FOLLOW 4096     //follow symbolic links
 #define SF_SECURE 8192     //lock internal buffers into memory so they aren't written to swap or coredumps
-#define SF_NONBLOCK 16384  //nonblocking open (you must use select to check that the fi
+#define SF_NONBLOCK 16384  //nonblocking open (you must use select to check that the file is ready to use)
 #define SF_TLS_AUTO 32768  //nothing to see here, move along
 #define SF_ERROR 65536     //raise an error if open or connect fails
 #define SF_EXEC_INHERIT 131072  //allow file to be inherited across an exec (default is close-on-exec)
@@ -139,7 +167,7 @@ typedef enum {STREAM_TYPE_FILE, STREAM_TYPE_PIPE, STREAM_TYPE_TTY, STREAM_TYPE_U
 #define SF_TMPNAME  16777216    //file path is a template to create a temporary file name (must end in 'XXXXXX')
 
 
-//Stream state values
+//Stream state values, set in S->State
 #define SS_CONNECTING 1
 #define SS_INITIAL_CONNECT_DONE 4
 #define SS_CONNECTED 8
@@ -263,6 +291,12 @@ STREAM *STREAMFileOpen(const char *Path, int Flags);
 //to close stdin, use this function  to free the STREAM object
 void STREAMDestroy(void *S);
 
+//close a stream and free most associated data, but don't destroy/free the stream object.
+//you would not normally use this except if you were linking libUseful to some kind of 
+//environment that expects to garbage-collect destroyed items itself (libUseful-lua is an
+//example of this situation)
+void STREAMShutdown(STREAM *Stream);
+
 //Close a file/connection and free the STREAM object
 void STREAMClose(STREAM *Stream);
 
@@ -364,7 +398,12 @@ STREAM *STREAMSelect(ListNode *Streams, struct timeval *timeout);
 //Push bytes into the front of the stream (so, they will be the first things read). 
 void STREAMInsertBytes(STREAM *S, const char *Bytes, int len);
 
-//if the stream is a file then peform file locking. Flags are the same as for flock
+//if the stream is a file then peform file locking. Flags are the same as for flock: 
+//LOCK_EX for an exclusive lock where only one process can lock the file
+//LOCK_SH for a shared lock where many processes can lock, but none can lock exclusively, usually used to implement 'read locks'
+//LOCK_UN for unlock
+//LOCK_NB for 'non blocking' lock that will fail if file already locked.
+//returns TRUE if lock succeeds, FALSE on failure
 int STREAMLock(STREAM *S, int flags);
 
 //find the key 'Item' in a file made up of lines broken up by newline, and a key value on each line separated from the rest of the line by 'Delimiter'.

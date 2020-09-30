@@ -29,17 +29,37 @@ void ExpectDialogDestroy(void *p_Item)
     free(ExpectDialog);
 }
 
+int ExpectDialogsDone(ListNode *ExpectDialogs)
+{
+ListNode *Curr;
+TExpectDialog *ExpectDialog;
+
+Curr=ListGetNext(ExpectDialogs);
+while (Curr)
+{
+ExpectDialog=(TExpectDialog *) Curr->Item;
+if (! (ExpectDialog->Flags & (DIALOG_DONE | DIALOG_OPTIONAL))) return(FALSE);
+Curr=ListGetNext(Curr);
+}
+
+return(TRUE);
+}
 
 
-int STREAMExpectDialog(STREAM *S, ListNode *ExpectDialogs)
+int STREAMExpectDialog(STREAM *S, ListNode *ExpectDialogs, int Timeout)
 {
     int inchar;
     ListNode *Curr;
+		int SavedTimeout;
     TExpectDialog *ExpectDialog;
+
+		SavedTimeout=S->Timeout;
+		if (Timeout > 0) S->Timeout=Timeout;
 
     inchar=STREAMReadChar(S);
     while (inchar !=EOF)
     {
+				if ((inchar == STREAM_NODATA) && (Timeout > 0)) break;
         if (inchar > 0)
         {
             Curr=ListGetNext(ExpectDialogs);
@@ -65,8 +85,8 @@ int STREAMExpectDialog(STREAM *S, ListNode *ExpectDialogs)
 															usleep(10000);
 															STREAMWriteLine(ExpectDialog->Reply,S);
 														}
-                            if (ExpectDialog->Flags & DIALOG_END) return(TRUE);
-                            if (ExpectDialog->Flags & DIALOG_FAIL) return(FALSE);
+                            if (ExpectDialog->Flags & DIALOG_END)  { S->Timeout=SavedTimeout; return(TRUE);  }
+                            if (ExpectDialog->Flags & DIALOG_FAIL) { S->Timeout=SavedTimeout; return(FALSE); }
                         }
                     }
 
@@ -78,6 +98,11 @@ int STREAMExpectDialog(STREAM *S, ListNode *ExpectDialogs)
         inchar=STREAMReadChar(S);
     }
 
+    S->Timeout=SavedTimeout;
+
+		//if we got timeout rather than EOF, that implies the command didn't complete
+		//so we only return TRUE if we got EOF and all our dialogs were processed
+		if ((inchar == EOF) && ExpectDialogsDone(ExpectDialogs)) return(TRUE);
     return(FALSE);
 }
 

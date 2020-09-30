@@ -492,10 +492,13 @@ int STREAMInternalFinalWriteBytes(STREAM *S, const char *Data, int DataLen)
     {
         if (S->State & SS_SSL)
         {
+
 #ifdef HAVE_LIBSSL
-		vptr=STREAMGetItem(S,"LIBUSEFUL-SSL:CTX");
+		//if this is an SSL stream, it should have an associated SSL object. If it doesn't then the stream
+		//either failed to open, or has been closed with STREAMShutdown
+		vptr=STREAMGetItem(S,"LIBUSEFUL-SSL:OBJ");
 		if (vptr) result=SSL_write((SSL *) vptr, Data + count, DataLen - count);
-		else result=0;
+		else result=STREAM_CLOSED;
 		if (result < 0) result=STREAM_CLOSED;
 #endif
         }
@@ -539,6 +542,7 @@ int STREAMInternalFinalWriteBytes(STREAM *S, const char *Data, int DataLen)
 
 				if (result < 0) break;
         count+=result;
+				if (S->Flags & SF_NONBLOCK) break;
     }
 
     S->BytesWritten+=count;
@@ -668,7 +672,7 @@ int STREAMLock(STREAM *S, int val)
 {
     int result;
 
-    result=flock(S->in_fd, val);
+    result=flock(S->in_fd,val);
 
     if (result==0) return(TRUE);
     return(FALSE);
@@ -749,8 +753,8 @@ STREAM *STREAMFileOpen(const char *Path, int Flags)
     else if (Flags & SF_RDONLY) Mode=O_RDONLY;
     else Mode=O_RDWR;
 
-    if (Flags & STREAM_APPEND) Mode|=O_APPEND;
-    if (Flags & SF_CREATE) Mode|=O_CREAT;
+    if (Flags & STREAM_APPEND) Mode |=O_APPEND;
+    if (Flags & SF_CREATE) Mode |=O_CREAT;
 
     if (strcmp(Path,"-")==0)
     {
@@ -765,7 +769,6 @@ STREAM *STREAMFileOpen(const char *Path, int Flags)
         fd=mkostemp(NewPath, Mode);
 #else
         fd=mkstemp(NewPath);
-        chmod(NewPath,Mode);
 #endif
         p_Path=NewPath;
     }
@@ -796,6 +799,7 @@ STREAM *STREAMFileOpen(const char *Path, int Flags)
     {
         if (flock(fd,LOCK_EX | LOCK_NB)==-1)
         {
+            RaiseError(ERRFLAG_ERRNO, "STREAMFileOpen", "file lock requested but failed %s", p_Path);
             close(fd);
             Destroy(NewPath);
             return(NULL);
@@ -819,7 +823,7 @@ STREAM *STREAMFileOpen(const char *Path, int Flags)
     // to get us to write somewhere other than intended.
 
 
-    if (! (Flags & SF_FOLLOW))
+    if ((Mode != O_RDONLY) && (! (Flags & SF_FOLLOW)))
     {
         if (lstat(p_Path, &myStat) !=0)
         {
@@ -954,6 +958,30 @@ int STREAMParseConfig(const char *Config)
 }
 
 
+
+//this function handles the situation where we have a 'chain' of URLs (network proxies)
+//it extracts the 'real' or 'master' URL that specifies the actual connection, which
+//will be the LAST one in the list
+static const char *STREAMExtractMasterURL(const char *URL)
+{
+char *ptr;
+
+	if (strncmp(URL, "cmd:",4) ==0) return(URL); //'cmd:' urls do not go through proxies!
+	if (strncmp(URL, "file:",5) ==0) return(URL); //'file:' urls do not go through proxies!
+	if (strncmp(URL, "mmap:",5) ==0) return(URL); //'mmap:' urls do not go through proxies!
+	if (strncmp(URL, "stdin:",6) ==0) return(URL); //'stdin:' urls do not go through proxies!
+	if (strncmp(URL, "stdout:",7) ==0) return(URL); //'stdout:' urls do not go through proxies!
+	if (strncmp(URL, "stdio:",6) ==0) return(URL); //'stdio:' urls do not go through proxies!
+
+   ptr=strrchr(URL, '|');
+   if (ptr) ptr++;
+   else ptr=URL;
+
+	return(ptr);
+}
+
+
+
 //URL can be a file path or a number of different network/file URL types
 STREAM *STREAMOpen(const char *URL, const char *Config)
 {
@@ -962,13 +990,9 @@ STREAM *STREAMOpen(const char *URL, const char *Config)
     const char *ptr;
     int Port=0, Flags=0;
 
-    //if we've got a chain of connections, then get the LAST one to analyze. 
-		//The others are all proxies we go via
-    ptr=strrchr(URL, '|');
-    if (ptr) ptr++;
-    else ptr=URL;
 
-    Proto=CopyStr(Proto,"file");
+    Proto=CopyStr(Proto,"");
+		ptr=STREAMExtractMasterURL(URL);
     ParseURL(ptr, &Proto, &Host, &Token, &User, &Pass, &Path, &Args);
     if (StrValid(Token)) Port=strtoul(Token,NULL,10);
 
@@ -980,38 +1004,52 @@ STREAM *STREAMOpen(const char *URL, const char *Config)
     {
     case 'c':
         if (strcasecmp(Proto,"cmd")==0) S=STREAMSpawnCommand(URL+4, Config);
+        else S=STREAMFileOpen(URL, Flags);
         break;
+
+		case 'f':
+        if (strcasecmp(Proto,"file")==0) 
+				{
+				ptr=URL+5;
+
+				//file protocol can have 3 '/' after file, like this file:///myfile.txt. So we strip off two of these
+				//thus anything with 3 of them is a full path from /, anything with less than that is a relative path
+				//from the current directory
+				if (*ptr=='/') ptr++;
+				if (*ptr=='/') ptr++;
+        S=STREAMFileOpen(ptr, Flags);
+				}
+        else S=STREAMFileOpen(URL, Flags);
+				break;
 
     case 'h':
         if (
-            (strcmp(Proto,"http")==0) ||
-            (strcmp(Proto,"https")==0)
-        ) S=HTTPWithConfig(URL, Config);
+            (strcasecmp(Proto,"http")==0) ||
+            (strcasecmp(Proto,"https")==0)
+        ) 
+				{
+				S=HTTPWithConfig(URL, Config);
         //the 'write only' and 'read only' flags normally result in one or another
         //buffer not being allocated (as it's not expected to be needed). However
         //with HTTP 'write' means 'POST', and we still need both read and write
         //buffers to read from and to the server, so we must unset these flags
         Flags &= ~(SF_WRONLY | SF_RDONLY);
+				}
+        else S=STREAMFileOpen(URL, Flags);
         break;
 
     case 'm':
-        if (strcmp(Proto,"mmap")==0) S=STREAMFileOpen(URL+5, Flags | SF_MMAP);
+        if (strcasecmp(Proto,"mmap")==0) S=STREAMFileOpen(URL+5, Flags | SF_MMAP);
+        else S=STREAMFileOpen(URL, Flags);
         break;
 
     case 't':
     case 's':
     case 'u':
-			if (strcasecmp(Proto,"ssh")==0) 
-			{
-				//if SF_RDONLY is set, then we treat this as a 'file get', otherwise we treat it as
-				//a remote command
-				if (Flags & SF_RDONLY)
-				{
-					Token=QuoteCharsInStr(Token, Path, "    ()");
-					Path=MCopyStr(Path, "cat ", Token, "; exit", NULL);
-				}
-				S=SSHConnect(Host, Port, User, Pass, Path);
-			}
+      if ( (strcmp(URL,"-")==0) || (strcasecmp(URL,"stdio:")==0) ) S=STREAMFromDualFD(0,1);
+			else if (strcasecmp(URL,"stdin:")==0) S=STREAMFromFD(0);
+			else if (strcasecmp(URL,"stdout:")==0) S=STREAMFromFD(1);
+			else if (strcasecmp(Proto,"ssh")==0) S=SSHOpen(Host, Port, User, Pass, Path, Flags);
       else if (strcasecmp(Proto,"tty")==0)
       {
             S=STREAMFromFD(TTYConfigOpen(URL+4, Config));
@@ -1021,7 +1059,7 @@ STREAM *STREAMOpen(const char *URL, const char *Config)
                 S->Type=STREAM_TYPE_TTY;
             }
       }
-      else
+      else 
       {
             S=STREAMCreate();
             S->Path=CopyStr(S->Path,URL);
@@ -1110,29 +1148,23 @@ void STREAMDestroy(void *p_S)
 
 void STREAMTruncate(STREAM *S, long size)
 {
-   ftruncate(S->out_fd,size);
+   ftruncate(S->out_fd, size);
 }
 
-void STREAMClose(STREAM *S)
+
+
+//Some special features specifically around closing files. Currently these mostly concern telling the OS that a file
+//doesn't require caching (maybe becasue it's a logfile rather than data)
+void STREAMCloseFile(STREAM *S)
 {
-    ListNode *Curr;
-    STREAM *tmpS;
-    int val;
-
-    if (! S) return;
-
-    //-1 means 'FLUSH'
-    STREAMReadThroughProcessors(S, NULL, -1);
-    STREAMFlush(S);
-    if (S->Type == STREAM_TYPE_TTY) TTYHangUp(S->in_fd);
-
     if (
         (StrEnd(S->Path)) ||
-        (strcmp(S->Path,"-") !=0)
+        (strcmp(S->Path,"-") !=0) //don't do this for stdin/stdout
     )
     {
-        if ((S->out_fd != -1) && (S->out_fd != S->in_fd))
+        if (S->out_fd != -1) 
         {
+					//if we don't need this file cached for future use, tell the os so when we close it
 #ifdef POSIX_FADV_DONTNEED
             if (S->Flags & SF_NOCACHE)
             {
@@ -1141,19 +1173,53 @@ void STREAMClose(STREAM *S)
             }
 #endif
 
-            close(S->out_fd);
         }
 
         if (S->in_fd != -1)
         {
 #ifdef POSIX_FADV_DONTNEED
-            if (S->Flags & SF_NOCACHE) posix_fadvise(S->in_fd, 0,0,POSIX_FADV_DONTNEED);
+					//if we don't need this input file cached for future use, tell the os so when we close it
+          if (S->Flags & SF_NOCACHE) posix_fadvise(S->in_fd, 0,0,POSIX_FADV_DONTNEED);
 #endif
 
-            close(S->in_fd);
         }
     }
+}
 
+
+
+void STREAMShutdown(STREAM *S)
+{
+    ListNode *Curr, *Next;
+    STREAM *tmpS;
+    int val;
+
+    if (! S) return;
+
+    //-1 means 'FLUSH'
+    STREAMReadThroughProcessors(S, NULL, -1);
+    STREAMFlush(S);
+
+		switch (S->Type)
+		{
+		case STREAM_TYPE_SSH:
+		SSHClose(S);
+		break;
+
+    case STREAM_TYPE_TTY:
+		TTYHangUp(S->in_fd);
+		break;
+
+		case STREAM_TYPE_FILE:
+		STREAMCloseFile(S);
+		break;
+		}
+
+
+		//OpenSSLClose only closes things that the OpenSSL subsystem has created, so it's safe to call on all streams
+		OpenSSLClose(S);
+
+//For all streams we kill off any helper processes and close any associated streams
     Curr=ListGetNext(S->Values);
     while (Curr)
     {
@@ -1165,23 +1231,48 @@ void STREAMClose(STREAM *S)
         Curr=ListGetNext(Curr);
     }
 
+		//associate streams are streams that support other streams, like the ssh connection that
+		//supports a port-forward through ssh. We close these down when the owner stream is closed
     Curr=ListGetNext(S->Items);
     while (Curr)
     {
-        if (strcmp(Curr->Tag,"LU:AssociatedStream")==0)
+			  Next=ListGetNext(Curr);	
+        if (strcmp(Curr->Tag, "LU:AssociatedStream")==0)
         {
-            tmpS=(STREAM *) Curr->Item;
-            STREAMClose(tmpS);
+          tmpS=(STREAM *) Curr->Item;
+          STREAMClose(tmpS);
+					ListDeleteNode(Curr);
         }
-        else if (strcmp(Curr->Tag, "HTTP:InfoStruct")==0) HTTPInfoDestroy(Curr->Item);
+        else if (strcmp(Curr->Tag, "HTTP:InfoStruct")==0) 
+				{
+					HTTPInfoDestroy(Curr->Item);
+					ListDeleteNode(Curr);
+				}
 
-        Curr=ListGetNext(Curr);
+
+        Curr=Next;
     }
 
-    STREAMDestroy(S);
+		//now we actually close the file descriptors for this stream. 
+		if ((S->out_fd != S->in_fd) && (S->out_fd > -1)) close(S->out_fd);
+		//out_fd is invalid now whether we closed it or not, so set it to -1
+		//so that if STREAMClose gets called later (say, in garbage-collected environments)
+		//we don't wind up closing another connection that has inhertied the file number
+		S->out_fd=-1;
+
+    if (S->in_fd > -1) 
+		{
+			close(S->in_fd);
+			S->in_fd=-1;
+		}
 }
 
 
+void STREAMClose(STREAM *S)
+{
+	STREAMShutdown(S);
+  STREAMDestroy(S);
+}
 
 
 int STREAMReadCharsToBuffer(STREAM *S)
@@ -1192,7 +1283,7 @@ int STREAMReadCharsToBuffer(STREAM *S)
     struct timeval tv;
     char *tmpBuff=NULL, *Peer=NULL;
 #ifdef HAVE_LIBSSL
-    void *SSL_CTX=NULL;
+    void *SSL_OBJ=NULL;
 #endif
 
     if (! S) return(0);
@@ -1239,14 +1330,14 @@ int STREAMReadCharsToBuffer(STREAM *S)
 
 //This is used in multiple places below, do don't just move it to within the first place
 #ifdef HAVE_LIBSSL
-    SSL_CTX=STREAMGetItem(S,"LIBUSEFUL-SSL:CTX");
+    SSL_OBJ=STREAMGetItem(S,"LIBUSEFUL-SSL:OBJ");
 
 //if there are bytes available in the internal OpenSSL buffers, when we don't have to
 //wait on a select, we can just go straight through to SSL_read
     if (S->State & SS_SSL)
     {
         //ssl pending checks if there's bytes in the SSL buffer, it's not a select
-        if (SSL_pending((SSL *) SSL_CTX) > 0) WaitForBytes=FALSE;
+        if (SSL_pending((SSL *) SSL_OBJ) > 0) WaitForBytes=FALSE;
     }
 #endif
 
@@ -1294,7 +1385,7 @@ int STREAMReadCharsToBuffer(STREAM *S)
 #ifdef HAVE_LIBSSL
         if (S->State & SS_SSL)
         {
-            bytes_read=SSL_read((SSL *) SSL_CTX, tmpBuff, val);
+            bytes_read=SSL_read((SSL *) SSL_OBJ, tmpBuff, val);
             saved_errno=errno;
         }
         else
@@ -2228,16 +2319,11 @@ unsigned long STREAMSendFile(STREAM *In, STREAM *Out, unsigned long Max, int Fla
             result=0;
 
 
-            //nothing to write!
-            if (towrite < 1)
-            {
-                //nothing in either buffer! Stream empty. Is it closed?
-                if ((Out->OutEnd==0) && (result==STREAM_CLOSED)) break;
-            }
-
             result=STREAMWriteBytes(Out,In->InputBuff+In->InStart,towrite);
-
-						if (result > 0)
+	
+						//write failed with 'STREAM_CLOSED'
+						if (result==STREAM_CLOSED) break;
+						else if (result > 0)
 						{
             In->InStart+=result;
             bytes_transferred+=result;

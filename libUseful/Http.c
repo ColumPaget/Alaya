@@ -42,6 +42,7 @@ void HTTPInfoDestroy(void *p_Info)
     DestroyString(Info->Host);
     DestroyString(Info->Doc);
     DestroyString(Info->UserName);
+    DestroyString(Info->UserAgent);
     DestroyString(Info->Destination);
     DestroyString(Info->ResponseCode);
     DestroyString(Info->PreviousRedirect);
@@ -111,14 +112,12 @@ int HTTPChunkedRead(TProcessingModule *Mod, const char *InBuff, unsigned long In
 
         //if there's nothing in our buffer, and nothing being added, then
         //we've already finished!
-        if ((Chunk->BuffLen==0) && (InLen==0)) return(STREAM_CLOSED);
+        if ((Chunk->BuffLen==0) && (InLen < 1)) return(STREAM_CLOSED);
 
-        ptr=Chunk->Buffer;
-        vptr=ptr;
+        vptr=Chunk->Buffer;
         //skip past any leading '\r' or '\n'
         if (*vptr=='\r') vptr++;
         if (*vptr=='\n') vptr++;
-
         ptr=memchr(vptr,'\n', end-vptr);
 
         //sometimes people seem to miss off the final '\n', so if we get told there's no more data
@@ -130,10 +129,10 @@ int HTTPChunkedRead(TProcessingModule *Mod, const char *InBuff, unsigned long In
         }
 
 
-        if (ptr)
+        if (ptr) 
         {
-            *ptr='\0';
-            ptr++;
+					StrTrunc(Chunk->Buffer, ptr - Chunk->Buffer);
+          ptr++;
         }
         else return(0);
 
@@ -143,7 +142,7 @@ int HTTPChunkedRead(TProcessingModule *Mod, const char *InBuff, unsigned long In
 
         Chunk->BuffLen=end-ptr;
 
-        if (Chunk->BuffLen > 0)	memmove(Chunk->Buffer,ptr, Chunk->BuffLen);
+        if (Chunk->BuffLen > 0)	memmove(Chunk->Buffer, ptr, Chunk->BuffLen);
         //in case it went negative in the above calcuation
         else Chunk->BuffLen=0;
 
@@ -438,6 +437,8 @@ void HTTPInfoSetURL(HTTPInfoStruct *Info, const char *Method, const char *iURL)
 
     if (StrValid(Pass)) CredsStoreAdd(Info->Host, User, Pass);
 
+		if (StrEnd(Info->Doc)) Info->Doc=CopyStr(Info->Doc, "/");
+
     DestroyString(User);
     DestroyString(Pass);
     DestroyString(Token);
@@ -577,7 +578,35 @@ static int HTTPHandleWWWAuthenticate(const char *Line, int *Type, char **Config)
     return(*Type);
 }
 
+/* redirect headers can get complex. WE can have a 'full' header:
+ *    http://myhost/whatever
+ * or just the 'path' part
+ *    /whatever
+ * or even this
+ *    //myhost/whatever
+ */
 
+static void HTTPParseLocationHeader(HTTPInfoStruct *Info, const char *Header)
+{
+   if (
+         (strncasecmp(Header,"http:",5)==0) ||
+         (strncasecmp(Header,"https:",6)==0)
+      )
+      {
+         Info->RedirectPath=HTTPQuoteChars(Info->RedirectPath, Header, " ");
+      }
+	 		else if (strncmp(Header, "//",2)==0)
+			{
+        if (Info->Flags & HTTP_SSL) Info->RedirectPath=MCopyStr(Info->RedirectPath,"https:",Header,NULL);
+         else Info->RedirectPath=MCopyStr(Info->RedirectPath,"http:",Header,NULL);
+			}
+      else
+      {
+         if (Info->Flags & HTTP_SSL) Info->RedirectPath=FormatStr(Info->RedirectPath,"https://%s:%d%s",Info->Host,Info->Port,Header);
+         else Info->RedirectPath=FormatStr(Info->RedirectPath,"http://%s:%d%s",Info->Host,Info->Port,Header);
+      }
+
+}
 
 
 static void HTTPParseHeader(STREAM *S, HTTPInfoStruct *Info, char *Header)
@@ -639,21 +668,7 @@ static void HTTPParseHeader(STREAM *S, HTTPInfoStruct *Info, char *Header)
 
         case 'L':
         case 'l':
-            if (strcasecmp(Token,"Location")==0)
-            {
-                if (
-                    (strncasecmp(ptr,"http:",5)==0) ||
-                    (strncasecmp(ptr,"https:",6)==0)
-                )
-                {
-                    Info->RedirectPath=HTTPQuoteChars(Info->RedirectPath, ptr, " ");
-                }
-                else
-                {
-                    if (Info->Flags & HTTP_SSL) Info->RedirectPath=FormatStr(Info->RedirectPath,"https://%s:%d%s",Info->Host,Info->Port,ptr);
-                    else Info->RedirectPath=FormatStr(Info->RedirectPath,"http://%s:%d%s",Info->Host,Info->Port,ptr);
-                }
-            }
+            if (strcasecmp(Token,"Location")==0) HTTPParseLocationHeader(Info, ptr);
             break;
 
         case 'P':

@@ -11,6 +11,8 @@ void UnicodeSetUTF8(int level);
 unsigned int UnicodeDecode(const char **ptr);
 char *UnicodeStr(char *RetStr, int Code);
 char *StrAddUnicodeChar(char *RetStr, int uchar);
+char *UnicodeStrFromName(char *RetStr, const char *Name);
+
 
 #ifdef __cplusplus
 }

@@ -160,7 +160,7 @@ void ProcessTitleCaptureBuffer(char **argv)
 }
 
 
-void ProcessSetTitle(char *FmtStr, ...)
+void ProcessSetTitle(const char *FmtStr, ...)
 {
     va_list args;
 
@@ -174,7 +174,7 @@ void ProcessSetTitle(char *FmtStr, ...)
 
 
 
-int CreateLockFile(char *FilePath, int Timeout)
+int CreateLockFile(const char *FilePath, int Timeout)
 {
     int fd, result;
 
@@ -198,13 +198,13 @@ int CreateLockFile(char *FilePath, int Timeout)
     return(fd);
 }
 
-int WritePidFile(char *ProgName)
+int WritePidFile(const char *ProgName)
 {
     char *Tempstr=NULL;
     int fd;
 
 
-    if (*ProgName=='/') Tempstr=CopyStr(Tempstr,ProgName);
+    if (*ProgName=='/') Tempstr=CopyStr(Tempstr, ProgName);
     else Tempstr=FormatStr(Tempstr,"/var/run/%s.pid",ProgName);
 
     fd=open(Tempstr,O_CREAT | O_WRONLY,0600);
@@ -762,6 +762,7 @@ int ProcessApplyConfig(const char *Config)
         else if (strcasecmp(Name,"sigdef")==0) Flags |= PROC_SIGDEF;
         else if (strcasecmp(Name,"sigdefault")==0) Flags |= PROC_SIGDEF;
         else if (strcasecmp(Name,"setsid")==0) Flags |= PROC_SETSID;
+        else if (strcasecmp(Name,"newpgroup")==0) Flags |= PROC_NEWPGROUP;
         else if (strcasecmp(Name,"daemon")==0) Flags |= PROC_DAEMON;
         else if (strcasecmp(Name,"demon")==0) Flags |= PROC_DAEMON;
         else if (strcasecmp(Name,"ctrltty")==0) Flags |= PROC_CTRL_TTY;
@@ -835,6 +836,7 @@ int ProcessApplyConfig(const char *Config)
     else
     {
         if (Flags & PROC_SETSID) setsid();
+        if (Flags & PROC_NEWPGROUP) setpgid(0, 0);
         if (Flags & PROC_CTRL_TTY) 
 				{
 //Set controlling tty to be stdin. This means that CTRL-C, SIGWINCH etc is handled for the

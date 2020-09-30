@@ -20,6 +20,8 @@ extern "C" {
 //exist it will be created.
 #define FileCopy(SrcPath, DestPath) (FileCopyWithProgress(SrcPath, DestPath, NULL))
 
+//move fire to a directory, creating the diretory path if needed.
+int FileMoveToDir(const char *FilePath, const char *Dir);
 
 //copy SrcPath to DestPath, periodically calling the function 'Callback' to ouput information about
 //copy progress. Look in 'DataProcessing.h' for more information about the Callback function.
@@ -129,7 +131,8 @@ int FileSetBinaryXAttr(const char *Path, const char *Name, const char *Value, in
 //Set text attribute
 int FileSetXAttr(const char *Path, const char *Name, const char *Value);
 
-
+//recursive copy of a directory
+int FileSystemCopyDir(const char *Src, const char *Dest);
 
 int FileSystemRmDir(const char *Dir);
 

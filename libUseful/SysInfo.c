@@ -7,6 +7,31 @@
 #include <sys/sysinfo.h>
 #endif
 
+#include <net/if.h>
+#include <arpa/inet.h>
+#include <sys/ioctl.h>
+
+
+char *OSSysInfoInterfaces(char *RetStr)
+{
+struct if_nameindex *interfaces;
+int i;
+
+RetStr=CopyStr(RetStr, "");
+interfaces=if_nameindex();
+if (interfaces)
+{
+for (i=0; interfaces[i].if_name != NULL; i++)
+{
+	RetStr=MCatStr(RetStr, interfaces[i].if_name, " ", NULL);
+}
+if_freenameindex(interfaces);
+}
+
+return(RetStr);
+}
+
+
 
 //This is a convinience function for use by modern languages like
 //lua that have an 'os' object that returns information
@@ -57,6 +82,12 @@ const char *OSSysInfoString(int Info)
         if (ptr) return(ptr);
         break;
 
+		case OSINFO_INTERFACES:
+			//don't just return output of function, as buf is static we must update it
+			buf=OSSysInfoInterfaces(buf);
+			return(buf);
+		break;
+
 
         /*
         case OSINFO_USERINFO:
@@ -83,7 +114,7 @@ const char *OSSysInfoString(int Info)
 
 //This is a convienice function for use by modern languages like
 //lua that have an 'os' object that returns information
-unsigned long OSSysInfoLong(int Info)
+size_t OSSysInfoLong(int Info)
 {
 #ifdef linux
     struct sysinfo SysInfo;
@@ -92,22 +123,44 @@ unsigned long OSSysInfoLong(int Info)
     switch (Info)
     {
     case OSINFO_UPTIME:
-        return((unsigned long) SysInfo.uptime);
+        return((size_t) SysInfo.uptime);
         break;
-    case OSINFO_TOTALMEM:
-        return((unsigned long) SysInfo.totalram);
-        break;
-    case OSINFO_FREEMEM:
-        return((unsigned long) SysInfo.freeram);
-        break;
-    case OSINFO_BUFFERMEM:
-        return((unsigned long) SysInfo.bufferram);
-        break;
-    case OSINFO_PROCS:
-        return((unsigned long) SysInfo.procs);
-        break;
-//case OSINFO_LOAD: MuJSArray(TYPE_ULONG, 3, (void *) SysInfo.loads); break;
 
+    case OSINFO_TOTALMEM:
+        return((size_t) (SysInfo.totalram * SysInfo.mem_unit));
+        break;
+
+    case OSINFO_FREEMEM:
+        return((size_t) (SysInfo.freeram * SysInfo.mem_unit));
+        break;
+
+    case OSINFO_BUFFERMEM:
+        return((size_t) (SysInfo.bufferram * SysInfo.mem_unit));
+       break;
+
+		case OSINFO_TOTALSWAP:
+			 	return((size_t) (SysInfo.totalswap * SysInfo.mem_unit));
+			break;
+
+		case OSINFO_FREESWAP:
+			 	return((size_t) (SysInfo.freeswap * SysInfo.mem_unit));
+				break;
+
+    case OSINFO_PROCS:
+        return((size_t) SysInfo.procs);
+        break;
+
+		case OSINFO_LOAD1MIN:
+        return((size_t) SysInfo.loads[0]);
+				break;
+
+		case OSINFO_LOAD5MIN:
+        return((size_t) SysInfo.loads[1]);
+				break;
+
+		case OSINFO_LOAD15MIN:
+        return((size_t) SysInfo.loads[2]);
+				break;
     }
 
 #endif

@@ -129,6 +129,24 @@ int FileChangeExtension(const char *FilePath, const char *NewExt)
 }
 
 
+int FileMoveToDir(const char *FilePath, const char *Dir)
+{
+    char *Tempstr=NULL;
+    char *ptr;
+    int result;
+
+    Tempstr=MCopyStr(Tempstr, Dir, "/", GetBasename(FilePath));
+    MakeDirPath(Tempstr, 0700);
+    result=rename(FilePath,Tempstr);
+    if (result !=0) RaiseError(ERRFLAG_ERRNO, "FileMoveToDir", "cannot rename '%s' to '%s'",FilePath, Tempstr);
+
+    DestroyString(Tempstr);
+
+    if (result==0) return(TRUE);
+    else return(FALSE);
+}
+
+
 int FindFilesInPath(const char *File, const char *Path, ListNode *Files)
 {
     char *Tempstr=NULL, *CurrPath=NULL;
@@ -273,11 +291,20 @@ int FileGetBinaryXAttr(char **RetStr, const char *Path, const char *Name)
 
     *RetStr=CopyStr(*RetStr, "");
 #ifdef HAVE_XATTR
+	#ifdef __APPLE__ //'cos some idiot's always got to 'think different'
+    len=getxattr(Path, Name, NULL, 0, 0, 0);
+	#else
     len=getxattr(Path, Name, NULL, 0);
+	#endif 
+
     if (len > 0)
     {
         *RetStr=SetStrLen(*RetStr,len);
+        #ifdef __APPLE__
+        getxattr(Path, Name, *RetStr, len, 0, 0);
+        #else
         getxattr(Path, Name, *RetStr, len);
+        #endif
     }
 #else
     RaiseError(0, "FileGetXAttr", "xattr support not compiled in");
@@ -300,7 +327,11 @@ char *FileGetXAttr(char *RetStr, const char *Path, const char *Name)
 int FileSetBinaryXAttr(const char *Path, const char *Name, const char *Value, int Len)
 {
 #ifdef HAVE_XATTR
+	#ifdef __APPLE__
+    return(setxattr(Path, Name, Value, Len, 0, 0));
+	#else
     return(setxattr(Path, Name, Value, Len, 0));
+	#endif
 #else
     RaiseError(0, "FileSetXAttr", "xattr support not compiled in");
 #endif
@@ -521,3 +552,53 @@ int FileSystemRmDir(const char *Dir)
 }
 
 
+int FileSystemCopyDir(const char *Src, const char *Dest)
+{
+glob_t Glob;
+const char *ptr;
+struct stat Stat;
+char *Tempstr=NULL, *Path=NULL;
+int i;
+
+Tempstr=MCopyStr(Tempstr, Dest, "/", NULL);
+MakeDirPath(Tempstr, 0777);
+Tempstr=MCopyStr(Tempstr, Src, "/*", NULL);
+glob(Tempstr, 0, 0, &Glob);
+Tempstr=MCopyStr(Tempstr, Src, "/.*", NULL);
+glob(Tempstr, GLOB_APPEND, NULL, &Glob);
+for (i=0; i < Glob.gl_pathc; i++)
+{
+	ptr=GetBasename(Glob.gl_pathv[i]);
+	
+	if ((strcmp(ptr,".") !=0) && (strcmp(ptr, "..") !=0) )
+	{
+	ptr=Glob.gl_pathv[i];
+	lstat(ptr, &Stat);
+
+	Path=MCopyStr(Path, Dest, "/", GetBasename(ptr), NULL);
+	if (S_ISLNK(Stat.st_mode))
+	{
+		Tempstr=SetStrLen(Tempstr, PATH_MAX);
+		readlink(ptr, Tempstr, PATH_MAX);
+		symlink(Path, Tempstr);
+	}
+	else if (S_ISDIR(Stat.st_mode))
+	{
+		FileSystemCopyDir(ptr, Path);
+	}
+	else if (S_ISREG(Stat.st_mode))
+	{
+		FileCopy(ptr, Path); 
+	}
+	else
+	{
+		 RaiseError(0, "FileSystemCopyDir", "WARNING: not copying %s. Files of this type aren't yet supported for copy", Src);
+	}
+	}
+}
+
+globfree(&Glob);
+
+Destroy(Tempstr);
+Destroy(Path);
+}

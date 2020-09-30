@@ -397,3 +397,24 @@ int ExtractVarsFromString(const char *Data, const char *FormatStr, ListNode *Var
 }
 
 
+
+
+int FindVarNamesInString(const char *Data, ListNode *Vars)
+{
+const char *ptr;
+char *Name=NULL;
+
+for (ptr=Data; *ptr !='\0'; ptr++)
+{
+  if ((*ptr=='$') && (*(ptr+1)=='('))
+  {
+  ptr=GetToken(ptr+2, ")", &Name, 0);
+  SetVar(Vars, Name, "");
+  }
+}
+
+Destroy(Name);
+
+return(ListSize(Vars));
+}
+

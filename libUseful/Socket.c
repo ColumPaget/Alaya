@@ -158,47 +158,47 @@ int SockSetOpt(int sock, int Opt, const char *Name, int OnOrOff)
 void SockSetOptions(int sock, int SetFlags, int UnsetFlags)
 {
 #ifdef SO_BROADCAST
-    if (SetFlags & SOCK_BROADCAST) SockSetOpt(sock, SO_BROADCAST, "SOCK_BROADCAST", 1);
+  if (SetFlags & SOCK_BROADCAST) SockSetOpt(sock, SO_BROADCAST, "SOCK_BROADCAST", 1);
 #endif
 
 #ifdef SO_DONTROUTE
-    if (SetFlags & SOCK_DONTROUTE) SockSetOpt(sock, SO_DONTROUTE, "SOCK_DONEROUTE", 1);
+  if (SetFlags & SOCK_DONTROUTE) SockSetOpt(sock, SO_DONTROUTE, "SOCK_DONTROUTE", 1);
 #endif
 
 #ifdef SO_REUSEPORT
-    if (SetFlags & SOCK_REUSEPORT) SockSetOpt(sock, SO_REUSEPORT, "SOCK_REUSEPORT", 1);
+  if (SetFlags & SOCK_REUSEPORT) SockSetOpt(sock, SO_REUSEPORT, "SOCK_REUSEPORT", 1);
 #endif
 
 #ifdef SO_PASSCRED
-    if (SetFlags & SOCK_PEERCREDS) SockSetOpt(sock, SO_PASSCRED, "SOCK_PEERCREDS", 1);
+  if (SetFlags & SOCK_PEERCREDS) SockSetOpt(sock, SO_PASSCRED,  "SOCK_PEERCREDS", 1);
 #endif
 
 #ifdef SO_KEEPALIVE
-//Default is KEEPALIVE ON
-    SockSetOpt(sock, SO_KEEPALIVE, "SO_KEEPALIVE", 1);
+	//Default is KEEPALIVE ON
+  SockSetOpt(sock, SO_KEEPALIVE, "SO_KEEPALIVE", 1);
 #endif
 
-    if (SetFlags & CONNECT_NONBLOCK) fcntl(sock,F_SETFL,O_NONBLOCK);
+  if (SetFlags & CONNECT_NONBLOCK) fcntl(sock,F_SETFL,O_NONBLOCK);
 
 
 #ifdef SO_BROADCAST
-    if (UnsetFlags & SOCK_BROADCAST) SockSetOpt(sock, SO_BROADCAST, "", 0);
+  if (UnsetFlags & SOCK_BROADCAST) SockSetOpt(sock, SO_BROADCAST, "", 0);
 #endif
 
 #ifdef SO_DONTROUTE
-    if (UnsetFlags & SOCK_DONTROUTE) SockSetOpt(sock, SO_DONTROUTE, "", 1);
+  if (UnsetFlags & SOCK_DONTROUTE) SockSetOpt(sock, SO_DONTROUTE, "", 1);
 #endif
 
 #ifdef SO_REUSEPORT
-    if (UnsetFlags & SOCK_REUSEPORT) SockSetOpt(sock, SO_REUSEPORT, "", 1);
+  if (UnsetFlags & SOCK_REUSEPORT) SockSetOpt(sock, SO_REUSEPORT, "", 1);
 #endif
 
 #ifdef SO_PASSCRED
-    if (UnsetFlags & SOCK_PEERCREDS) SockSetOpt(sock, SO_PASSCRED, "", 1);
+  if (UnsetFlags & SOCK_PEERCREDS) SockSetOpt(sock, SO_PASSCRED, "", 1);
 #endif
 
 #ifdef SO_KEEPALIVE
-    if (SetFlags & SOCK_NOKEEPALIVE) SockSetOpt(sock, SO_KEEPALIVE, "SOCK_NOKEEPALIVE", 0);
+  if (SetFlags & SOCK_NOKEEPALIVE) SockSetOpt(sock, SO_KEEPALIVE, "SOCK_NOKEEPALIVE", 0);
 #endif
 }
 
@@ -282,7 +282,7 @@ int SockAddrCreate(struct sockaddr **ret_sa, const char *Host, int Port)
     }
 
 #ifdef USE_INET6
-    return(IP6SockAddrCreate(ret_sa, p_Addr, Port));
+    if (IsIP6Address(p_Addr)) return(IP6SockAddrCreate(ret_sa, p_Addr, Port));
 #endif
 
     return(IP4SockAddrCreate(ret_sa, p_Addr, Port));
@@ -298,7 +298,6 @@ int BindSock(int Type, const char *Address, int Port, int Flags)
     socklen_t salen;
     int fd;
 
-
     salen=SockAddrCreate(&sa, Address, Port);
     if (salen==0) return(-1);
     if (Flags & BIND_RAW)
@@ -308,17 +307,15 @@ int BindSock(int Type, const char *Address, int Port, int Flags)
     }
     else fd=socket(sa->sa_family, Type, 0);
 
-    //REISEADDR and REUSEPORT must be set BEFORE bind
+    //REUSEADDR and REUSEPORT must be set BEFORE bind
     result=1;
-#ifdef SO_REUSEADDR
-    setsockopt(fd,SOL_SOCKET,SO_REUSEADDR,&result,sizeof(result));
-#endif
+		#ifdef SO_REUSEADDR
+	    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &result, sizeof(result));
+		#endif
 
-    /*
-    	#ifdef SO_REUSEPORT
-    	setsockopt(fd,SOL_SOCKET,SO_REUSEPORT,&result,sizeof(result));
-    	#endif
-    */
+   	#ifdef SO_REUSEPORT
+	   	if (Flags & BIND_REUSEPORT) setsockopt(fd, IPPROTO_IP, SO_REUSEPORT, &result, sizeof(result));
+   	#endif
 
     result=bind(fd, sa, salen);
     free(sa);
@@ -419,6 +416,42 @@ int GetSockDestination(int sock, char **Host, int *Port)
     return(result);
 }
 
+
+char *GetInterfaceDetails(char *RetStr, const char *Interface)
+{
+    int fd, result;
+    struct ifreq ifr;
+		char *Tempstr=NULL;
+
+		RetStr=CopyStr(RetStr, "");
+    if (! StrValid(Interface)) return(RetStr);
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd==-1) return(RetStr);
+
+    ifr.ifr_addr.sa_family = AF_INET;
+    strncpy(ifr.ifr_name, Interface, IFNAMSIZ-1);
+
+    result=ioctl(fd, SIOCGIFADDR, &ifr);
+		if (result > -1) RetStr=MCopyStr(RetStr, "ip4address=", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr), " ", NULL);
+
+    result=ioctl(fd, SIOCGIFBRDADDR, &ifr);
+		RetStr=MCatStr(RetStr, "ip4broadcast=", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_broadaddr)->sin_addr), " ", NULL);
+
+    result=ioctl(fd, SIOCGIFNETMASK, &ifr);
+		RetStr=MCatStr(RetStr, "ip4netmask=", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_broadaddr)->sin_addr), " ", NULL);
+
+    result=ioctl(fd, SIOCGIFDSTADDR, &ifr);
+		RetStr=MCatStr(RetStr, "ip4destaddr=", inet_ntoa(((struct sockaddr_in *)&ifr.ifr_dstaddr)->sin_addr), " ", NULL);
+
+    result=ioctl(fd, SIOCGIFMTU, &ifr);
+		Tempstr=FormatStr(Tempstr, "%d", ifr.ifr_mtu);
+		RetStr=MCatStr(RetStr, "ip4destaddr=", Tempstr, " ", NULL);
+
+    close(fd);
+
+		Destroy(Tempstr);
+	return(RetStr);
+}
 
 
 
@@ -564,9 +597,10 @@ int STREAMSendDgram(STREAM *S, const char *Host, int Port, char *Data, int len)
 
 
 
-int IPServerInit(int iType, const char *Address, int Port)
+int IPServerNew(int iType, const char *Address, int Port, int Flags)
 {
     int sock, val, Type;
+		int BindFlags=0;
     const char *p_Addr=NULL, *ptr;
 
 //if IP6 not compiled in then throw error if one is passed
@@ -598,7 +632,11 @@ int IPServerInit(int iType, const char *Address, int Port)
         break;
     }
 
-    sock=BindSock(Type, p_Addr, Port, BIND_CLOEXEC | BIND_LISTEN);
+		BindFlags=BIND_CLOEXEC | BIND_LISTEN;
+		if (Flags & SOCK_REUSEPORT) BindFlags |= BIND_REUSEPORT;
+    sock=BindSock(Type, p_Addr, Port, BindFlags);
+
+   if (sock > -1) SockSetOptions(sock, Flags, 0);
 
 #ifdef IP_TRANSPARENT
     if (iType==SOCK_TPROXY)
@@ -615,6 +653,13 @@ int IPServerInit(int iType, const char *Address, int Port)
 
 
     return(sock);
+}
+
+
+
+int IPServerInit(int iType, const char *Address, int Port)
+{
+return(IPServerNew(iType, Address, Port, 0));
 }
 
 
@@ -646,8 +691,8 @@ STREAM *STREAMFromSock(int sock, int Type, const char *Peer, const char *DestIP,
     S->Type=Type;
     if (StrValid(Peer))
     {
-        if (strncmp(Peer,"::ffff:",7)==0) STREAMSetValue(S,"Peer",Peer+7);
-        else STREAMSetValue(S,"Peer",Peer);
+        if (strncmp(Peer,"::ffff:",7)==0) STREAMSetValue(S,"PeerIP",Peer+7);
+        else STREAMSetValue(S,"PeerIP",Peer);
     }
 
     if (StrValid(DestIP))
@@ -666,31 +711,54 @@ STREAM *STREAMFromSock(int sock, int Type, const char *Peer, const char *DestIP,
     return(S);
 }
 
-STREAM *STREAMServerInit(const char *URL)
+
+int ServerParseConfig(const char *Config)
+{
+const char *ptr;
+int Flags=0;
+
+for (ptr=Config; *ptr !='\0'; ptr++)
+{
+	switch (*ptr)
+	{
+		case 'A': Flags |= SOCK_TLS_AUTO; break;
+		case 'B': Flags |= SOCK_BROADCAST; break;
+		case 'R': Flags |= SOCK_DONTROUTE; break;
+		case 'P': Flags |= SOCK_REUSEPORT; break;
+	}
+}
+
+return(Flags);
+}
+
+
+STREAM *STREAMServerNew(const char *URL, const char *Config)
 {
     char *Proto=NULL, *Host=NULL, *Token=NULL;
-    int fd=-1, Port=0, Type;
+    int fd=-1, Port=0, Type, Flags=0;
     STREAM *S=NULL;
 
     ParseURL(URL, &Proto, &Host, &Token,NULL, NULL,NULL,NULL);
     if (StrValid(Token)) Port=atoi(Token);
+
+		Flags=ServerParseConfig(Config);
 
     switch (*Proto)
     {
     case 'u':
         if (strcmp(Proto,"udp")==0)
         {
-            fd=IPServerInit(SOCK_DGRAM,Host,Port);
+            fd=IPServerNew(SOCK_DGRAM, Host, Port, Flags);
             Type=STREAM_TYPE_UDP;
         }
         else if (strcmp(Proto,"unix")==0)
         {
-            fd=UnixServerInit(SOCK_STREAM,URL+5);
+            fd=UnixServerInit(SOCK_STREAM, URL+5);
             Type=STREAM_TYPE_UNIX_SERVER;
         }
         else if (strcmp(Proto,"unixdgram")==0)
         {
-            fd=UnixServerInit(SOCK_DGRAM,URL+10);
+            fd=UnixServerInit(SOCK_DGRAM, URL+10);
             Type=STREAM_TYPE_UNIX_DGRAM;
         }
         break;
@@ -698,13 +766,13 @@ STREAM *STREAMServerInit(const char *URL)
     case 't':
         if (strcmp(Proto,"tcp")==0)
         {
-            fd=IPServerInit(SOCK_STREAM,Host,Port);
+            fd=IPServerNew(SOCK_STREAM, Host, Port, Flags);
             Type=STREAM_TYPE_TCP_SERVER;
         }
         else if (strcmp(Proto,"tproxy")==0)
         {
 #ifdef SOCK_TPROXY
-            fd=IPServerInit(SOCK_TPROXY,Host,Port);
+            fd=IPServerNew(SOCK_TPROXY, Host, Port, Flags);
             Type=STREAM_TYPE_TPROXY;
 #endif
         }
@@ -712,7 +780,11 @@ STREAM *STREAMServerInit(const char *URL)
     }
 
     S=STREAMFromSock(fd, Type, NULL, Host, Port);
-    if (S) S->Path=CopyStr(S->Path, URL);
+    if (S) 
+		{
+			S->Path=CopyStr(S->Path, URL);
+   		if (Flags & SOCK_TLS_AUTO) S->Flags |= SF_TLS_AUTO;
+		}
 
     DestroyString(Proto);
     DestroyString(Host);
@@ -721,6 +793,11 @@ STREAM *STREAMServerInit(const char *URL)
     return(S);
 }
 
+
+STREAM *STREAMServerInit(const char *URL)
+{
+return(STREAMServerNew(URL, ""));
+}
 
 STREAM *STREAMServerAccept(STREAM *Serv)
 {
@@ -757,19 +834,8 @@ STREAM *STREAMServerAccept(STREAM *Serv)
     S=STREAMFromSock(fd, type, Tempstr, DestIP, DestPort);
     if (type==STREAM_TYPE_TCP_ACCEPT)
     {
-        //if TLS autodetection enabled, perform it now
-        if (Serv->Flags & SF_TLS_AUTO)
-        {
-            Tempstr=SetStrLen(Tempstr,255);
-            result=recv(S->in_fd, Tempstr, 4, MSG_PEEK);
-            if (result >3)
-            {
-                if (memcmp(Tempstr, "\x16\x03\x01",3)==0)
-                {
-                    //it's SSL/TLS
-                }
-            }
-        }
+    	//if TLS autodetection enabled, perform it now
+    	if (Serv->Flags & SF_TLS_AUTO) OpenSSLAutoDetect(S);
     }
 
     DestroyString(Tempstr);
@@ -909,22 +975,24 @@ int IPReconnect(int sock, const char *Host, int Port, int Flags)
 
 int TCPConnectWithAttributes(const char *LocalHost, const char *Host, int Port, int Flags, int TTL, int ToS)
 {
-    int sock, result;
+const char *p_LocalHost=LocalHost;
+int sock, result;
 
-    sock=BindSock(SOCK_STREAM, LocalHost, 0, 0);
+if ((! StrValid(p_LocalHost)) && IsIP6Address(Host)) p_LocalHost="::";
 
-    if (TTL > 0) setsockopt(sock, IPPROTO_IP, IP_TTL, &TTL, sizeof(int));
-    if (ToS > 0) setsockopt(sock, IPPROTO_IP, IP_TOS, &ToS, sizeof(int));
+sock=BindSock(SOCK_STREAM, p_LocalHost, 0, 0);
 
-    result=IPReconnect(sock,Host,Port,Flags);
-    if (result==-1)
-    {
-        close(sock);
-        return(-1);
-    }
+if (TTL > 0) setsockopt(sock, IPPROTO_IP, IP_TTL, &TTL, sizeof(int));
+if (ToS > 0) setsockopt(sock, IPPROTO_IP, IP_TOS, &ToS, sizeof(int));
 
+result=IPReconnect(sock,Host,Port,Flags);
+if (result==-1)
+{
+  close(sock);
+  return(-1);
+}
 
-    return(sock);
+return(sock);
 }
 
 
@@ -1181,12 +1249,17 @@ int STREAMConnect(STREAM *S, const char *URL, const char *Config)
     while (ptr)
     {
         if (strcmp("Name","E")==0) Flags |= CONNECT_ERROR;
-        if (strcmp("Name","k")==0) Flags |= SOCK_NOKEEPALIVE;
-        if (strcasecmp("Name","keepalive")==0)
+        else if (strcmp("Name","k")==0) Flags |= SOCK_NOKEEPALIVE;
+        else if (strcasecmp("Name","keepalive")==0)
         {
             if (StrLen(Value) && (strncasecmp(Value, "n",1)==0)) Flags |= SOCK_NOKEEPALIVE;
         }
-        STREAMSetValue(S, Name, Value);
+				else if (strcasecmp("Name","timeout")==0)
+        {
+            S->Timeout=atoi(Value);
+        }
+        else STREAMSetValue(S, Name, Value);
+
         ptr=GetNameValuePair(ptr," ","=",&Name,&Value);
     }
 

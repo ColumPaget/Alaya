@@ -187,7 +187,7 @@ const char *OpenSSLQueryCipher(STREAM *S)
     void *ptr;
 
     if (! S) return(NULL);
-    ptr=STREAMGetItem(S,"LIBUSEFUL-SSL:CTX");
+    ptr=STREAMGetItem(S,"LIBUSEFUL-SSL:OBJ");
     if (! ptr) return(NULL);
 
 #ifdef HAVE_LIBSSL
@@ -259,7 +259,7 @@ int OpenSSLVerifyCertificate(STREAM *S)
     X509 *cert=NULL;
     SSL *ssl;
 
-    ptr=STREAMGetItem(S,"LIBUSEFUL-SSL:CTX");
+    ptr=STREAMGetItem(S,"LIBUSEFUL-SSL:OBJ");
     if (! ptr) return(FALSE);
 
     ssl=(SSL *) ptr;
@@ -481,7 +481,8 @@ int DoSSLClientNegotiation(STREAM *S, int Flags)
             SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, OpenSSLVerifyCallback);
             ssl=SSL_new(ctx);
             SSL_set_fd(ssl,S->in_fd);
-            STREAMSetItem(S,"LIBUSEFUL-SSL:CTX",(void *) ssl);
+            STREAMSetItem(S,"LIBUSEFUL-SSL:CTX",(void *) ctx);
+            STREAMSetItem(S,"LIBUSEFUL-SSL:OBJ",(void *) ssl);
             OpenSSLSetOptions(S, ssl, SSL_OP_SINGLE_DH_USE);
 
             ptr=LibUsefulGetValue("SSL:PermittedCiphers");
@@ -547,7 +548,7 @@ void OpenSSLSetupDH(SSL_CTX *ctx)
     if (CachedDH) dh=CachedDH;
     else
     {
-        ptr=LibUsefulGetValue("SSL:DHParamsFile");
+        ptr=LibUsefulGetValue("SSL:DHParams-File");
         if (StrValid(ptr)) Tempstr=CopyStr(Tempstr,ptr);
 
         paramfile = fopen(Tempstr, "r");
@@ -613,7 +614,10 @@ int DoSSLServerNegotiation(STREAM *S, int Flags)
                 OpenSSLSetOptions(S, ssl, SSL_OP_SINGLE_DH_USE|SSL_OP_CIPHER_SERVER_PREFERENCE);
 
                 SSL_set_fd(ssl,S->in_fd);
-                STREAMSetItem(S,"LIBUSEFUL-SSL:CTX",ssl);
+              
+ 		            STREAMSetItem(S,"LIBUSEFUL-SSL:CTX",(void *) ctx);
+   			        STREAMSetItem(S,"LIBUSEFUL-SSL:OBJ",(void *) ssl);
+ 
                 ptr=LibUsefulGetValue("SSL:PermittedCiphers");
                 if (StrValid(ptr)) SSL_set_cipher_list(ssl, ptr);
                 SSL_set_accept_state(ssl);
@@ -657,12 +661,12 @@ int DoSSLServerNegotiation(STREAM *S, int Flags)
 
 
 
-int STREAMIsPeerAuth(STREAM *S)
+int OpenSSLIsPeerAuth(STREAM *S)
 {
 #ifdef HAVE_LIBSSL
     void *ptr;
 
-    ptr=STREAMGetItem(S,"LIBUSEFUL-SSL:CTX");
+    ptr=STREAMGetItem(S,"LIBUSEFUL-SSL:OBJ");
     if (! ptr) return(FALSE);
 
     if (SSL_get_verify_result((SSL *) ptr)==X509_V_OK)
@@ -674,3 +678,56 @@ int STREAMIsPeerAuth(STREAM *S)
 }
 
 
+void OpenSSLClose(STREAM *S)
+{
+ListNode *Node;
+
+#ifdef HAVE_LIBSSL
+
+Node=ListFindNamedItem(S->Items,"LIBUSEFUL-SSL:OBJ");
+if (Node) 
+{
+	SSL_free((SSL *) Node->Item);
+	ListDeleteNode(Node);
+}
+
+Node=ListFindNamedItem(S->Items,"LIBUSEFUL-SSL:CTX");
+if (Node) 
+{
+	SSL_CTX_free((SSL_CTX *) Node->Item);
+	ListDeleteNode(Node);
+}
+#endif
+}
+
+
+
+int OpenSSLAutoDetect(STREAM *S)
+{
+int result, val, RetVal=FALSE;
+char *Tempstr=NULL;
+
+val=S->Timeout;
+STREAMSetTimeout(S, 1);
+
+result=STREAMCountWaitingBytes(S);
+if (result > 1)
+{
+   Tempstr=SetStrLen(Tempstr,255);
+   result=recv(S->in_fd, Tempstr, 2, MSG_PEEK);
+   if (result >1)
+   {
+     if (memcmp(Tempstr, "\x16\x03",2)==0)
+     {
+     	//it's SSL/TLS
+			DoSSLServerNegotiation(S, 0);
+			RetVal=TRUE;
+     }
+   }
+}
+STREAMSetTimeout(S, val);
+
+Destroy(Tempstr);
+
+return(RetVal);
+}

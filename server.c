@@ -1270,6 +1270,7 @@ static int HTTPServerAuthenticate(HTTPSession *Session)
 	{
 		if (strcmp(Session->UserName, Session->AuthenticatedUser)==0) 
 		{
+			ProcessSetTitle("alaya %s@%s", Session->AuthenticatedUser, Session->ClientIP);
 			LogToFile(Settings.LogPath,"AUTH: Session Keep-Alive active, reusing authentication for %s@%s (%s) %s %s", Session->ClientIP, Session->ClientHost, Session->ClientIP, Session->Method, Session->Path);
 			return(TRUE);
 		}
@@ -1305,6 +1306,7 @@ static int HTTPServerAuthenticate(HTTPSession *Session)
 	{
 		Session->AuthenticatedUser=CopyStr(Session->AuthenticatedUser, Session->UserName);
 		Session->Flags |= SESSION_AUTHENTICATED;
+		ProcessSetTitle("alaya %s@%s", Session->AuthenticatedUser, Session->ClientIP);
 	}
 
 	return(result);

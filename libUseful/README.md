@@ -16,7 +16,7 @@ should be as simple as:
 make
 make install
 
-.h files will be copied to <prefix>/include/libUseful-3.0
+.h files will be copied to <prefix>/include/libUseful-4
 
 On linux a few linux-specific functions can be activated via configure:
 

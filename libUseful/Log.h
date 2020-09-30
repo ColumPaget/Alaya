@@ -102,9 +102,11 @@ int LogWrite(TLogFile *Log, const char *Str);
 //this is the main function that you'll call to log to a logfile. 
 int LogToFile(const char *FileName, const char *fmt, ...);
 
-//check if a file needs rotating and do so if it does
+//check if a logfile needs to be rotated and do so if it does
 void LogFileCheckRotate(const char *FileName);
 
+//check all known logfiles to be rotated or other scheduled tasks (e.g. 'MARK' lines)
+void LogFilesHousekeep();
 
 #ifdef __cplusplus
 }

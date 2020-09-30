@@ -66,6 +66,7 @@ const char *ParseHostDetails(const char *Data,char **Host,char **Port,char **Use
     return(ptr);
 }
 
+
 void ParseURL(const char *URL, char **Proto, char **Host, char **Port, char **User, char **Password, char **Path, char **Args)
 {
     const char *ptr;
@@ -95,15 +96,17 @@ void ParseURL(const char *URL, char **Proto, char **Host, char **Port, char **Us
             //some number of '//' follow protocol
             while (*ptr=='/') ptr++;
         }
-
-        ptr=GetToken(ptr,"/",&Token,0);
-        ParseHostDetails(Token,Host,Port,User,Password);
     }
     else ptr=URL;
 
-    while (ptr && (*ptr=='/')) ptr++;
+	// either we've cut out a protocol, or we haven't. If not the next thing is going to be the hostname
+	// maybe there we be a path coming after '/', even if '/' is absent this GetToken will return the Host part
+   ptr=GetToken(ptr,"/",&Token,0);
+   ParseHostDetails(Token,Host,Port,User,Password);
 
-    if (ptr)
+    //while (ptr && (*ptr=='/')) ptr++;
+
+    if (StrValid(ptr))
     {
         if (Path)
         {

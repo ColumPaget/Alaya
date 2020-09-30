@@ -20,6 +20,7 @@ Read Stream.h to understand the STREAM object. STREAMS can be pipes to other pro
 #define DIALOG_END 1
 #define DIALOG_FAIL 2
 #define DIALOG_OPTIONAL 4
+#define DIALOG_TIMEOUT 8
 
 typedef struct
 {
@@ -68,7 +69,7 @@ ListDestroy(DialogList, ExpectDialogDestroy);
 */
 
 void ExpectDialogAdd(ListNode *Dialogs, char *Expect, char *Reply, int Flags);
-int STREAMExpectDialog(STREAM *S, ListNode *Dialogs);
+int STREAMExpectDialog(STREAM *S, ListNode *Dialogs, int Timeout);
 
 void ExpectDialogDestroy(void *Item);
 

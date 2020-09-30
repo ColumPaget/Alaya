@@ -14,9 +14,6 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 
-//this function is in Stream.c but we do not want to declare it in Stream.h and expose it to the user, so it's prototyped here
-int STREAMReadThroughProcessors(STREAM *S, char *Bytes, int InLen);
-
 typedef struct
 {
     char *Key;
@@ -29,6 +26,12 @@ typedef struct
     EVP_CIPHER_CTX *dec_ctx;
 } libCryptoProcessorData;
 #endif
+
+
+
+
+//this function is in Stream.c but we do not want to declare it in Stream.h and expose it to the user, so it's prototyped here
+extern int STREAMReadThroughProcessors(STREAM *S, char *Bytes, int InLen);
 
 
 void DataProcessorDestroy(void *In)
@@ -423,8 +426,8 @@ int libCryptoProcessorInit(TProcessingModule *ProcMod, const char *Args)
 
     if (Data->Cipher)
     {
-        Data->enc_ctx=(EVP_CIPHER_CTX *) calloc(1,sizeof(EVP_CIPHER_CTX));
-        Data->dec_ctx=(EVP_CIPHER_CTX *) calloc(1,sizeof(EVP_CIPHER_CTX));
+        Data->enc_ctx=EVP_CIPHER_CTX_new();
+        Data->dec_ctx=EVP_CIPHER_CTX_new();
         EVP_CIPHER_CTX_init(Data->enc_ctx);
         EVP_CIPHER_CTX_init(Data->dec_ctx);
         Data->BlockSize=EVP_CIPHER_block_size(Data->Cipher);

@@ -20,6 +20,17 @@ int SpawnParseConfig(const char *Config)
     while (ptr)
     {
         if (strcasecmp(Token,"+stderr")==0) Flags |= SPAWN_COMBINE_STDERR;
+				else if (strcasecmp(Token,"stderr2null")==0)
+				{
+					close(2);
+					open("/dev/null", O_WRONLY);
+				}
+				else if (strcasecmp(Token,"stdout2null")==0)
+				{
+					close(1);
+					open("/dev/null", O_WRONLY);
+				}
+
 
         ptr=GetToken(ptr," |,",&Token,GETTOKEN_MULTI_SEP);
     }
@@ -107,19 +118,25 @@ pid_t xforkio(int StdIn, int StdOut, int StdErr)
         if (StdIn !=0) 
         {
         		if (StdIn == -1) fd_remap_path(0, "/dev/null", O_RDONLY);	
-						else fd_remap(0, StdIn);	
+						else 
+						{
+							fd_remap(0, StdIn);	
+							close(StdIn); //must close or we will have it open twice, and it won't close when the peer closes it
+						}
         }
 
         if (StdOut !=1) 
         {
         		if (StdOut == -1) fd_remap_path(1, "/dev/null", O_WRONLY);	
 						else fd_remap(1, StdOut);	
+						close(StdOut); //must close or we will have it open twice, and it won't close when the peer closes it
         }
 
         if (StdErr !=2) 
         {
         		if (StdErr == -1) fd_remap_path(2, "/dev/null", O_WRONLY);	
 						else fd_remap(2, StdErr);	
+						close(StdErr); //must close or we will have it open twice, and it won't close when the peer closes it
         }
     }
 
@@ -212,9 +229,14 @@ pid_t PipeSpawnFunction(int *infd, int *outfd, int *errfd, BASIC_FUNC Func, void
         if (errfd) close(channel3[0]);
         else if (DevNull==-1) DevNull=open("/dev/null",O_RDWR);
 
+				//if Func is NULL we effectively do a fork, rather than calling a function we just
+        //continue exectution from where we were
         Flags=ProcessApplyConfig(Config);
+				if (Func)
+				{
 				if (! (Flags & PROC_SETUP_FAIL)) Func(Data, Flags);
         exit(0);
+				}
     }
     else // This is the parent process, not the spawned child
     {
@@ -274,8 +296,14 @@ pid_t PseudoTTYSpawnFunction(int *ret_pty, BASIC_FUNC Func, void *Data, int Flag
             close(tty);
 
             ConfigFlags=ProcessApplyConfig(Config);
+
+						//if Func is NULL we effectively do a fork, rather than calling a function we just
+						//continue exectution from where we were
+						if (Func)
+						{
 						if (! (ConfigFlags & PROC_SETUP_FAIL)) Func((char *) Data, ConfigFlags);
             _exit(0);
+						}
         }
 
         close(tty);
@@ -315,7 +343,14 @@ STREAM *STREAMSpawnFunction(BASIC_FUNC Func, void *Data, const char *Config)
         pid=PipeSpawnFunction(&to_fd, &from_fd, iptr, Func, Data, Config);
     }
 
-    if (pid > 0) S=STREAMFromDualFD(from_fd, to_fd);
+    if (pid > 0) 
+		{
+			//sleep to allow spawned function time to exit due to startup problems
+			usleep(250);
+			//use waitpid to check process has not exited, if so then spawn stream
+			if (waitpid(pid, NULL, WNOHANG) < 1) S=STREAMFromDualFD(from_fd, to_fd);
+		}
+
     if (S)
     {
         STREAMSetFlushType(S,FLUSH_LINE,0,0);

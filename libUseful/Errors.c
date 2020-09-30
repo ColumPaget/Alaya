@@ -27,6 +27,33 @@ ListNode *ErrorsGet()
 }
 
 
+static bool ErrorOutputWanted(int flags)
+{
+bool result=TRUE;
+
+//if stderr isn't a tty then don't print, unless ERRFLAG_NOTTY is set
+//(this is used to disable this check when we consider syslog debugging too)
+if ( 
+		(! (flags & ERRFLAG_NOTTY)) && 
+		(! isatty(2))
+	) 
+{
+	if (! LibUsefulGetBool("Error:notty")) result=FALSE;
+}
+
+//if this error is a debug error, then don't print unless either LIBUSEFUL_DEBUG environment variable is set
+//or the libUseful:Debug internal value is set
+if (flags & ERRFLAG_DEBUG) 
+{
+	result=FALSE;
+	if (StrValid(getenv("LIBUSEFUL_DEBUG"))) result=TRUE;
+	if (LibUsefulGetBool("libUseful:Debug")) result=TRUE;
+}
+
+return(result);
+}
+
+
 void InternalRaiseError(int flags, const char *where, const char *file, int line, const char *FmtStr, ...)
 {
     char *Tempstr=NULL;
@@ -47,28 +74,23 @@ void InternalRaiseError(int flags, const char *where, const char *file, int line
     if (! Errors) Errors=ListCreate();
     if (flags & ERRFLAG_ERRNO) ptr=strerror(errno_save);
 
-    if (flags & ERRFLAG_DEBUG)
-    {
-        ptr=getenv("LIBUSEFUL_DEBUG");
-        if (StrEnd(ptr))
-        {
-            if (LibUsefulGetBool("libUseful:Debug")) ptr="y";
-        }
+		//first consider if we want to print out a message on stderr
+		if (ErrorOutputWanted(flags))
+		{
+       if (! LibUsefulGetBool("Error:Silent")) fprintf(stderr,"DEBUG: %s %s:%d %s. %s\n", where, file, line, Tempstr, ptr);
+		}
 
-        if (StrValid(ptr))
-        {
-            if (! LibUsefulGetBool("Error:Silent")) fprintf(stderr,"DEBUG: %s %s:%d %s. %s\n", where, file, line, Tempstr, ptr);
-            if (LibUsefulGetBool("Error:Syslog")) syslog(LOG_ERR,"DEBUG: %s %s:%d %s. %s", where, file, line, Tempstr, ptr);
-        }
-    }
-    else
+		//now consider if we want to syslog an error message. Pass ERRFLAG_NOTTY as it doesn't matter if stderr is not a
+		//tty for this case
+		if (ErrorOutputWanted(flags | ERRFLAG_NOTTY))
+		{
+       if (LibUsefulGetBool("Error:Syslog")) syslog(LOG_ERR,"DEBUG: %s %s:%d %s. %s", where, file, line, Tempstr, ptr);
+		}
+
+		//if this Error is just debugging, then never add it to the list of errors
+    if (! (flags & ERRFLAG_DEBUG))
     {
         Now=GetTime(TIME_MILLISECS);
-
-        if (! LibUsefulGetBool("Error:Silent")) fprintf(stderr,"ERROR: %s %s:%d %s. %s\n", where, file, line, Tempstr, ptr);
-        if (LibUsefulGetBool("Error:Syslog")) syslog(LOG_ERR,"ERROR: %s %s:%d %s. %s", where, file, line, Tempstr, ptr);
-
-
         Err=(TError *) calloc(1,sizeof(TError));
         Err->errval=errno_save;
         Err->when=Now;

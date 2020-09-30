@@ -53,3 +53,15 @@ return(CommandLineNext(CmdLine));
 }
 
 
+const char *CommandLinePeek(CMDLINE *CmdLine)
+{
+const char *ptr=NULL;
+
+if ((CmdLine->curr+1) < CmdLine->argc)
+{
+ptr=CmdLine->argv[CmdLine->curr+1];
+}
+
+return(ptr);
+}
+

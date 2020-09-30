@@ -43,7 +43,7 @@ int TTYReset(int tty)
 
     if (! isatty(tty)) return(FALSE);
     Tempstr=FormatStr(Tempstr,"%d",tty);
-    Curr=ListFindNamedItem(TTYAttribs,Tempstr);
+    Curr=ListFindNamedItem(TTYAttribs, Tempstr);
     if (Curr)
     {
         tty_data=(struct termios *) Curr->Item;
@@ -55,6 +55,16 @@ int TTYReset(int tty)
     DestroyString(Tempstr);
 
     return(TRUE);
+}
+
+
+void PTYSetGeometry(int pty, int wid, int high)
+{
+    struct winsize w;
+
+    w.ws_col=wid;
+    w.ws_row=high;
+    ioctl(pty, TIOCSWINSZ, &w);
 }
 
 
@@ -265,6 +275,8 @@ int TTYOpen(const char *devname, int LineSpeed, int Flags)
 }
 
 
+
+
 int TTYParseConfig(const char *Config, int *Speed)
 {
     const char *ptr;
@@ -308,41 +320,53 @@ int TTYConfigOpen(const char *Dev, const char *Config)
 
 
 
-int PseudoTTYGrab(int *pty, int *tty, int TermFlags)
+
+int PseudoTTYGrabUnix98(int *master, int *slave, int TermFlags)
 {
-    char c1,c2;
     char *Tempstr=NULL;
-		struct termios tty_conf;
 
 //first try unix98 style
-    *pty=open("/dev/ptmx",O_RDWR);
-    if (*pty > -1)
+    *master=open("/dev/ptmx",O_RDWR);
+    if (*master > -1)
     {
-        if (grantpt(*pty)==-1) RaiseError(ERRFLAG_ERRNO, "pty", "grantpt failed");
-        if (unlockpt(*pty)==-1) RaiseError(ERRFLAG_ERRNO, "pty", "unlockpt failed");
+        if (grantpt(*master)==-1) RaiseError(ERRFLAG_ERRNO, "pty", "grantpt failed");
+        if (unlockpt(*master)==-1) RaiseError(ERRFLAG_ERRNO, "pty", "unlockpt failed");
         Tempstr=SetStrLen(Tempstr,100);
 				memset(Tempstr, 0, 100);
 
 #ifdef HAVE_PTSNAME_R
-        if (ptsname_r(*pty,Tempstr,100) != 0)
+        if (ptsname_r(*master,Tempstr,100) != 0)
 #endif
-            Tempstr=CopyStr(Tempstr,ptsname(*pty));
-        if (StrLen(Tempstr))
+
+        Tempstr=CopyStr(Tempstr, ptsname(*master));
+        if (StrValid(Tempstr))
         {
-            if ( (*tty=open(Tempstr,O_RDWR)) >-1)
+            if ( (*slave=open(Tempstr,O_RDWR)) >-1)
             {
-                if (TermFlags !=0) TTYConfig(*tty,0,TermFlags);
+                if (TermFlags !=0) TTYConfig(*slave,0,TermFlags);
                 DestroyString(Tempstr);
-                return(1);
+                return(TRUE);
             }
             else RaiseError(ERRFLAG_ERRNO, "pty", "failed to open %s", Tempstr);
         }
-        close(*pty);
+        close(*master);
     }
     else
     {
         RaiseError(ERRFLAG_ERRNO, "pty", "failed to open /dev/ptmx");
     }
+
+Destroy(Tempstr);
+return(FALSE);
+}
+
+
+
+
+int PseudoTTYGrabBSD(int *master, int *slave, int TermFlags)
+{
+    char c1,c2;
+    char *Tempstr=NULL;
 
 //if unix98 fails, try old BSD style
 
@@ -351,15 +375,15 @@ int PseudoTTYGrab(int *pty, int *tty, int TermFlags)
         for (c2='5'; c2 <='9'; c2++)
         {
             Tempstr=FormatStr(Tempstr,"/dev/pty%c%c",c1,c2);
-            if ( (*pty=open(Tempstr,O_RDWR)) >-1)
+            if ( (*master=open(Tempstr,O_RDWR)) >-1)
             {
                 Tempstr=FormatStr(Tempstr,"/dev/tty%c%c",c1,c2);
-                if ( (*tty=TTYOpen(Tempstr,0,TermFlags)) >-1)
+                if ( (*slave=TTYOpen(Tempstr,0,TermFlags)) >-1)
                 {
                     DestroyString(Tempstr);
-                    return(1);
+                    return(TRUE);
                 }
-                else close(*pty);
+                else close(*master);
             }
 
         }
@@ -368,7 +392,16 @@ int PseudoTTYGrab(int *pty, int *tty, int TermFlags)
 
     RaiseError(0, "pty", "failed to grab pseudo tty");
     DestroyString(Tempstr);
-    return(0);
+    return(FALSE);
+}
+
+
+int PseudoTTYGrab(int *master, int *slave, int TermFlags)
+{
+if (PseudoTTYGrabUnix98(master, slave, TermFlags)) return(TRUE);
+if (PseudoTTYGrabBSD(master, slave, TermFlags)) return(TRUE);
+
+return(FALSE);
 }
 
 

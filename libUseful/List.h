@@ -25,6 +25,14 @@ This module provides double linked lists and 'maps'. Maps are hashed arrays of l
 #define LIST_FLAG_MAP (LIST_FLAG_MAP_HEAD | LIST_FLAG_MAP_CHAIN) //internally used flag
 #define LIST_FLAG_STATS 256     //internally used flag
 
+//list contains only one instance of a named item, so don't keep searching after first find.
+//N.B. This ignores item type, one instance of a name means exactly that, NOT one instance of 
+//name and type. It's specifically for use in cases where items are uniquely named but might
+//have different types, or the type value might be being used for some other purpose. It
+//allows list to return 'not found' as soon as it can
+#define LIST_FLAG_UNIQ  512     
+                             
+
 
 //these flags are available to be set against a listnode for whatever purpose the user
 //desires
@@ -102,7 +110,8 @@ typedef struct lnode
 extern "C" {
 #endif
 
-//
+// function prototypes for 'destroy' and 'clone' functions used by
+// 'DestroyList' and 'CloneList'
 typedef void (*LIST_ITEM_DESTROY_FUNC)(void *);
 typedef void *(*LIST_ITEM_CLONE_FUNC)(void *);
 
@@ -166,6 +175,9 @@ ListNode *ListGetLast(ListNode *);
 
 //get nth item in a list
 ListNode *ListGetNth(ListNode *Head, int n);
+
+
+ListNode *MapChainGetNext(ListNode *);
 
 //get next item in a map
 ListNode *MapGetNext(ListNode *);

@@ -348,6 +348,8 @@ HTTPSession *Response;
 	else
 	{
 		STREAMFlush(ClientCon);
+
+		//Launch a process that will run the requested program
 		result=fork();
 		if (result==0)
 		{
@@ -448,6 +450,8 @@ HTTPSession *Response;
 		if (StrValid(Response->StartDir)) chdir(Response->StartDir);
 		STREAMFlush(ClientCon);
 		LogFileFlushAll(TRUE);
+
+		//Launch a process that will run the requested program
 		result=fork();
 		if (result==0)
 		{
@@ -465,6 +469,9 @@ HTTPSession *Response;
 			//exit whether script ran or not!
 			_exit(0);
 		}
+
+		close(ClientCon->in_fd);
+		close(ClientCon->out_fd);
 	}
 
 

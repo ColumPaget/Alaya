@@ -120,10 +120,21 @@ see examples/Tokenizer.c for examples
 extern "C" {
 #endif
 
+//this is a function that converts a config string into flags for GETTOKEN. You wouldn't normally use this unless you have libUseful bound
+//to a language that struggles with passing bitmasks of flags (libUseful-lua uses this function)
+int GetTokenParseConfig(const char *Config);
+
+//this is the main 'GetToken' function. Given a Search string, and a delimiter, copy the next Token into 'Token' and return a pointer to the remaining string
 const char *GetToken(const char *SearchStr, const char *Delim, char **Token, int Flags);
+
+//for strings of the form "name1=value1 name2=value2" get the next name and value using the supplied delimiters
 const char *GetNameValuePair(const char *Input, const char *PairDelim, const char *NameValueDelim, char **Name, char **Value);
 
-int GetTokenParseConfig(const char *Config);
+
+//for strings of the form "name1=value1 name2=value2" get the value for the name/value pair named by 'SearchName'
+char *GetNameValue(char *RetStr, const char *Input, const char *PairDelim, const char *NameValueDelim, const char *SearchName);
+
+
 #ifdef __cplusplus
 }
 #endif

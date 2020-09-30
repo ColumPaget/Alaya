@@ -19,6 +19,7 @@ Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
 #define SOCK_REUSEPORT 128
 #define SOCK_PEERCREDS 512  //used with UNIX sockets to get remote user ID
 #define CONNECT_ERROR 1024  //report errors even if Error:IgnoreIP is set
+#define SOCK_TLS_AUTO 2048
 
 #define SOCK_CONNECTED 1
 #define SOCK_CONNECTING -1
@@ -29,6 +30,7 @@ Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
 #define BIND_LISTEN  1
 #define BIND_CLOEXEC 2
 #define BIND_RAW 4
+#define BIND_REUSEPORT 8
 
 //This is not defined on all systems, so add it here
 #ifndef HOST_NAME_MAX
@@ -44,6 +46,24 @@ Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
 extern "C" {
 #endif
 
+
+#ifndef HAVE_HTONLL
+#if __BIG_ENDIAN__
+# define htonll(x) (x)
+#else
+# define htonll(x) ( (uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32) )
+#endif
+#endif
+
+#ifndef HAVE_NTOHLL
+#if __BIG_ENDIAN__
+# define ntohll(x) (x)
+#else
+# define ntohll(x) ( (uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32) )
+#endif
+#endif
+
+
 //these functions return TRUE if a string appears to be an IP4 or IP6 address
 int IsIP4Address(const char *Str);
 int IsIP6Address(const char *Str);
@@ -53,6 +73,9 @@ int IsIPAddress(const char *Str);
 
 //return the primary IP bound to an interface (e.g. 127.0.0.1 for lo). Currently only returns IP4 addresses
 const char *GetInterfaceIP(const char *Interface);
+
+//interface details as a list of name=value pairs. (Pass in a string for them to be copied into, like 'copy str'
+char *GetInterfaceDetails(char *RetStr, const char *Interface);
 
 //look in the kernel's arp cache for the MAC address of an IP. Also can return the network device (eth0 etc) that
 //this IP has been seen on. Some communication with the device must have recently happened for this to work.
@@ -79,13 +102,25 @@ int UDPRecv(int sock,  char *Buffer, int len, char **Host, int *Port);
 // 'Address' is a local device name or IP address to bind to, or blank to bind to all local addresses/devices.
 // Return value is socket file descriptor
 int IPServerInit(int Type, const char *Address, int Port);
+int IPServerNew(int Type, const char *Address, int Port, int Flags);
 
 //Accept a connection on a ServerSocket previously created by IPServerInit. 'Addr' returns the IP of the remote
 //host that is connecting, you can pass NULL if you don't want that. Return value is a new file descriptor for
 //the accepted connection
 int IPServerAccept(int ServerSock,char **Addr);
 
+//STREAMServerInit and STREAMServerNew create server sockets for tcp:// udp:// unix:// unixdgram:// and tproxy:// protocols
+//STREAMServerNew takes a Config argument that is a string containing characters as follows:
+//  A - Autodetect SSL
+//  B - BROADCAST  set udp socket to be a broadcast socket
+//  R - Don't route. All addresses are treated as local 
+//  P - REUSE_PORT allows multiple processes to listen on the same port
+
+
 STREAM *STREAMServerInit(const char *URL);
+STREAM *STREAMServerNew(const char *URL, const char *Config);
+
+//Accept a connection on a tcp:// unix:// or tproxy:// socket
 STREAM *STREAMServerAccept(STREAM *Serv);
 
 //get endpoint details of a connection. Any of LocalAddress, LocalPort, RemoteAddress and RemotePort can be NULL if
