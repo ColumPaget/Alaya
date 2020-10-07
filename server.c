@@ -18,6 +18,11 @@
 #include "xssi.h"
 #include "icecast.h"
 
+#ifdef USE_UNSHARE
+ #define _GNU_SOURCE
+ #include <sched.h>
+#endif
+
 const char *HTTPMethods[]={"HEAD","GET","POST","PUT","DELETE","MKCOL","PROPFIND","PROPPATCH","MOVE","COPY","OPTIONS","CONNECT","LOCK","UNLOCK","MKCALENDAR", "REPORT", NULL};
 
 const char *HeaderStrings[]={"Authorization","Proxy-Authorization","Host","Destination","Content-Type","Content-Length","Depth","Overwrite","User-Agent","Cookie","If-Modified-Since","Accept-Encoding","Icy-MetaData","Referer","Connection","Upgrade","Sec-WebSocket-Key","Sec-Websocket-Key1", "Sec-Websocket-Key2","Sec-WebSocket-Protocol","Sec-WebSocket-Version","Origin", NULL};
@@ -1123,6 +1128,28 @@ Destroy(Tempstr);
 
 
 
+static int HTTPServerChroot(HTTPSession *Session)
+{
+char *Tempstr=NULL;
+STREAM *S;
+
+#ifdef USE_UNSHARE
+unshare(CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWUTS | CLONE_NEWNET);
+Tempstr=FormatStr(Tempstr, "/proc/%d/uid_map");
+S=STREAMOpen(Tempstr, "w");
+STREAMWriteLine("1 1 4294967295", S);
+STREAMClose(S);
+
+Tempstr=FormatStr(Tempstr, "/proc/%d/gid_map");
+S=STREAMOpen(Tempstr, "w");
+STREAMWriteLine("1 1 4294967295", S);
+STREAMClose(S);
+#endif
+
+if (chroot(".")==0) Session->StartDir=CopyStr(Session->StartDir,"/");
+
+Destroy(Tempstr);
+}
 
 
 static int HTTPServerSetUserContext(HTTPSession *Session)
@@ -1156,15 +1183,7 @@ else
 	Session->StartDir=CopyStr(Session->StartDir,ChrootDir);
 	}
 
-	//if we are run as the root user we do a full chroot
-	if (getuid()==0)
-	{
-		if (Settings.Flags & (FLAG_CHHOME | FLAG_CHROOT))
-		{
-			chroot(".");
-			Session->StartDir=CopyStr(Session->StartDir,"/");
-		}
-	}
+	if (Settings.Flags & (FLAG_CHHOME | FLAG_CHROOT)) HTTPServerChroot(Session);
 }
 
 /*

@@ -31,6 +31,18 @@ then
 AC_DEFINE([USE_SOCKS])
 fi
 
+AC_ARG_ENABLE(unshare, [  --enable-unshare       enable unshare containers support (default=no)], cf_use_unshare=$enableval )
+if test "$cf_use_unshare" = "yes" 
+then
+AC_CHECK_LIB(c,unshare,,)
+cf_have_unshare=$ac_cv_lib_c_unshare
+fi
+
+if test "$cf_have_unshare" = "yes"
+then
+AC_DEFINE([USE_UNSHARE])
+fi
+
 cf_have_capabilities=no
 AC_ARG_ENABLE(capabilities, [  --enable-capabilities       enable linux capabilities support (default=no)], cf_use_capabilities=$enableval )
 if test "$cf_use_capabilities" != "no"
@@ -155,6 +167,13 @@ then
 echo "sendfile NOT enabled"
 else
 echo "sendfile enabled"
+fi
+
+if test "$cf_use_unshare" != "yes"
+then
+echo "unshare containers NOT enabled"
+else
+echo "unshare containers enabled"
 fi
 
 

@@ -684,6 +684,7 @@ enable_sendfile
 enable_ip6
 enable_xattr
 enable_socks
+enable_unshare
 enable_capabilities
 enable_pam
 enable_ssl
@@ -1310,6 +1311,7 @@ Optional Features:
   --enable-ip6		use IPv6 (default=no)
   --enable-xattr       enable extended file attributes support (default=no)
   --enable-socks       enable socks proxy support (default=no)
+  --enable-unshare       enable unshare containers support (default=no)
   --enable-capabilities       enable linux capabilities support (default=no)
   --enable-pam		enable Pluggable Authentication Modules (default=autodetect) 
   --enable-ssl		use Secure Sockets Layer (default=no)
@@ -3678,6 +3680,67 @@ $as_echo "@%:@define USE_SOCKS 1" >>confdefs.h
 
 fi
 
+@%:@ Check whether --enable-unshare was given.
+if test "${enable_unshare+set}" = set; then :
+  enableval=$enable_unshare; cf_use_unshare=$enableval 
+fi
+
+if test "$cf_use_unshare" = "yes" 
+then
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for unshare in -lc" >&5
+$as_echo_n "checking for unshare in -lc... " >&6; }
+if ${ac_cv_lib_c_unshare+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lc  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char unshare ();
+int
+main ()
+{
+return unshare ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_c_unshare=yes
+else
+  ac_cv_lib_c_unshare=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_c_unshare" >&5
+$as_echo "$ac_cv_lib_c_unshare" >&6; }
+if test "x$ac_cv_lib_c_unshare" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+@%:@define HAVE_LIBC 1
+_ACEOF
+
+  LIBS="-lc $LIBS"
+
+fi
+
+cf_have_unshare=$ac_cv_lib_c_unshare
+fi
+
+if test "$cf_have_unshare" = "yes"
+then
+$as_echo "@%:@define USE_UNSHARE 1" >>confdefs.h
+
+fi
+
 cf_have_capabilities=no
 @%:@ Check whether --enable-capabilities was given.
 if test "${enable_capabilities+set}" = set; then :
@@ -5579,6 +5642,13 @@ then
 echo "sendfile NOT enabled"
 else
 echo "sendfile enabled"
+fi
+
+if test "$cf_use_unshare" != "yes"
+then
+echo "unshare containers NOT enabled"
+else
+echo "unshare containers enabled"
 fi
 
 
