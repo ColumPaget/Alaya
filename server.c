@@ -1126,52 +1126,59 @@ Destroy(Tempstr);
 
 
 
-
-
-static int HTTPServerChroot(HTTPSession *Session)
+static void HTTPServerSetupNamespaceUIDMap(int ext_uid, int ext_gid)
 {
 char *Tempstr=NULL;
 STREAM *S;
 
-#ifdef USE_UNSHARE
-unshare(CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWUTS | CLONE_NEWNET);
-Tempstr=FormatStr(Tempstr, "/proc/%d/uid_map");
-S=STREAMOpen(Tempstr, "w");
-STREAMWriteLine("1 1 4294967295", S);
-STREAMClose(S);
+	Tempstr=FormatStr(Tempstr, "/proc/%d/setgroups", getpid());
+	S=STREAMOpen(Tempstr, "w");
+	if (S)
+	{
+	STREAMWriteLine("deny", S);
+	STREAMClose(S);
+	}
 
-Tempstr=FormatStr(Tempstr, "/proc/%d/gid_map");
-S=STREAMOpen(Tempstr, "w");
-STREAMWriteLine("1 1 4294967295", S);
-STREAMClose(S);
-#endif
+	Tempstr=FormatStr(Tempstr, "/proc/%d/uid_map", getpid());
+	S=STREAMOpen(Tempstr, "w");
+	if (S)
+	{
+	Tempstr=FormatStr(Tempstr, "%d %d 1\n", ext_uid, ext_uid);
+	STREAMWriteLine(Tempstr, S);
+	STREAMClose(S);
+	}
 
-if (chroot(".")==0) Session->StartDir=CopyStr(Session->StartDir,"/");
+	Tempstr=FormatStr(Tempstr, "/proc/%d/gid_map", getpid());
+	S=STREAMOpen(Tempstr, "w");
+	if (S)
+	{
+	Tempstr=FormatStr(Tempstr, "%d %d 1\n", getgid(), ext_gid);
+	STREAMWriteLine(Tempstr, S);
+	STREAMClose(S);
+	}
 
 Destroy(Tempstr);
 }
 
 
-static int HTTPServerSetUserContext(HTTPSession *Session)
+static int HTTPServerChroot(HTTPSession *Session)
 {
-char *ChrootDir=NULL, *Tempstr=NULL;
+char *ChrootDir=NULL;
+int ext_uid, ext_gid;
+pid_t pid;
 
-Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
-ChrootDir=CopyStr(ChrootDir,Settings.DefaultDir);
 
-if (IsProxyMethod(Session->MethodID))
-{
 	//Do not chroot for proxy commands
-}
-else 
+if (IsProxyMethod(Session->MethodID)) return(FALSE);
+
+ChrootDir=CopyStr(ChrootDir,Settings.DefaultDir);
+if (Settings.Flags & FLAG_CHHOME) ChrootDir=CopyStr(ChrootDir, Session->HomeDir);
+
+//if (Settings.Flags & FLAG_LOG_VERBOSE) 
+LogToFile(Settings.LogPath,"ChRoot to: %s home=%s",ChrootDir, Session->HomeDir);
+
+if (StrValid(ChrootDir))
 {
-	if (Settings.Flags & FLAG_CHHOME) ChrootDir=CopyStr(ChrootDir, Session->HomeDir);
-
-		//if (Settings.Flags & FLAG_LOG_VERBOSE) 
-	LogToFile(Settings.LogPath,"ChRoot to: %s home=%s",ChrootDir, Session->HomeDir);
-
-	if (StrValid(ChrootDir))
-	{
 	if (chdir(ChrootDir) !=0) 
 	{
 		LogToFile(Settings.LogPath,"ERROR: CHDIR FAILED: %d %s %s",getuid(),ChrootDir,strerror(errno));
@@ -1180,30 +1187,50 @@ else
  		_exit(1);
 	}
 
-	Session->StartDir=CopyStr(Session->StartDir,ChrootDir);
-	}
-
-	if (Settings.Flags & (FLAG_CHHOME | FLAG_CHROOT)) HTTPServerChroot(Session);
 }
 
-/*
-/Not working yet
-else if (Settings.Flags & FLAG_CHSHARE) 
+#ifdef USE_UNSHARE
+
+ext_uid=getuid();
+ext_gid=getgid();
+if (ext_uid==0) 
 {
-	chdir(Settings.DefaultDir);
-	chroot(".");
-	if (strncmp(Session->StartDir,Settings.DefaultDir,StrLen(Settings.DefaultDir))==0)
-	{
-		Tempstr=MCopyStr(Tempstr,"/", Session->StartDir+StrLen(Settings.DefaultDir),NULL);
-		chdir(Tempstr);
-		Session->StartDir=CopyStr(Session->StartDir,Tempstr);
-	}
+	ext_uid=Session->RealUserUID;
+	ext_gid=Session->GroupID;
 }
-*/
+
+unshare(CLONE_NEWUSER | CLONE_NEWUTS | CLONE_NEWNET | CLONE_NEWPID);
+HTTPServerSetupNamespaceUIDMap(ext_uid, ext_gid);
+
+
+//we no longer need /proc etc, so
+unshare(CLONE_NEWNS);
+#endif
+
+if (chroot(".")==0) 
+{
+	Session->StartDir=CopyStr(Session->StartDir,"/");
+	DropCapabilities(CAPS_LEVEL_CHROOTED);
+}
+else Session->StartDir=CopyStr(Session->StartDir,ChrootDir);
+
+Destroy(ChrootDir);
+}
+
+
+static int HTTPServerSetUserContext(HTTPSession *Session)
+{
+
+Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
+
+//if we cannot unshare to a user namespace, then we must do chroot while we are still root
+#ifndef USE_UNSHARE
+if (Settings.Flags & (FLAG_CHHOME | FLAG_CHROOT)) HTTPServerChroot(Session);
+#endif
 
 Session->StartDir=SlashTerminateDirectoryPath(Session->StartDir);
 
-LogToFile(Settings.LogPath,"User Context: Chroot: %s, StartDir: %s, HomeDir: %s, UserID: %d, GroupID: %d,",ChrootDir, Session->StartDir, Session->HomeDir, Session->RealUserUID, Session->GroupID);
+LogToFile(Settings.LogPath,"User Context: StartDir: %s, HomeDir: %s, UserID: %d, GroupID: %d,",Session->StartDir, Session->HomeDir, Session->RealUserUID, Session->GroupID);
 
 if (Session->GroupID > 0)
 {
@@ -1227,20 +1254,34 @@ else if (Settings.DefaultGroupID > 0)
 
 if (getuid()==0)
 {
-	DropCapabilities(CAPS_LEVEL_CHROOTED);
-	if (setresuid(Session->RealUserUID, Session->RealUserUID, Session->RealUserUID)!=0)
+	if (setresuid(Session->RealUserUID, Session->RealUserUID, Session->RealUserUID) !=0)
 	{
 		HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user");
  		LogToFile(Settings.LogPath,"ERROR: Failed to switch user to %s/%d. Exiting", Session->RealUser, Session->RealUserUID);
  	 _exit(1);
 	}
 
-//drop everything! (In case someting went wrong with setresuid) 
-DropCapabilities(CAPS_LEVEL_SESSION);
+//you must do this on linux in some situations after switching users,
+//otherwise many files in /proc will continue to be owned by root 
+//which will cause trouble with unshare
+#ifdef USE_PRCTL
+#include <sys/prctl.h>
+prctl(PR_SET_DUMPABLE,1);
+#endif
 }
 
-Destroy(Tempstr);
-Destroy(ChrootDir);
+
+// if we do have unshare, then it's better to chroot after unsharing to a new user namespace
+#ifdef USE_UNSHARE
+if (Settings.Flags & (FLAG_CHHOME | FLAG_CHROOT)) HTTPServerChroot(Session);
+#endif
+
+
+//drop everything! We no longer need capabilites, and even if getuid() !=0 we could have
+//inherited some, or be within a user namespace (where we would have some capabilities
+//even as a non-root user)
+DropCapabilities(CAPS_LEVEL_SESSION);
+
 
 return(TRUE);
 }
@@ -1655,6 +1696,9 @@ if (Settings.AuthFlags & FLAG_AUTH_REQUIRED)
 		if (Session->AuthFlags & FLAG_AUTH_PRESENT) LogToFile(Settings.LogPath,"AUTHENTICATE FAIL: %s@%s for '%s %s' against %s %s\n", Session->UserName, Session->ClientIP, Session->Method, Session->Path,Settings.AuthPath,Settings.AuthMethods);
 	}
 }
+//seems odd, but this will lookup user details for the 'default user' (normally 'nobody' or 'wwwrun')
+else AuthenticateLookupUserDetails(Session);
+
 
 
 

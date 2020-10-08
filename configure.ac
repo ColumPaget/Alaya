@@ -35,6 +35,7 @@ AC_ARG_ENABLE(unshare, [  --enable-unshare       enable unshare containers suppo
 if test "$cf_use_unshare" = "yes" 
 then
 AC_CHECK_LIB(c,unshare,,)
+AC_CHECK_LIB(c,prctl,,)
 cf_have_unshare=$ac_cv_lib_c_unshare
 fi
 
@@ -42,6 +43,12 @@ if test "$cf_have_unshare" = "yes"
 then
 AC_DEFINE([USE_UNSHARE])
 fi
+
+if test "$ac_cv_lib_c_prctl" = "yes"
+then
+AC_DEFINE([USE_PRCTL])
+fi
+
 
 cf_have_capabilities=no
 AC_ARG_ENABLE(capabilities, [  --enable-capabilities       enable linux capabilities support (default=no)], cf_use_capabilities=$enableval )

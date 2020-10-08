@@ -199,7 +199,7 @@ return(result);
 
 
 
-static int AuthenticateLookupUserDetails(HTTPSession *Session)
+int AuthenticateLookupUserDetails(HTTPSession *Session)
 {
 struct passwd *pwent;
 int uid;
@@ -242,6 +242,7 @@ pwent=getpwnam(Session->RealUser);
 if (pwent)
 {
 	Session->RealUserUID=pwent->pw_uid;
+	Session->GroupID=pwent->pw_gid;
 	if (! StrValid(Session->HomeDir)) Session->HomeDir=CopyStr(Session->HomeDir,pwent->pw_dir);
 
 	//grent=getgrnam(Session->Group);

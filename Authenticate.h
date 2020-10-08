@@ -20,6 +20,7 @@
 int AuthenticateExamineMethods(const char *Methods, int LogErrors);
 int CheckServerAllowDenyLists(const char *UserName);
 int CheckUserExists(const char *UserName);
+int AuthenticateLookupUserDetails(HTTPSession *Session);
 int Authenticate(HTTPSession *Session);
 const char *GetDefaultUser();
 
