@@ -282,9 +282,12 @@ while (ptr)
 	}
 	else 
 	{
-		Tempstr=FormatStr(Tempstr,"tcp:%s:%d",Token,Settings.Port);
-		Config=CopyStr(Config, "F");
+		
+		if (Settings.Flags & FLAG_USE_FASTOPEN) Config=CatStr(Config, "F");
 		if (Settings.Flags & FLAG_USE_REUSEPORT) Config=CatStr(Config, "P");
+		Tempstr=FormatStr(Tempstr, " listen=", Settings.ListenQueueLen);
+
+		Tempstr=FormatStr(Tempstr,"tcp:%s:%d",Token,Settings.Port);
 	}
 
 	S=STREAMServerNew(Tempstr, Config);

@@ -23,6 +23,8 @@
 #define FLAG_SIGHUP_RECV 65536
 #define FLAG_LOG_VERBOSE 131072
 #define FLAG_LOG_MORE_VERBOSE 262144
+#define FLAG_USE_FASTOPEN 524288
+#define FLAG_USE_HTTPS_FASTOPEN 1048576
 
 
 //Flag values for Settings->AuthFlags and Session->AuthFlags
@@ -42,6 +44,7 @@ typedef struct
 {
 int Flags;
 int Port;
+int ListenQueueLen;
 char *DefaultUser;
 char *DefaultGroup;
 gid_t DefaultGroupID;

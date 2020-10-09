@@ -18,6 +18,51 @@
 #endif
 
 
+typedef struct
+{
+int Flags;
+int QueueLen;
+} TSockSettings;
+
+int SocketParseConfig(const char *Config, TSockSettings *Settings)
+{
+const char *ptr;
+char *Name=NULL, *Value=NULL;
+
+Settings->Flags=0;
+Settings->QueueLen=0;
+
+ptr=GetToken(Config, "\\S", &Value, 0);
+for (ptr=Value; *ptr !='\0'; ptr++)
+{
+	switch (*ptr)
+	{
+		case 'E': Settings->Flags |= CONNECT_ERROR; break;
+		case 'k': Settings->Flags |= SOCK_NOKEEPALIVE; break;
+		case 'A': Settings->Flags |= SOCK_TLS_AUTO; break;
+		case 'B': Settings->Flags |= SOCK_BROADCAST; break;
+		case 'F': Settings->Flags |= SOCK_TCP_FASTOPEN; break;
+		case 'R': Settings->Flags |= SOCK_DONTROUTE; break;
+		case 'P': Settings->Flags |= SOCK_REUSEPORT; break;
+		case 'N': Settings->Flags |= SOCK_TCP_NODELAY; break;
+	}
+}
+
+ptr=GetNameValuePair(ptr, "=", "\\S", &Name, &Value);
+while (ptr)
+{
+if (strcmp(Name, "listen")==0) Settings->QueueLen=atoi(Value);
+ptr=GetNameValuePair(ptr, "=", "\\S", &Name, &Value);
+}
+
+Destroy(Name);
+Destroy(Value);
+
+return(Settings->Flags);
+}
+
+
+
 int IsIP4Address(const char *Str)
 {
     const char *ptr;
@@ -739,40 +784,19 @@ STREAM *STREAMFromSock(int sock, int Type, const char *Peer, const char *DestIP,
 }
 
 
-int SocketParseConfig(const char *Config)
-{
-const char *ptr;
-int Flags=0;
-
-for (ptr=Config; *ptr !='\0'; ptr++)
-{
-	switch (*ptr)
-	{
-		case 'E': Flags |= CONNECT_ERROR; break;
-		case 'k': Flags |= SOCK_NOKEEPALIVE; break;
-		case 'A': Flags |= SOCK_TLS_AUTO; break;
-		case 'B': Flags |= SOCK_BROADCAST; break;
-		case 'F': Flags |= SOCK_TCP_FASTOPEN; break;
-		case 'R': Flags |= SOCK_DONTROUTE; break;
-		case 'P': Flags |= SOCK_REUSEPORT; break;
-		case 'N': Flags |= SOCK_TCP_NODELAY; break;
-	}
-}
-
-return(Flags);
-}
 
 
 STREAM *STREAMServerNew(const char *URL, const char *Config)
 {
     char *Proto=NULL, *Host=NULL, *Token=NULL;
     int fd=-1, Port=0, Type, Flags=0;
+		TSockSettings Settings;
     STREAM *S=NULL;
 
     ParseURL(URL, &Proto, &Host, &Token,NULL, NULL,NULL,NULL);
     if (StrValid(Token)) Port=atoi(Token);
 
-		Flags=SocketParseConfig(Config);
+		Flags=SocketParseConfig(Config, &Settings);
 
     switch (*Proto)
     {
@@ -799,6 +823,11 @@ STREAM *STREAMServerNew(const char *URL, const char *Config)
         {
             fd=IPServerNew(SOCK_STREAM, Host, Port, Flags);
             Type=STREAM_TYPE_TCP_SERVER;
+						if (Settings.QueueLen > 0)
+						{
+							listen(fd, Settings.QueueLen);
+							if (Flags & SOCK_TCP_FASTOPEN) SockSetOpt(fd, TCP_FASTOPEN, "TCP_FASTOPEN", Settings.QueueLen);
+						}
         }
         else if (strcmp(Proto,"tproxy")==0)
         {
@@ -1270,11 +1299,13 @@ int STREAMConnect(STREAM *S, const char *URL, const char *Config)
 {
     int result=FALSE;
     char *Name=NULL, *Value=NULL;
+		TSockSettings Settings;
     const char *ptr;
+
     int Flags=0;
 
 		ptr=GetToken(Config, "\\S", &Value, 0);
-		Flags=SocketParseConfig(Value);
+		Flags=SocketParseConfig(Value, &Settings);
 
 		ptr=LibUsefulGetValue("TCP:Keepalives");
 		if ( StrValid(ptr) &&  (! strtobool(ptr)) ) Flags |= SOCK_NOKEEPALIVE;

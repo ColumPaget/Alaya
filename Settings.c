@@ -164,11 +164,11 @@ void ParseConfigItem(const char *ConfigLine)
 {
 const char *ConfTokens[]={"include","Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","Path","FileType","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","WebsocketHandler","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings",
 "SSLKey","SSLCert","SSLCiphers","SSLDHParams","SSLClientCertificate","SSLVerifyPath", "SSLVersion",
-"Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats","Admin","AllowProxy", "DenyProxy", "UseNamespaces", "ReusePort",
+"Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats","Admin","AllowProxy", "DenyProxy", "UseNamespaces", "ReusePort", "TCPFastOpen","ListenQueue",
 NULL};
 typedef enum {CT_INCLUDE,CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE,CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_PATH, CT_FILETYPE, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, 
 CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_SSL_VERSION, 
-CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS, CT_ADMIN, CT_ALLOWPROXY, CT_DENYPROXY, CT_USE_NAMESPACES, CT_REUSE_PORT} TConfigTokens;
+CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS, CT_ADMIN, CT_ALLOWPROXY, CT_DENYPROXY, CT_USE_NAMESPACES, CT_REUSE_PORT, CT_FAST_OPEN, CT_LISTEN_QUEUE} TConfigTokens;
 
 char *Token=NULL;
 const char *ptr;
@@ -408,6 +408,10 @@ switch(TokType)
 		Settings.ActivityTimeout=atoi(ptr);
 	break;
 
+	case CT_LISTEN_QUEUE:
+		Settings.ListenQueueLen=atoi(ptr);
+	break;
+
 	case CT_ARCHIVE_FORMATS:
 		Settings.PackFormats=ParsePackFormats(Settings.PackFormats, ptr);
 	break;
@@ -433,6 +437,13 @@ switch(TokType)
 		if (strtobool(ptr)) Settings.Flags |= FLAG_USE_REUSEPORT;
 		else Settings.Flags &= ~FLAG_USE_REUSEPORT;
 	break;
+
+	case CT_FAST_OPEN:
+		if (strcasecmp(ptr, "https")==0) Settings.Flags |= FLAG_USE_HTTPS_FASTOPEN;
+		else if (strtobool(ptr)) Settings.Flags |= FLAG_USE_FASTOPEN;
+		else Settings.Flags &= ~(FLAG_USE_FASTOPEN | FLAG_USE_HTTPS_FASTOPEN);
+	break;
+
 }
 
 Destroy(Token);
@@ -784,13 +795,14 @@ SetTimezoneEnv();
 
 uname(&UnameData);
 memset(&Settings,0,sizeof(TSettings));
+Settings.ListenQueueLen=10;
 Settings.MaxLogSize=999999;
 Settings.MaxLogRotate=5;
 Settings.LogPath=CopyStr(Settings.LogPath,"SYSLOG");
 Settings.ConfigPath=CopyStr(Settings.ConfigPath,"/etc/alaya.conf");
 Settings.DefaultDir=CopyStr(Settings.DefaultDir,"./");
 Settings.BindAddress=CopyStr(Settings.BindAddress,"");
-Settings.Flags |= FLAG_KEEPALIVES | FLAG_USE_REUSEPORT | FLAG_USE_UNSHARE;
+Settings.Flags |= FLAG_KEEPALIVES | FLAG_USE_REUSEPORT | FLAG_USE_UNSHARE | FLAG_USE_HTTPS_FASTOPEN;
 Settings.DirListFlags=DIR_SHOWFILES | DIR_FANCY;
 Settings.AuthFlags=FLAG_AUTH_REQUIRED | FLAG_AUTH_COOKIE;
 Settings.AuthPath=CopyStr(Settings.AuthPath,"/etc/alaya.auth:~/.alaya/alaya.auth");

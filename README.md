@@ -169,17 +169,20 @@ CustomHeader=<full HTTP header>   Custom HTTP header to be added to all server r
 LookupClientName 	 If present then lookup client hostnames with DNS and use in logging. The default is just to log the ip-address, as this is faster.
 SanitizeAllowTags=<tag list>		List of HTML tags allowed to be used in 'POST' to cgi-scripts. If left blank, then all are allowed, if set, then all but the listed html elements will be stripped 
 UserAgentSettings=UserAgentString,Settings		Settings to be applied when a particular user agent string is seen.
-FileCacheTime=<seconds>		Amount of time to recommend the browser	caches documents for.
-HttpKeepAlive=<yes|no>		Use http keep-alive
-ReusePort=<yes|no>				Bind server socket with SO_REUSEPORT allowing multiple server processes to bind to the same port (on by default).
-UseNamespaces=<yes|no>		Use linux namespaces to isolate the connection-handler processes (on by default).
+FileCacheTime=<seconds>		  Amount of time to recommend the browser	caches documents for.
+ListenQueue=<num>           Number of connections to queue waiting for 'accept'. Default is 10.
+HttpKeepAlive=<yes|no>		  Use http keep-alive
+ReusePort=<yes|no>				  Bind server socket with SO_REUSEPORT allowing multiple server processes to bind to the same port (on by default).
+UseNamespaces=<yes|no>		  Use linux namespaces to isolate the connection-handler processes (on by default).
+TcpFastOpen=<https|yes|no>  Use 'tcp fast open'. 'https' only enables this in for encrypted channels, which is the default due to some security concerns.
 
-MaxMemory=<max bytes>			Maximum amount of memory per alaya process. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
-MaxStack=<max bytes>			Maximum Stack Size. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
-PackFormats=<list>	List of 'pack formats' to offer in the 'download as packed' item on the directory page.
+MaxMemory=<max bytes>			  Maximum amount of memory per alaya process. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
+MaxStack=<max bytes>			  Maximum Stack Size. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
+PackFormats=<list>	        List of 'pack formats' to offer in the 'download as packed' item on the directory page.
 WebsocketHandler:<path>:<protocol>=<script path>   Specify a program that handles websockets requests to a particular path and protocol.
-DenyProxy=<host>:<port>   Configuration for proxy systems, see 'PROXY' section below
+DenyProxy=<host>:<port>     Configuration for proxy systems, see 'PROXY' section below
 AllowProxy=<host>:<port> [redirect=<host>:<port>] [ssl]   Configuration for proxy systems, see 'PROXY' section below
+
 ```
 
 

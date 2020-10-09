@@ -17,6 +17,7 @@
 #include "VPath.h"
 #include "xssi.h"
 #include "icecast.h"
+#include <netinet/tcp.h>
 
 #ifdef USE_UNSHARE
  #define _GNU_SOURCE
@@ -97,6 +98,9 @@ if (Settings.AuthFlags & (FLAG_AUTH_CERT_REQUIRED | FLAG_AUTH_CERT_SUFFICIENT | 
 if (DoSSLServerNegotiation(Session->S,Flags))
 {
 	Session->Flags |= HTTP_SSL;
+	#ifndef TCP_FASTOPEN
+	if (Settings.Flags & FLAG_HTTPS_FAST_OPEN) SockSetOpen(Session->S->in_fd, TCP_FASTOPEN, "TCP_FASTOPEN", Settings.ListenQueue);
+	#endif
 	return(TRUE);
 }
 
