@@ -4,6 +4,9 @@
 #include "UnixSocket.h"
 
 #include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <ctype.h>
@@ -143,9 +146,12 @@ int IsSockConnected(int sock)
 
 int SockSetOpt(int sock, int Opt, const char *Name, int OnOrOff)
 {
-    int val=OnOrOff;
+    int val=OnOrOff, level;
+		
+		if (strncmp(Name, "TCP_", 4)==0) level=IPPROTO_TCP;
+		else level=SOL_SOCKET;
 
-    if (setsockopt(sock, SOL_SOCKET, Opt, &val,sizeof(int)) != 0)
+    if (setsockopt(sock, level, Opt, &val, sizeof(int)) != 0)
     {
         RaiseError(ERRFLAG_ERRNO, "Failed to setsockopt '%s'",Name);
         return(FALSE);
@@ -173,33 +179,54 @@ void SockSetOptions(int sock, int SetFlags, int UnsetFlags)
   if (SetFlags & SOCK_PEERCREDS) SockSetOpt(sock, SO_PASSCRED,  "SOCK_PEERCREDS", 1);
 #endif
 
+#ifdef TCP_NODELAY
+  if (SetFlags & SOCK_TCP_NODELAY) SockSetOpt(sock, TCP_NODELAY, "TCP_NODELAY", 1);
+#endif
+
+#ifdef TCP_FASTOPEN
+  if (SetFlags & SOCK_TCP_FASTOPEN) SockSetOpt(sock, TCP_FASTOPEN, "TCP_FASTOPEN", 1);
+#endif
+
+
 #ifdef SO_KEEPALIVE
 	//Default is KEEPALIVE ON
+	//SOCK_NOKEEPALIVE unsets the default, so looks opposite to all the others
   SockSetOpt(sock, SO_KEEPALIVE, "SO_KEEPALIVE", 1);
 #endif
 
-  if (SetFlags & CONNECT_NONBLOCK) fcntl(sock,F_SETFL,O_NONBLOCK);
+
+if (SetFlags & CONNECT_NONBLOCK) fcntl(sock,F_SETFL,O_NONBLOCK);
 
 
 #ifdef SO_BROADCAST
-  if (UnsetFlags & SOCK_BROADCAST) SockSetOpt(sock, SO_BROADCAST, "", 0);
+  if (UnsetFlags & SOCK_BROADCAST) SockSetOpt(sock, SO_BROADCAST, "SOCK_BROADCAST", 0);
 #endif
 
 #ifdef SO_DONTROUTE
-  if (UnsetFlags & SOCK_DONTROUTE) SockSetOpt(sock, SO_DONTROUTE, "", 1);
+  if (UnsetFlags & SOCK_DONTROUTE) SockSetOpt(sock, SO_DONTROUTE, "SOCK_DONTROUTE", 0);
 #endif
 
 #ifdef SO_REUSEPORT
-  if (UnsetFlags & SOCK_REUSEPORT) SockSetOpt(sock, SO_REUSEPORT, "", 1);
+  if (UnsetFlags & SOCK_REUSEPORT) SockSetOpt(sock, SO_REUSEPORT, "SOCK_REUSEPORT", 0);
 #endif
 
 #ifdef SO_PASSCRED
-  if (UnsetFlags & SOCK_PEERCREDS) SockSetOpt(sock, SO_PASSCRED, "", 1);
+  if (UnsetFlags & SOCK_PEERCREDS) SockSetOpt(sock, SO_PASSCRED, "SOCK_PASSCRED", 0);
+#endif
+
+#ifdef TCP_NODELAY
+  if (UnsetFlags & SOCK_TCP_NODELAY) SockSetOpt(sock, TCP_NODELAY, "TCP_NODELAY", 0);
+#endif
+
+#ifdef TCP_FASTOPEN
+  if (UnsetFlags & SOCK_TCP_FASTOPEN) SockSetOpt(sock, TCP_FASTOPEN, "TCP_FASTOPEN", 0);
 #endif
 
 #ifdef SO_KEEPALIVE
+	//SOCK_NOKEEPALIVE unsets the default, so looks opposite to all the others
   if (SetFlags & SOCK_NOKEEPALIVE) SockSetOpt(sock, SO_KEEPALIVE, "SOCK_NOKEEPALIVE", 0);
 #endif
+
 }
 
 
@@ -314,7 +341,7 @@ int BindSock(int Type, const char *Address, int Port, int Flags)
 		#endif
 
    	#ifdef SO_REUSEPORT
-	   	if (Flags & BIND_REUSEPORT) setsockopt(fd, IPPROTO_IP, SO_REUSEPORT, &result, sizeof(result));
+	   	if (Flags & BIND_REUSEPORT) setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &result, sizeof(result));
    	#endif
 
     result=bind(fd, sa, salen);
@@ -712,7 +739,7 @@ STREAM *STREAMFromSock(int sock, int Type, const char *Peer, const char *DestIP,
 }
 
 
-int ServerParseConfig(const char *Config)
+int SocketParseConfig(const char *Config)
 {
 const char *ptr;
 int Flags=0;
@@ -721,10 +748,14 @@ for (ptr=Config; *ptr !='\0'; ptr++)
 {
 	switch (*ptr)
 	{
+		case 'E': Flags |= CONNECT_ERROR; break;
+		case 'k': Flags |= SOCK_NOKEEPALIVE; break;
 		case 'A': Flags |= SOCK_TLS_AUTO; break;
 		case 'B': Flags |= SOCK_BROADCAST; break;
+		case 'F': Flags |= SOCK_TCP_FASTOPEN; break;
 		case 'R': Flags |= SOCK_DONTROUTE; break;
 		case 'P': Flags |= SOCK_REUSEPORT; break;
+		case 'N': Flags |= SOCK_TCP_NODELAY; break;
 	}
 }
 
@@ -741,7 +772,7 @@ STREAM *STREAMServerNew(const char *URL, const char *Config)
     ParseURL(URL, &Proto, &Host, &Token,NULL, NULL,NULL,NULL);
     if (StrValid(Token)) Port=atoi(Token);
 
-		Flags=ServerParseConfig(Config);
+		Flags=SocketParseConfig(Config);
 
     switch (*Proto)
     {
@@ -1242,15 +1273,16 @@ int STREAMConnect(STREAM *S, const char *URL, const char *Config)
     const char *ptr;
     int Flags=0;
 
+		ptr=GetToken(Config, "\\S", &Value, 0);
+		Flags=SocketParseConfig(Value);
+
 		ptr=LibUsefulGetValue("TCP:Keepalives");
 		if ( StrValid(ptr) &&  (! strtobool(ptr)) ) Flags |= SOCK_NOKEEPALIVE;
 
-    ptr=GetNameValuePair(Config," ","=",&Name,&Value);
+    ptr=GetNameValuePair(ptr," ","=",&Name,&Value);
     while (ptr)
     {
-        if (strcmp("Name","E")==0) Flags |= CONNECT_ERROR;
-        else if (strcmp("Name","k")==0) Flags |= SOCK_NOKEEPALIVE;
-        else if (strcasecmp("Name","keepalive")==0)
+        if (strcasecmp("Name","keepalive")==0)
         {
             if (StrLen(Value) && (strncasecmp(Value, "n",1)==0)) Flags |= SOCK_NOKEEPALIVE;
         }
@@ -1270,7 +1302,7 @@ int STREAMConnect(STREAM *S, const char *URL, const char *Config)
         result=STREAMProcessConnectHops(S, Value);
     }
     else if (strchr(URL, '|')) result=STREAMProcessConnectHops(S, URL);
-    else result=STREAMDirectConnect(S, URL, 0);
+    else result=STREAMDirectConnect(S, URL, Flags);
 
 
     DestroyString(Name);

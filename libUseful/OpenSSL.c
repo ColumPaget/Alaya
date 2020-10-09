@@ -495,7 +495,7 @@ int DoSSLClientNegotiation(STREAM *S, int Flags)
             ptr=GetToken(ptr,":",&Token,0);
             SSL_set_tlsext_host_name(ssl, Token);
 #endif
-
+						SSL_CTX_set_timeout (ctx, 1);
             result=SSL_connect(ssl);
             while (result==-1)
             {

@@ -171,6 +171,9 @@ SanitizeAllowTags=<tag list>		List of HTML tags allowed to be used in 'POST' to 
 UserAgentSettings=UserAgentString,Settings		Settings to be applied when a particular user agent string is seen.
 FileCacheTime=<seconds>		Amount of time to recommend the browser	caches documents for.
 HttpKeepAlive=<yes|no>		Use http keep-alive
+ReusePort=<yes|no>				Bind server socket with SO_REUSEPORT allowing multiple server processes to bind to the same port (on by default).
+UseNamespaces=<yes|no>		Use linux namespaces to isolate the connection-handler processes (on by default).
+
 MaxMemory=<max bytes>			Maximum amount of memory per alaya process. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
 MaxStack=<max bytes>			Maximum Stack Size. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
 PackFormats=<list>	List of 'pack formats' to offer in the 'download as packed' item on the directory page.

@@ -263,7 +263,7 @@ const char *ptr;
 
 int ServiceSocketsInit(ListNode *Connections)
 {
-char *Tempstr=NULL, *Token=NULL;
+char *Tempstr=NULL, *Token=NULL, *Config=NULL;
 const char *ptr;
 int fd, BoundCount=0;
 STREAM *S;
@@ -275,14 +275,23 @@ ptr=GetToken(Settings.BindAddress,",",&Token,0);
 while (ptr)
 {
 	//if it starts with a '/' it's a unix Socket
-	if (*Token=='/') Tempstr=MCopyStr(Tempstr,"unix:",Token,NULL);
-	else Tempstr=FormatStr(Tempstr,"tcp:%s:%d",Token,Settings.Port);
+	if (*Token=='/') 
+	{
+		Tempstr=MCopyStr(Tempstr,"unix:",Token,NULL);
+		Config=CopyStr(Config, "");
+	}
+	else 
+	{
+		Tempstr=FormatStr(Tempstr,"tcp:%s:%d",Token,Settings.Port);
+		Config=CopyStr(Config, "F");
+		if (Settings.Flags & FLAG_USE_REUSEPORT) Config=CatStr(Config, "P");
+	}
 
-	S=STREAMServerInit(Tempstr);
+	S=STREAMServerNew(Tempstr, Config);
 	if (! S)
 	{
 		sleep(1);
-		S=STREAMServerInit(Tempstr);
+		S=STREAMServerNew(Tempstr, Config);
 	}
 
 	if (S) 
@@ -310,6 +319,7 @@ exit(1);
 }
 
 Destroy(Tempstr);
+Destroy(Config);
 Destroy(Token);
 }
 

@@ -1190,7 +1190,8 @@ if (StrValid(ChrootDir))
 }
 
 #ifdef USE_UNSHARE
-
+if (Settings.Flags & FLAG_USE_UNSHARE)
+{
 ext_uid=getuid();
 ext_gid=getgid();
 if (ext_uid==0) 
@@ -1205,6 +1206,7 @@ HTTPServerSetupNamespaceUIDMap(ext_uid, ext_gid);
 
 //we no longer need /proc etc, so
 unshare(CLONE_NEWNS);
+}
 #endif
 
 if (chroot(".")==0) 
@@ -1220,13 +1222,16 @@ Destroy(ChrootDir);
 
 static int HTTPServerSetUserContext(HTTPSession *Session)
 {
+int UseUnshare=FALSE;
 
 Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 
-//if we cannot unshare to a user namespace, then we must do chroot while we are still root
 #ifndef USE_UNSHARE
-if (Settings.Flags & (FLAG_CHHOME | FLAG_CHROOT)) HTTPServerChroot(Session);
+if (Settings.Flags & FLAG_USE_UNSHARE) UseUnshare=TRUE;
 #endif
+
+//if we cannot unshare to a user namespace, then we must do chroot while we are still root
+if ((! UseUnshare) && (Settings.Flags & (FLAG_CHHOME | FLAG_CHROOT))) HTTPServerChroot(Session);
 
 Session->StartDir=SlashTerminateDirectoryPath(Session->StartDir);
 
@@ -1273,7 +1278,7 @@ prctl(PR_SET_DUMPABLE,1);
 
 // if we do have unshare, then it's better to chroot after unsharing to a new user namespace
 #ifdef USE_UNSHARE
-if (Settings.Flags & (FLAG_CHHOME | FLAG_CHROOT)) HTTPServerChroot(Session);
+if (UseUnshare && (Settings.Flags & (FLAG_CHHOME | FLAG_CHROOT))) HTTPServerChroot(Session);
 #endif
 
 

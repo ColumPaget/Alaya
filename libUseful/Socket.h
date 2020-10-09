@@ -20,6 +20,8 @@ Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
 #define SOCK_PEERCREDS 512  //used with UNIX sockets to get remote user ID
 #define CONNECT_ERROR 1024  //report errors even if Error:IgnoreIP is set
 #define SOCK_TLS_AUTO 2048
+#define SOCK_TCP_NODELAY  4096
+#define SOCK_TCP_FASTOPEN 8192
 
 #define SOCK_CONNECTED 1
 #define SOCK_CONNECTING -1
@@ -111,11 +113,13 @@ int IPServerAccept(int ServerSock,char **Addr);
 
 //STREAMServerInit and STREAMServerNew create server sockets for tcp:// udp:// unix:// unixdgram:// and tproxy:// protocols
 //STREAMServerNew takes a Config argument that is a string containing characters as follows:
+//  k - disable tcp keepalives
 //  A - Autodetect SSL
 //  B - BROADCAST  set udp socket to be a broadcast socket
+//  F - Tcp FASTOPEN
+//  N - Tcp NODELAY - disable Nagel's algorithm and send data straight away 
 //  R - Don't route. All addresses are treated as local 
 //  P - REUSE_PORT allows multiple processes to listen on the same port
-
 
 STREAM *STREAMServerInit(const char *URL);
 STREAM *STREAMServerNew(const char *URL, const char *Config);

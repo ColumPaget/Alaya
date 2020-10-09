@@ -118,25 +118,19 @@ pid_t xforkio(int StdIn, int StdOut, int StdErr)
         if (StdIn !=0) 
         {
         		if (StdIn == -1) fd_remap_path(0, "/dev/null", O_RDONLY);	
-						else 
-						{
-							fd_remap(0, StdIn);	
-							close(StdIn); //must close or we will have it open twice, and it won't close when the peer closes it
-						}
+						else fd_remap(0, StdIn);	
         }
 
         if (StdOut !=1) 
         {
         		if (StdOut == -1) fd_remap_path(1, "/dev/null", O_WRONLY);	
 						else fd_remap(1, StdOut);	
-						close(StdOut); //must close or we will have it open twice, and it won't close when the peer closes it
         }
 
         if (StdErr !=2) 
         {
         		if (StdErr == -1) fd_remap_path(2, "/dev/null", O_WRONLY);	
 						else fd_remap(2, StdErr);	
-						close(StdErr); //must close or we will have it open twice, and it won't close when the peer closes it
         }
     }
 
