@@ -1230,7 +1230,7 @@ int UseUnshare=FALSE;
 
 Session->StartDir=CopyStr(Session->StartDir,Settings.DefaultDir);
 
-#ifndef USE_UNSHARE
+#ifdef USE_UNSHARE
 if (Settings.Flags & FLAG_USE_UNSHARE) UseUnshare=TRUE;
 #endif
 
