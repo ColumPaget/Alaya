@@ -808,6 +808,7 @@ void InitSettings()
     Settings.MaxLogSize=999999;
     Settings.MaxLogRotate=5;
     Settings.LogPath=CopyStr(Settings.LogPath,"SYSLOG");
+    Settings.PidFilePath=CopyStr(Settings.PidFilePath,"/var/run/alaya.pid");
     Settings.ConfigPath=CopyStr(Settings.ConfigPath,"/etc/alaya.conf");
     Settings.DefaultDir=CopyStr(Settings.DefaultDir,"./");
     Settings.BindAddress=CopyStr(Settings.BindAddress,"");

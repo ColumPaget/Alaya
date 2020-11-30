@@ -383,7 +383,7 @@ main(int argc, char *argv[])
     if (! (Settings.Flags & FLAG_NODEMON)) demonize();
 
 // must do this AFTER demonize
-    WritePidFile(Settings.PidFilePath);
+    if (StrValid(Settings.PidFilePath)) WritePidFile(Settings.PidFilePath);
 
 //We no longer need the 'bind port' capablity
     DropCapabilities(CAPS_LEVEL_NETBOUND);
