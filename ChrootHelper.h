@@ -4,7 +4,7 @@
 #include "common.h"
 
 //These functions relate to requests for data from outside of the current
-//path and possibly outside of chroot. These scripts/documents are served 
+//path and possibly outside of chroot. These scripts/documents are served
 //through a request passed to the 'master' alaya parent process
 
 void AlayaLog(char *Msg);

@@ -15,12 +15,12 @@
 
 typedef struct
 {
-int Type;
-char *ContentType;
-char *Icon;
-char *Data;
-int Len;
-int Flags;
+    int Type;
+    char *ContentType;
+    char *Icon;
+    char *Data;
+    int Len;
+    int Flags;
 } TFileMagic;
 
 

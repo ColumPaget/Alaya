@@ -71,68 +71,68 @@ typedef enum {PATHTYPE_NONE, PATHTYPE_LOCAL, PATHTYPE_EXTFILE, PATHTYPE_CGI, PAT
 
 typedef struct
 {
-int Type;
-int Flags;
-char *URL;
-char *Path;
-char *Name;
-char *ContentType;
-off_t Size;
-unsigned int CacheTime;
-char *User;
-char *Password;
-char *Group;
-time_t Mtime;
-char *OnUpload;
+    int Type;
+    int Flags;
+    char *URL;
+    char *Path;
+    char *Name;
+    char *ContentType;
+    off_t Size;
+    unsigned int CacheTime;
+    char *User;
+    char *Password;
+    char *Group;
+    time_t Mtime;
+    char *OnUpload;
 } TPathItem;
 
 
 
 typedef struct
 {
-int Flags;
-int AuthFlags;
-char *Protocol;
-char *Method;
-int MethodID;
-char *ResponseCode;
-char *OriginalURL;
-char *URL;
-char *Path;
-char *Arguments;
-char *Cipher;
-char *Destination;
-char *ContentType;
-char *ContentBoundary;
-char *Cookies;
-char *AuthDetails;
-char *RemoteAuthenticate; //Used in proxy server mode
-char *UserName;
-char *Password;
-char *AuthenticatedUser;
-char *RealUser;
-int RealUserUID;
-char *Group;
-gid_t GroupID;
-char *StartDir;
-char *HomeDir;
-char *Host;
-char *ClientIP;
-char *ClientHost;
-char *ClientMAC;
-char *ClientReferrer;
-char *UserAgent;
-char *ServerName;
-char *UserSettings;
-char *SearchPath;
-unsigned int ServerPort;
-unsigned int ContentSize;
-unsigned int CacheTime;
-unsigned int Depth;
-time_t LastModified;
-time_t IfModifiedSince;
-ListNode *Headers;
-STREAM *S;
+    int Flags;
+    int AuthFlags;
+    char *Protocol;
+    char *Method;
+    int MethodID;
+    char *ResponseCode;
+    char *OriginalURL;
+    char *URL;
+    char *Path;
+    char *Arguments;
+    char *Cipher;
+    char *Destination;
+    char *ContentType;
+    char *ContentBoundary;
+    char *Cookies;
+    char *AuthDetails;
+    char *RemoteAuthenticate; //Used in proxy server mode
+    char *UserName;
+    char *Password;
+    char *AuthenticatedUser;
+    char *RealUser;
+    int RealUserUID;
+    char *Group;
+    gid_t GroupID;
+    char *StartDir;
+    char *HomeDir;
+    char *Host;
+    char *ClientIP;
+    char *ClientHost;
+    char *ClientMAC;
+    char *ClientReferrer;
+    char *UserAgent;
+    char *ServerName;
+    char *UserSettings;
+    char *SearchPath;
+    unsigned int ServerPort;
+    unsigned int ContentSize;
+    unsigned int CacheTime;
+    unsigned int Depth;
+    time_t LastModified;
+    time_t IfModifiedSince;
+    ListNode *Headers;
+    STREAM *S;
 } HTTPSession;
 
 

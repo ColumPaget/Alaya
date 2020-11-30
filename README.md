@@ -57,6 +57,7 @@ alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <
 Comma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for readonly DAV.
 'BASE' will set GET,POST,HEAD. 'DAV' will set everything needed for WebDAV. 'RGET' will allow proxy-server gets. 'PROXY' will enable CONNECT and RGET. 'DAV,PROXY' enables everything.
 	-p:		Set port to listen on.
+	-P:		Path for pid file.
 	-r:		'ChRoot mode', chroot into directory and offer services from it
 	-sslv: Lowest SSL Version to use. One of ssl, tls, tls1.2, tls1.2
 	-key:   Keyfile for SSL (HTTPS)
@@ -142,6 +143,7 @@ AllowUsers=<list>			Only allow these users access.
 DenyUsers=<list>			Deny these users access.
 Port=<port>				Port to listen on
 LogFile=<path>    Log file path
+PidFile=<path>    Pid file path
 AuthPath=<path>		Path to native authentication file(s)
 AuthRealm=<realm>		Realm for HTTP authentication
 BindAddress=<addr>	Interface to serve requests on

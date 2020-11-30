@@ -4,7 +4,7 @@
 #include "common.h"
 
 //Only used by 'HTTPServerSendHeaders'
-#define HEADERS_CGI 1 
+#define HEADERS_CGI 1
 #define HEADERS_AUTH 2
 #define HEADERS_USECACHE 4
 #define HEADERS_SENDFILE 8
