@@ -384,8 +384,8 @@ char *HTTPServerPropFindXML(char *InBuff, HTTPSession *Heads, ListNode *PropList
     {
 
         Tempstr=FormatURL(Tempstr,Heads,Heads->Path);
-        RetStr=MCatStr(RetStr,"<href>",Tempstr,"</href>\n<propstat>\n<prop>\n",NULL);
-        RetStr=CatStr(RetStr,"</prop>\n<status>HTTP/1.1 404 Not Found</status>\n</propstat>\n<response>\n");
+        RetStr=MCatStr(RetStr,"<response><href>",Tempstr,"</href>\n<propstat>\n<prop>\n",NULL);
+        RetStr=CatStr(RetStr,"</prop>\n<status>HTTP/1.1 404 Not Found</status>\n</propstat>\n</response>\n");
 
     }
 
