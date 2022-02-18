@@ -275,7 +275,7 @@ int SMTPSendMail(const char *Sender, const char *Recipient, const char *Subject,
     {
         if (! (Flags & SMTP_NOHEADER))
         {
-            Tempstr=MCopyStr(Tempstr,"Date: ", GetDateStr("%a, %d %b %Y %H:%M:%S", NULL), "\r\n", NULL);
+            Tempstr=MCopyStr(Tempstr,"Date: ", GetDateStr("%a, %d %b %Y %H:%M:%S", Settings.Timezone), "\r\n", NULL);
             Tempstr=MCatStr(Tempstr,"From: ", Sender, "\r\n", NULL);
             Tempstr=MCatStr(Tempstr,"To: ", Recipient, "\r\n", NULL);
             Tempstr=MCatStr(Tempstr,"Subject: ", Subject, "\r\n\r\n", NULL);

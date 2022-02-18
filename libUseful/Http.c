@@ -876,7 +876,7 @@ void HTTPSendHeaders(STREAM *S, HTTPInfoStruct *Info)
 
     if (Info->IfModifiedSince > 0)
     {
-        Tempstr=CopyStr(Tempstr,GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S GMT",Info->IfModifiedSince,NULL));
+        Tempstr=CopyStr(Tempstr,GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S GMT",Info->IfModifiedSince,Settings.Timezone));
         SendStr=MCatStr(SendStr,"If-Modified-Since: ",Tempstr, "\r\n",NULL);
     }
 

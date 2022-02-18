@@ -362,7 +362,7 @@ static char *FormatFancyDirItem(char *RetStr, int count, TPathItem *File, const 
     {
         DateStr=FormatStr(DateStr,"<font color=red>%d seconds ago</font>",Now - File->Mtime);
     }
-    else DateStr=CopyStr(DateStr,GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",File->Mtime,NULL));
+    else DateStr=CopyStr(DateStr,GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",File->Mtime,Settings.Timezone));
 
     FileType=FormatFileType(FileType, File, Vars, MimeIconsURL);
     //Okay, start building the actual table row
@@ -532,8 +532,8 @@ static char *FinalizeDirListHTML(char *Buffer, HTTPSession *Session, const char 
         HTML=CatStr(HTML, "<tr><td>\n");
         //UserName might be blank if we are running without authentication
         if (StrValid(Session->UserName)) HTML=MCatStr(HTML, "User: ", Session->UserName,"<br/>",NULL);
-        HTML=MCatStr(HTML, "Date: ", GetDateStrFromSecs("%Y/%m/%d", Now, NULL), "<br/>", NULL);
-        HTML=MCatStr(HTML, "Time: ", GetDateStrFromSecs("%H:%M:%S", Now, NULL), "<br/>", NULL);
+        HTML=MCatStr(HTML, "Date: ", GetDateStrFromSecs("%Y/%m/%d", Now, Settings.Timezone), "<br/>", NULL);
+        HTML=MCatStr(HTML, "Time: ", GetDateStrFromSecs("%H:%M:%S", Now, Settings.Timezone), "<br/>", NULL);
         if (Settings.Flags & FLAG_LOGOUT_AVAILABLE) HTML=MCatStr(HTML,"<a href=\"",GetLogoutPath(),"\">( Logout )</a>",NULL);
         HTML=CatStr(HTML, "</td><td>\n");
 
@@ -760,7 +760,7 @@ static void DirectorySendCSV(STREAM *S, HTTPSession *Session, const char *Path, 
     {
         stat(Files[i]->Path,&Stat);
         SizeStr=FormatStr(SizeStr,"%d",Stat.st_size);
-        CSV=MCatStr(CSV,"\"",GetBasename(Files[i]->Path),"\", \"",Files[i]->URL,"\", \"",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",Stat.st_mtime,NULL),"\", \"",SizeStr,"\"\r\n",NULL);
+        CSV=MCatStr(CSV,"\"",GetBasename(Files[i]->Path),"\", \"",Files[i]->URL,"\", \"",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",Stat.st_mtime,Settings.Timezone),"\", \"",SizeStr,"\"\r\n",NULL);
     }
 
     Tempstr=MCopyStr(Tempstr,Path,".csv",NULL);

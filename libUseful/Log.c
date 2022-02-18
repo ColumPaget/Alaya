@@ -151,8 +151,8 @@ char *LogFileInternalGetRotateDestinationPath(char *RetStr, TLogFile *LogFile)
     Tempstr=CopyStr(Tempstr, STREAMGetValue(LogFile->S,"RotatePath"));
     if (StrLen(Tempstr) && strchr(Tempstr,'$'))
     {
-        STREAMSetValue(LogFile->S, "Date",GetDateStr("%Y_%m_%d",NULL));
-        STREAMSetValue(LogFile->S, "Time",GetDateStr("%H:%M:%S",NULL));
+        STREAMSetValue(LogFile->S, "Date",GetDateStr("%Y_%m_%d",Settings.Timezone));
+        STREAMSetValue(LogFile->S, "Time",GetDateStr("%H:%M:%S",Settings.Timezone));
         RetStr=SubstituteVarsInString(RetStr,Tempstr,LogFile->S->Values,0);
     }
     else RetStr=CopyStr(RetStr,LogFile->Path);
@@ -270,7 +270,7 @@ int LogFileInternalWrite(TLogFile *LF, STREAM *S, int Flags, const char *Str)
 
     if (Flags & LOGFILE_TIMESTAMP)
     {
-        LogStr=CopyStr(LogStr, GetDateStr("%Y/%m/%d %H:%M:%S",NULL));
+        LogStr=CopyStr(LogStr, GetDateStr("%Y/%m/%d %H:%M:%S",Settings.Timezone));
 				
         if (Flags & LOGFILE_MILLISECS)
         {

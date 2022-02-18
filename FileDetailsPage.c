@@ -31,13 +31,13 @@ char *FormatFileProperties(char *HTML, HTTPSession *Session, int FType, const ch
     ptr=GetVar(Vars,"MTime-Secs");
     if (ptr)
     {
-        HTML=MCatStr(HTML,"<tr><td>Modify Time</td><td colspan=2>",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",atoi(ptr),NULL),"</td></tr>",NULL);
+        HTML=MCatStr(HTML,"<tr><td>Modify Time</td><td colspan=2>",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",atoi(ptr),Settings.Timezone),"</td></tr>",NULL);
     }
 
     ptr=GetVar(Vars,"CTime-Secs");
     if (ptr)
     {
-        HTML=MCatStr(HTML,"<tr><td>Create Time</td><td colspan=2>",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",atoi(ptr),NULL),"</td></tr>",NULL);
+        HTML=MCatStr(HTML,"<tr><td>Create Time</td><td colspan=2>",GetDateStrFromSecs("%Y/%m/%d %H:%M:%S",atoi(ptr),Settings.Timezone),"</td></tr>",NULL);
     }
 
     HTML=MCatStr(HTML,"<tr bgcolor=#CCFFCC><td>ContentType</td><td colspan=2>",GetVar(Vars,"ContentType"),"</td></tr>",NULL);

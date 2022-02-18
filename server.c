@@ -493,7 +493,7 @@ void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
 
     HTTPServerSendHeader(S,"Date",GetDateStr("%a, %d %b %Y %H:%M:%S %Z",NULL));
 
-    if (Session->LastModified > 0) HTTPServerSendHeader(S,"Last-Modified",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z", Session->LastModified,NULL));
+    if (Session->LastModified > 0) HTTPServerSendHeader(S,"Last-Modified",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z", Session->LastModified,Settings.Timezone));
 
     if (Flags & HEADERS_AUTH)
     {
@@ -551,7 +551,7 @@ void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
         {
             Tempstr=FormatStr(Tempstr,"max-age=%d", Session->CacheTime);
             HTTPServerSendHeader(S, "Cache-Control", Tempstr);
-            HTTPServerSendHeader(S,"Expires",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",time(NULL) + Session->CacheTime,NULL));
+            HTTPServerSendHeader(S,"Expires",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",time(NULL) + Session->CacheTime,Settings.Timezone));
         }
         else
         {
@@ -1117,7 +1117,7 @@ static void HTTPServerOptions(STREAM *S,HTTPSession *ClientHeads)
     char *Tempstr=NULL;
 
     STREAMWriteLine("HTTP/1.1 200 OK\r\n",S);
-    HTTPServerSendHeader(S, "Date", GetDateStr("Date: %a, %d %b %Y %H:%M:%S %Z",NULL));
+    HTTPServerSendHeader(S, "Date", GetDateStr("Date: %a, %d %b %Y %H:%M:%S %Z",Settings.Timezone));
     HTTPServerSendHeader(S, "Content-Length", "0");
     HTTPServerSendHeader(S, "Public", "OPTIONS, TRACE, GET, HEAD, DELETE, PUT, POST, COPY, MOVE, MKCOL, PROPFIND, PROPPATCH, LOCK, UNLOCK, SEARCH, MKCALENDAR, REPORT, calendar-access");
     HTTPServerSendHeader(S, "Allow", "OPTIONS, TRACE, GET, HEAD, DELETE, PUT, POST, COPY, MOVE, MKCOL, PROPFIND, PROPPATCH, LOCK, UNLOCK, SEARCH, MKCALENDAR, REPORT, calendar-access");
