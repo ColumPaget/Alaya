@@ -49,7 +49,7 @@ static void HTTPProxySendResponse(STREAM *S, const char *Response)
     char *Date=NULL;
 
     STREAMWriteLine(Response,S);
-    Date=CopyStr(Date,GetDateStr("Date: %a, %d %b %Y %H:%M:%S %Z\r\n",NULL));
+    Date=CopyStr(Date,GetDateStr("Date: %a, %d %b %Y %H:%M:%S %Z\r\n",Settings.Timezone));
     STREAMWriteLine(Date,S);
     STREAMWriteLine("Connection: close\r\n",S);
     STREAMWriteLine("\r\n",S);

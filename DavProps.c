@@ -238,7 +238,7 @@ char *HTTPServerPropFindItemPropsXML(char *InBuff, char *ItemName, int FileType,
         {
         case PROP_CREATE_DATE:
 //<D:creationdate xmlns:D="DAV:">2008-12-18T01-47-04-0800</D:creationdate>
-            ValBuff=CopyStr(ValBuff,GetDateStrFromSecs("%Y-%m-%dT%H:%M:%SZ",atoi(Curr->Item),NULL));
+            ValBuff=CopyStr(ValBuff,GetDateStrFromSecs("%Y-%m-%dT%H:%M:%SZ",atoi(Curr->Item),Settings.Timezone));
             RetStr=MCatStr(RetStr,"<creationdate>",ValBuff,"</creationdate>\n",NULL);
             break;
 
@@ -273,7 +273,7 @@ char *HTTPServerPropFindItemPropsXML(char *InBuff, char *ItemName, int FileType,
             break;
 
         case PROP_LASTMODIFIED:
-            ValBuff=CopyStr(ValBuff,GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",atoi(Curr->Item),NULL));
+            ValBuff=CopyStr(ValBuff,GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",atoi(Curr->Item),Settings.Timezone));
             RetStr=MCatStr(RetStr,"<getlastmodified>",ValBuff,"</getlastmodified>\n",NULL);
             break;
 
