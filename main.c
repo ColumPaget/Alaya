@@ -333,6 +333,7 @@ main(int argc, char *argv[])
     pid_t pid;
 
     ProcessTitleCaptureBuffer(argv);
+    SSLAvailable();
 
     SetTimezoneEnv();
 

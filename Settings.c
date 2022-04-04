@@ -164,13 +164,10 @@ void ParseConfigItem(const char *ConfigLine)
 {
     const char *ConfTokens[]= {"include","Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","PidFilePath","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","Path","FileType","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","WebsocketHandler","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings",
                                "SSLKey","SSLCert","SSLCiphers","SSLDHParams","SSLClientCertificate","SSLVerifyPath", "SSLVersion",
-                               "Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats","Admin","AllowProxy", "DenyProxy", "UseNamespaces", "ReusePort", "TCPFastOpen","ListenQueue",
+                               "Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats","Admin","AllowProxy", "DenyProxy", "UseNamespaces", "ReusePort", "TCPFastOpen","ListenQueue","PFS","PerfectForwardSecrecy",
                                NULL
                               };
-    typedef enum {CT_INCLUDE,CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE, CT_PIDFILE, CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_PATH, CT_FILETYPE, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS,
-                  CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_SSL_VERSION,
-                  CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS, CT_ADMIN, CT_ALLOWPROXY, CT_DENYPROXY, CT_USE_NAMESPACES, CT_REUSE_PORT, CT_FAST_OPEN, CT_LISTEN_QUEUE
-                 } TConfigTokens;
+    typedef enum {CT_INCLUDE,CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE, CT_PIDFILE, CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_PATH, CT_FILETYPE, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_SSL_VERSION, CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS, CT_ADMIN, CT_ALLOWPROXY, CT_DENYPROXY, CT_USE_NAMESPACES, CT_REUSE_PORT, CT_FAST_OPEN, CT_LISTEN_QUEUE, CT_SSL_PFS, CT_SSL_PERFECT_FORWARD_SECRECY} TConfigTokens;
 
     char *Token=NULL;
     const char *ptr;
@@ -260,12 +257,18 @@ void ParseConfigItem(const char *ConfigLine)
         Settings.Flags |=FLAG_SSL;
         break;
 
+    case CT_SSL_PFS:
+    case CT_SSL_PERFECT_FORWARD_SECRECY:
+        if (strtobool(ptr)) Settings.Flags |= FLAG_SSL_PFS | FLAG_PFS_GENERATE;
+        break;
+
     case CT_SSLCIPHERS:
         LibUsefulSetValue("SSL:PermittedCiphers",ptr);
         break;
 
     case CT_SSLDHPARAMS:
         LibUsefulSetValue("SSL:DHParamsFile",ptr);
+        Settings.Flags |= FLAG_SSL_PFS;
         break;
 
     case CT_SSL_VERSION:
@@ -578,7 +581,8 @@ void PrintUsage()
     fprintf(stdout,"	-cert:		Certificate for SSL (HTTPS). This can be a certificate chain bundled in .pem format.\n");
     fprintf(stdout,"	-ciphers:	List of SSL ciphers to use.\n");
     fprintf(stdout,"	-dhparams:	Path to a file containing Diffie Helmann parameters for Perfect Forward Secrecy.\n");
-    fprintf(stdout,"	-dhgenerate:	Generate Diffie Helmann parameters for Perfect Forward Secrecy at startup (will take a long time).\n");
+    fprintf(stdout,"	-dhgenerate:	Generate Diffie Helmann parameters for Perfect Forward Secrecy at startup (will take a long time). Will not generate if a dhparams file ahs been supplied with -dhparams\n");
+    fprintf(stdout,"	-pfs:		Use Perfect Forward Secrecy. Will not generate Diffie Helmann parameters unless -dhgenerate is supplied too\n");
     fprintf(stdout,"	-client-cert:	Settings for SSL client certificate authentication. Three levels are available: 'required' means a client MUST supply a certificate, but that it may still be required to log in through normal authentication. 'sufficient' means that a client CAN supply a certificate, and that the certificate is all the authentication that's needed. 'required+sufficient' means that a client MUST provide a certificate, and that this certificate is sufficient for authentication. 'ask' is used at the global level, when 'required' or 'sufficient' is present in the authentication file for a specific user.\n");
     fprintf(stdout,"	-verify-path:		Path to a file, or a directory, containing Authority certificates for verifying client certificates.\n");
     fprintf(stdout,"	-cgi:		Directory containing cgi programs. These programs will be accessible even though they are outside of a 'chroot'\n");
@@ -696,6 +700,7 @@ void SettingsParseCommandLine(int argc, char *argv[], TSettings *Settings)
             ParseConfigItem(Token);
         }
         else if (strcmp(argv[i],"-dhgenerate")==0) Settings->Flags |= FLAG_SSL_PFS | FLAG_PFS_GENERATE;
+        else if (strcmp(argv[i],"-pfs")==0) Settings->Flags |= FLAG_SSL_PFS;
         else if (strcmp(argv[i],"-ciphers")==0)
         {
             Token=MCopyStr(Token,"SSLCiphers=",argv[++i],NULL);

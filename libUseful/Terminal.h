@@ -25,6 +25,19 @@ and the following 'tilde command' formatting values
 ~M        switch background to magenta
 ~c        switch color to cyan
 ~C        switch background to cyan
+~+R       switch background to bright red
+~+g       switch color to bright green
+~+G       switch background to bright green
+~+b       switch color to bright blue
+~+B       switch background to bright blue
+~+n       switch color to bright black ('night' or 'noir')
+~+N       switch background to bright black ('night' or 'noir')
+~+y       switch color to bright yellow
+~+Y       switch background to bright yellow
+~+m       switch color to bright magenta
+~+M       switch background to bright magenta
+~+c       switch color to bright cyan
+~+C       switch background to bright cyan
 ~e        switch to bold text
 ~i        switch to inverse text
 ~u        switch to underlined text
@@ -96,7 +109,7 @@ extern "C" {
 #endif
 
 //These values are passed as Color and BgColor to ANSICode to produce escape sequences with those colors
-typedef enum {ANSI_NONE, ANSI_BLACK, ANSI_RED, ANSI_GREEN, ANSI_YELLOW, ANSI_BLUE, ANSI_MAGENTA, ANSI_CYAN, ANSI_WHITE, ANSI_RESET, ANSI_RESET2, ANSI_DARKGREY, ANSI_LIGHTRED, ANSI_LIGHTGREEN, ANSI_LIGHTYELLOW, ANSI_LIGHTBLUE, ANSI_LIGHTMAGENTA, ANSI_LIGHTCYAN, ANSI_LIGHTWHITE} T_ANSI_COLORS;
+typedef enum {ANSI_NONE, ANSI_BLACK, ANSI_RED, ANSI_GREEN, ANSI_YELLOW, ANSI_BLUE, ANSI_MAGENTA, ANSI_CYAN, ANSI_WHITE, ANSI_RESET, ANSI_RESET2, ANSI_DARKGREY,  ANSI_LIGHTRED, ANSI_LIGHTGREEN, ANSI_LIGHTYELLOW, ANSI_LIGHTBLUE, ANSI_LIGHTMAGENTA, ANSI_LIGHTCYAN, ANSI_LIGHTWHITE} T_ANSI_COLORS;
 
 
 
@@ -110,6 +123,8 @@ typedef enum {ANSI_NONE, ANSI_BLACK, ANSI_RED, ANSI_GREEN, ANSI_YELLOW, ANSI_BLU
 #define TERMBAR_LOWER 256
 #define TERM_SAVEATTRIBS 512
 #define TERM_SAVE_ATTRIBS 512
+#define TERM_MOUSE        1024 //send xterm mouse events for buttons 1 2 and 3
+#define TERM_WHEELMOUSE   2048 //send xterm mouse events for buttons 1 2 and 3, and wheel buttons (4 and 5)
 #define TERM_ALIGN_CENTER 4096
 #define TERM_ALIGN_RIGHT  8192
 
@@ -131,6 +146,13 @@ typedef enum {ANSI_NONE, ANSI_BLACK, ANSI_RED, ANSI_GREEN, ANSI_YELLOW, ANSI_BLU
 typedef enum {TERM_NORM, TERM_TEXT, TERM_COLOR, TERM_CLEAR_SCREEN, TERM_CLEAR_ENDLINE, TERM_CLEAR_STARTLINE, TERM_CLEAR_LINE, TERM_CURSOR_HOME, TERM_CURSOR_MOVE, TERM_CURSOR_SAVE, TERM_CURSOR_UNSAVE, TERM_CURSOR_HIDE, TERM_CURSOR_SHOW, TERM_SCROLL, TERM_SCROLL_REGION, TERM_UNICODE, TERM_UNICODE_NAME} ETerminalCommands;
 
 
+typedef struct
+{
+int flags;
+int button;
+int x;
+int y;
+} TMouseEvent;
 
 // pass in ANSI_ flags as listed above and get out an ANSI escape sequence 
 char *ANSICode(int Color, int BgColor, int Flags);
@@ -213,6 +235,10 @@ const char *TerminalFormatSubStr(const char *Str, char **RetStr, STREAM *Term);
 //'Str' is a format string with 'tilde commands' in it. The ANSI coded result is output to stream S
 void TerminalPutStr(const char *Str, STREAM *S);
 
+
+//step past a single character. Understands tilde-strings and (some) unicode, consuming them as one character
+int TerminalConsumeCharacter(const char **ptr);
+
 //calculate length of string *after ANSI formating*, so ANSI escape sequences don't count as characters added
 //to the length 
 int TerminalStrLen(const char *Str);
@@ -269,6 +295,8 @@ typedef int (*TKEY_CALLBACK_FUNC)(STREAM *Term, int Key);
 //set a callback function that will be passed all key presses
 void TerminalSetKeyCallback(STREAM *Term, TKEY_CALLBACK_FUNC Func);
 
+//returns a structure describing the last mouse event. Call this after recieving a MOUSE_BTN keypress event
+TMouseEvent *TerminalGetMouse(STREAM *Term);
 
 #ifdef __cplusplus
 }

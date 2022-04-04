@@ -22,7 +22,9 @@ Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
 
 #include "includes.h"
 #include "memory.h"
+#include "IPAddress.h"
 #include "Socket.h"
+#include "Server.h"
 #include "UnixSocket.h"
 #include "String.h"
 #include "Expect.h"
@@ -48,6 +50,7 @@ Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
 #include "Pty.h"
 #include "Log.h"
 #include "Http.h"
+#include "Gemini.h"
 #include "OAuth.h"
 #include "Ssh.h"
 #include "Smtp.h"

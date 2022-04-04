@@ -32,6 +32,17 @@ int ptr_incr(const char **ptr, int count)
     return(TRUE);
 }
 
+const char *traverse_until(const char *ptr, char terminator)
+{
+    while ((*ptr != terminator) && (*ptr != '\0'))
+    {
+        //handle quoted chars
+        if ((*ptr=='\\') && (*(ptr+1) != '\0')) ptr++;
+        ptr++;
+    }
+    return(ptr);
+}
+
 
 const char *traverse_quoted(const char *ptr)
 {
@@ -39,13 +50,7 @@ const char *traverse_quoted(const char *ptr)
 
     Quote=*ptr;
     ptr++;
-    while ((*ptr != Quote) && (*ptr != '\0'))
-    {
-        //handle quoted chars
-        if ((*ptr=='\\') && (*(ptr+1) != '\0')) ptr++;
-        ptr++;
-    }
-    return(ptr);
+    return(traverse_until(ptr, Quote));
 }
 
 
@@ -86,22 +91,22 @@ void *ArrayGetItem(void *array[], int pos)
 //remap one fd to another, usually used to change stdin, stdout or stderr
 int fd_remap(int fd, int newfd)
 {
-	close(fd);
-	dup(newfd);
-	return(TRUE);
+    close(fd);
+    dup(newfd);
+    return(TRUE);
 }
 
 int fd_remap_path(int fd, const char *Path, int Flags)
 {
-int newfd;
-int result;
+    int newfd;
+    int result;
 
-newfd=open(Path, Flags);
-if (newfd==-1) return(FALSE);
-result=fd_remap(fd, newfd);
-close(newfd);
+    newfd=open(Path, Flags);
+    if (newfd==-1) return(FALSE);
+    result=fd_remap(fd, newfd);
+    close(newfd);
 
-return(result);
+    return(result);
 }
 
 
@@ -208,7 +213,6 @@ const char *ToSIUnit(double Value, int Base, int Precision)
 int LookupUID(const char *User)
 {
     struct passwd *pwent;
-    char *ptr;
 
     if (! StrValid(User)) return(-1);
     pwent=getpwnam(User);
@@ -220,7 +224,6 @@ int LookupUID(const char *User)
 int LookupGID(const char *Group)
 {
     struct group *grent;
-    char *ptr;
 
     if (! StrValid(Group)) return(-1);
     grent=getgrnam(Group);
@@ -232,7 +235,6 @@ int LookupGID(const char *Group)
 const char *LookupUserName(uid_t uid)
 {
     struct passwd *pwent;
-    char *ptr;
 
     pwent=getpwuid(uid);
     if (! pwent) return("");
@@ -243,7 +245,6 @@ const char *LookupUserName(uid_t uid)
 const char *LookupGroupName(gid_t gid)
 {
     struct group *grent;
-    char *ptr;
 
     grent=getgrgid(gid);
     if (! grent) return("");

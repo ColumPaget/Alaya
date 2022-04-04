@@ -72,7 +72,8 @@ void ProcessTitleCaptureBuffer(char **argv);
 //arguments. ProcessTitleCaptureBuffer must be called first
 void ProcessSetTitle(const char *FmtStr, ...);
 
-
+// set 'fd' to be a processes controling tty
+void ProcessSetControlTTY(int fd);
 
 /*
 ProcessApplyConfig()  changes aspects of a running process. This function is not normally used in C programming, and is instead either called from the Spawn or fork functions in SpawnCommands.c or is used when binding libUseful functionality to scripting languages that have limited types, and where structures cannot easily be used to pass data.
@@ -86,12 +87,22 @@ dir=<path>      run process in directory 'path'
 setsid          start a new session for the process
 newpgroup       start a new process group for the process (pgid will be the same as the processes pid)
 
+ctrl_tty        set controlling tty of process to be it's standard-in. Signals and tty output will then happen on that channel, rather than
+                via the console the program is running on. So if your overall program is running on /dev/tty1, switch it to believe it's
+                tty is really whatever is on stdin
+
+ctty=<fd>       set controlling tty of process to be 'fd' (where fd is a file descriptor number). Same as ctrl_tty above, but using an
+                arbitary file descriptor rather than stdin.
+
+innull          redirect process stdin to /dev/null
+outnull         redirect process stdout and stderr to /dev/null
+errnull         redirect process stderr to /dev/null
 
 sigdef          set all signal handlers to the default values (throw away any sighandlers set by parent process)
 sigdefault      set all signal handlers to the default values (throw away any sighandlers set by parent process)
 
 chroot=<path>   chroot process into <path>. This option happens before switching users, so that user info lookup, lockfile, pidfile,
-								and chdir to directory specified with 'dir=<path>'  all happen within the chroot. Thus this is used when chrooting
+                and chdir to directory specified with 'dir=<path>'  all happen within the chroot. Thus this is used when chrooting
                 into a full unix filesystem
 
 jail            jail the process. This does a chroot AFTER looking up the user id, creating lockfile, etc ,etc. This can be used to

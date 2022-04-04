@@ -58,6 +58,8 @@ If you *KNOW* that your output of DecodeBytes is going to be null-terminated tex
 */
 
 #define ENCODE_NONE 0
+#define ENCODE_QUOTED_MIME 1
+#define ENCODE_QUOTED_HTTP 2
 #define ENCODE_OCTAL 8
 #define ENCODE_DECIMAL 10
 #define ENCODE_HEX  16
@@ -75,10 +77,10 @@ If you *KNOW* that your output of DecodeBytes is going to be null-terminated tex
 
 #define HEX_CHARS "0123456789ABCDEF"
 #define ALPHA_CHARS "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-#define BASE64_CHARS "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+#define BASE64_CHARS  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+#define RBASE64_CHARS "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_" //RFC4648 compliant
 #define IBASE64_CHARS "AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz0123456789+/"
 #define PBASE64_CHARS "0123456789-ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
-#define RBASE64_CHARS "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_" //RFC4648 compliant
 #define CRYPT_CHARS "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 #define UUENC_CHARS " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
 #define XXENC_CHARS "+-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"

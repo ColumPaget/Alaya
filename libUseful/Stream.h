@@ -75,6 +75,28 @@ S     file contents are sorted
 x     treat file path as a command to execute (currently on in ssh: streams) 
 z     compress/uncompress with gzip
 
+
+for tcp/unix/udp network connections the 'config argument' is normally 'rw' followed by name-value pairs with the following values
+
+r  - 'read' mode (a non-op as all sockets are readable)
+w  - 'write' mode (a non-op as all sockets are writeable)
+n  - nonblocking socket
+E  - report socket connection errors
+k  - TURN OFF socket keep alives
+B  - broadcast socket
+F  - TCP Fastopen
+R  - Don't route (equivalent to applying SOCKOPT_DONTROUTE)
+N  - TCP no-delay (disable Nagle algo)
+
+Name-value pairs are:
+
+ttl=<seconds>       set ttl of socket
+tos=<value>         set tos of socket
+mark=<value>        set SOCKOPT_MARK if supported
+keepalive=<y/n>     turn on/off socket keepalives
+timeout=<centisecs> connect/read timeout for socket
+
+
 for 'http' and 'https' URLs the first argument is a character list (though only one character long) with the following values
 
 r    GET method (default if no method specified)
@@ -92,6 +114,7 @@ content-length=<content length>
 user=<username>
 useragent=<user agent>
 user-agent=<user agent>
+timeout=<centisecs>
 hostauth
 
 Note, 'hostauth' is not a name/value pair, just a config flag that enables sending authentication without waiting for a 401 Response from the server. This means that we can't know the authentication realm for the server, and so internally use the hostname as the realm for looking up logon credentials. This is mostly useful for the github api.
@@ -215,8 +238,8 @@ typedef struct
 
     unsigned int InStart, InEnd;
     unsigned int OutEnd;
-    char *InputBuff;
-    char *OutputBuff;
+    unsigned char *InputBuff;
+    unsigned char *OutputBuff;
 
     unsigned long Size;
     unsigned long BytesRead;

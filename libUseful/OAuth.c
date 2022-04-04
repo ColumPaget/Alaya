@@ -2,22 +2,67 @@
 #include "Http.h"
 #include "Markup.h"
 #include "DataParser.h"
+#include "Encodings.h"
+#include "Hash.h"
 
 
 static ListNode *OAuthTypes=NULL;
 static ListNode *OAuthKeyChain=NULL;
 
+void AddOAuthType(const char *Name, const char *Stage1Args, const char *Stage2Args, const char *VerifyTemplate)
+{
+    char *Tempstr=NULL;
+
+    if (! OAuthTypes) OAuthTypes=ListCreate();
+    Tempstr=MCopyStr(Tempstr, Stage1Args, ",", Stage2Args, ",", VerifyTemplate, NULL);
+    SetVar(OAuthTypes, Name, Tempstr);
+
+    Destroy(Tempstr);
+}
 
 void SetupOAuthTypes()
 {
-    OAuthTypes=ListCreate();
-    SetVar(OAuthTypes, "implicit", "response_type=token&client_id=$(client_id)&redirect_uri=$(redirect_uri)&scope=basic&state=$(session)");
-    SetVar(OAuthTypes, "device", "client_id=$(client_id)&scope=$(scope),client_id=$(client_id)&client_secret=$(client_secret)&code=$(device_code)&grant_type=http://oauth.net/grant_type/device/1.0");
-    SetVar(OAuthTypes, "password", "client_name=$(client_id)&scope=$(scope)&redirect_uris=$(redirect_uri)&grant_type=password,client_id=$(client_id)&client_secret=$(client_secret)&grant_type=password&username=$(username)&password=$(password)");
-    SetVar(OAuthTypes, "getpocket.com", "consumer_key=$(client_id)&scope=$(scope)&redirect_uri=$(redirect_uri),consumer_key=$(client_id)&code=$(code),https://getpocket.com/auth/authorize?request_token=$(code)&redirect_uri=$(redirect_uri)");
-    SetVar(OAuthTypes, "auth", ",client_id=$(client_id)&client_secret=$(client_secret)&code=$(code)&grant_type=authorization_code&redirect_uri=$(redirect_uri),$(url)?response_type=code&client_id=$(client_id)&redirect_uri=$(redirect_uri)&scope=$(scope)&state=$(session)");
+    AddOAuthType( "implicit",  "response_type=token&client_id=$(client_id)&redirect_uri=$(redirect_uri)&scope=basic&state=$(session)", "", "");
+    AddOAuthType( "device",  "client_id=$(client_id)&scope=$(scope)", "client_id=$(client_id)&client_secret=$(client_secret)&code=$(device_code)&grant_type=http://oauth.net/grant_type/device/1.0", "");
+    AddOAuthType( "password",  "client_name=$(client_id)&scope=$(scope)&redirect_uris=$(redirect_uri)&grant_type=password", "client_id=$(client_id)&client_secret=$(client_secret)&grant_type=password&username=$(username)&password=$(password)", "");
+    AddOAuthType( "getpocket.com",  "consumer_key=$(client_id)&scope=$(scope)&redirect_uri=$(redirect_uri)", "consumer_key=$(client_id)&code=$(code)", "https://getpocket.com/auth/authorize?request_token=$(code)&redirect_uri=$(redirect_uri)");
+    AddOAuthType( "auth",  "", "client_id=$(client_id)&client_secret=$(client_secret)&code=$(code)&grant_type=authorization_code&redirect_uri=$(redirect_uri)", "$(url)?response_type=code&client_id=$(client_id)&redirect_uri=$(redirect_uri)&scope=$(scope)&state=$(session)");
+    AddOAuthType( "pkce", "", "client_id=$(client_id)&client_secret=$(client_secret)&code=$(code)&grant_type=authorization_code&code_verifier=$(code_verifier)&redirect_uri=$(redirect_uri)", "$(url)?client_id=$(client_id)&response_type=code&code_challenge=$(code_challenge)&code_challenge_method=S256&redirect_uri=$(redirect_uri)&scope=$(scope)&token_access_type=$(token_access_type)");
 }
 
+
+//Only include Arguments in the URL if they have values. Some oauth implementations will balk at '&redirect_uri=&' but will happily accept
+//no redirect_uri at all.
+char *OAuthBuildURL(char *RetStr, const char *Template, ListNode *Vars)
+{
+    char *Tempstr=NULL, *Name=NULL, *Value=NULL;
+    const char *ptr;
+
+    Tempstr=SubstituteVarsInString(Tempstr, Template, Vars, 0);
+    if (strchr(Tempstr, '?'))
+    {
+        ptr=GetToken(Tempstr, "?", &Value, 0);
+        RetStr=MCopyStr(RetStr, Value, "?", NULL);
+    }
+    else
+    {
+        RetStr=CopyStr(RetStr,"");
+        ptr=Tempstr;
+    }
+
+    ptr=GetNameValuePair(ptr, "&", "=", &Name, &Value);
+    while (ptr)
+    {
+        if (StrValid(Name) && StrValid(Value)) RetStr=MCatStr(RetStr, Name, "=", Value, "&", NULL);
+        ptr=GetNameValuePair(ptr, "&", "=", &Name, &Value);
+    }
+
+    Destroy(Tempstr);
+    Destroy(Name);
+    Destroy(Value);
+
+    return(RetStr);
+}
 
 
 
@@ -59,6 +104,17 @@ OAUTH *OAuthCreate(const char *Type, const char *Name, const char *ClientID, con
 //Ctx->VerifyURL=MCopyStr(Ctx->VerifyURL,"https://getpocket.com/auth/authorize?request_token=",Ctx->AccessToken,"&redirect_uri=",Args,NULL);
     }
     else if (strcasecmp(Type, "implicit")==0) Ctx->Flags |= OAUTH_IMPLICIT;
+    else if (strcasecmp(Type, "pkce")==0)
+    {
+        GenerateRandomBytes(&Token, 44, ENCODE_RBASE64);
+        strrep(Token, '=', '\0');
+        StripTrailingWhitespace(Token);
+        SetVar(Ctx->Vars,"code_verifier",Token);
+        HashBytes(&Tempstr, "sha256", Token, StrLen(Token), ENCODE_RBASE64);
+        strrep(Tempstr, '=', '\0');
+        StripTrailingWhitespace(Tempstr);
+        SetVar(Ctx->Vars,"code_challenge",Tempstr);
+    }
 
     if (! OAuthKeyChain) OAuthKeyChain=ListCreate();
     ListAddNamedItem(OAuthKeyChain, Name, Ctx);
@@ -151,13 +207,13 @@ int OAuthConnectBack(OAUTH *Ctx, int sock)
             ptr=GetToken(Tempstr,"\\S", &Token,0);
             //URL
             ptr=GetToken(ptr,"\\S", &Token,0);
-            if (ptr) 
-						{
-							tptr=strchr(Token, '?');
-							if (tptr) tptr++;
-							else tptr=Token;
-							OAuthParseReply(Ctx, "application/x-www-form-urlencoded", tptr);
-						}
+            if (ptr)
+            {
+                tptr=strchr(Token, '?');
+                if (tptr) tptr++;
+                else tptr=Token;
+                OAuthParseReply(Ctx, "application/x-www-form-urlencoded", tptr);
+            }
 
 
             while (Tempstr)
@@ -206,7 +262,7 @@ int OAuthListen(OAUTH *Ctx, int Port, const char *URL, int Flags)
         else if (FD_ISSET(0, &fds))
         {
             S=STREAMFromFD(0);
-						STREAMSetTimeout(S,0);
+            STREAMSetTimeout(S,0);
             Tempstr=STREAMReadLine(Tempstr, S);
             if ( (strncmp(Tempstr, "http:", 5)==0) || (strncmp(Tempstr, "https:", 6)==0) ) OAuthParseReply(Ctx, "application/x-www-form-urlencoded", Tempstr);
             else
@@ -235,12 +291,14 @@ int OAuthGrant(OAUTH *Ctx, const char *URL, const char *PostArgs)
     int len, result=FALSE;
 
     Tempstr=MCopyStr(Tempstr,URL,"?",PostArgs,NULL);
+    if (LibUsefulDebugActive()) fprintf(stderr, "DEBUG: OAuthGrant: %s\n", Tempstr);
     S=HTTPMethod("POST",URL,"application/x-www-form-urlencoded; charset=UTF-8",PostArgs,StrLen(PostArgs));
     if (S)
     {
         sleep(1);
         Tempstr=STREAMReadDocument(Tempstr, S);
 
+        if (LibUsefulDebugActive()) fprintf(stderr, "DEBUG: OAuthGrant Response: %s\n", Tempstr);
         result=OAuthParseReply(Ctx, STREAMGetValue(S, "HTTP:Content-Type"), Tempstr);
         STREAMClose(S);
     }
@@ -309,7 +367,8 @@ int OAuthFinalize(OAUTH *Ctx, const char *URL)
     char *Tempstr=NULL;
     int result;
 
-    Tempstr=SubstituteVarsInString(Tempstr, Ctx->Stage2, Ctx->Vars,0);
+    //Tempstr=SubstituteVarsInString(Tempstr, Ctx->Stage2, Ctx->Vars,0);
+    Tempstr=OAuthBuildURL(Tempstr, Ctx->Stage2, Ctx->Vars);
     result=OAuthGrant(Ctx, URL, Tempstr);
     if (StrValid(Ctx->AccessToken)) OAuthSave(Ctx, "");
 
@@ -348,7 +407,8 @@ int OAuthStage1(OAUTH *Ctx, const char *URL)
     Tempstr=GetRandomAlphabetStr(Tempstr, 10);
     SetVar(Ctx->Vars, "session",Tempstr);
     SetVar(Ctx->Vars, "url",URL);
-    Tempstr=SubstituteVarsInString(Tempstr, Ctx->Stage1, Ctx->Vars, 0);
+    //Tempstr=SubstituteVarsInString(Tempstr, Ctx->Stage1, Ctx->Vars, 0);
+    Tempstr=OAuthBuildURL(Tempstr, Ctx->Stage1, Ctx->Vars);
 
     if (StrLen(Tempstr))
     {
@@ -359,6 +419,7 @@ int OAuthStage1(OAUTH *Ctx, const char *URL)
     if (StrLen(Ctx->VerifyTemplate))
     {
         Ctx->VerifyURL=SubstituteVarsInString(Ctx->VerifyURL, Ctx->VerifyTemplate, Ctx->Vars,0);
+        Ctx->VerifyURL=OAuthBuildURL(Ctx->VerifyURL, Ctx->VerifyTemplate, Ctx->Vars);
     }
 
     DestroyString(Tempstr);
@@ -405,44 +466,44 @@ void OAuthParse(OAUTH *Ctx, const char *Line)
 //so that newer entries overwrite old ones, then writing back to disk
 static void OAuthCleanupCredsFile(const char *Path)
 {
-char *Tempstr=NULL, *Name=NULL;
-ListNode *Items=NULL, *Curr;
-const char *ptr;
-STREAM *S;
+    char *Tempstr=NULL, *Name=NULL;
+    ListNode *Items=NULL, *Curr;
+    const char *ptr;
+    STREAM *S;
 
-Items=ListCreate();
-S=STREAMOpen(Path, "rw");
-if (S)
-{
-	STREAMLock(S, LOCK_EX);
-	Tempstr=STREAMReadLine(Tempstr, S);
-	while (Tempstr)
-	{
-	StripTrailingWhitespace(Tempstr);
-	if (StrValid(Tempstr))
-	{
-	ptr=GetToken(Tempstr, "\\S", &Name, GETTOKEN_QUOTES);
-	SetVar(Items, Name, ptr);
-	}
-	Tempstr=STREAMReadLine(Tempstr, S);
-	}
+    Items=ListCreate();
+    S=STREAMOpen(Path, "rw");
+    if (S)
+    {
+        STREAMLock(S, LOCK_EX);
+        Tempstr=STREAMReadLine(Tempstr, S);
+        while (Tempstr)
+        {
+            StripTrailingWhitespace(Tempstr);
+            if (StrValid(Tempstr))
+            {
+                ptr=GetToken(Tempstr, "\\S", &Name, GETTOKEN_QUOTES);
+                SetVar(Items, Name, ptr);
+            }
+            Tempstr=STREAMReadLine(Tempstr, S);
+        }
 
-	STREAMTruncate(S, 0);
-	STREAMSeek(S, SEEK_SET, 0);
-	Curr=ListGetNext(Items);
-	while (Curr)
-	{
-		Tempstr=MCopyStr(Tempstr, "'", Curr->Tag, "' ", Curr->Item, "\n", NULL);
-		STREAMWriteLine(Tempstr, S);
-		Curr=ListGetNext(Curr);
-	}
+        STREAMTruncate(S, 0);
+        STREAMSeek(S, SEEK_SET, 0);
+        Curr=ListGetNext(Items);
+        while (Curr)
+        {
+            Tempstr=MCopyStr(Tempstr, "'", Curr->Tag, "' ", Curr->Item, "\n", NULL);
+            STREAMWriteLine(Tempstr, S);
+            Curr=ListGetNext(Curr);
+        }
 
-	STREAMClose(S);
-}
+        STREAMClose(S);
+    }
 
-ListDestroy(Items, Destroy);
-Destroy(Tempstr);
-Destroy(Name);
+    ListDestroy(Items, Destroy);
+    Destroy(Tempstr);
+    Destroy(Name);
 }
 
 
@@ -452,17 +513,17 @@ int OAuthLoad(OAUTH *Ctx, const char *ReqName, const char *iPath)
     char *Tempstr=NULL, *Token=NULL, *Name=NULL, *Path;
     const char *ptr;
     int result=FALSE;
-		int MatchingLines=0;
+    int MatchingLines=0;
 
-		//if we are explictly passed an entry name then use that,
-		//else use the one from the OAUTH object
+    //if we are explictly passed an entry name then use that,
+    //else use the one from the OAUTH object
     if (StrValid(ReqName)) Name=CopyStr(Name, ReqName);
     else Name=CopyStr(Name, Ctx->Name);
 
-		//if we are explictly passed a file path then use that,
-		//else use the one from the OAUTH object
-		if (StrValid(iPath)) Path=CopyStr(Path, iPath);
-		else Path=CopyStr(Path, Ctx->SavePath);
+    //if we are explictly passed a file path then use that,
+    //else use the one from the OAUTH object
+    if (StrValid(iPath)) Path=CopyStr(Path, iPath);
+    else Path=CopyStr(Path, Ctx->SavePath);
 
     Ctx->AccessToken=CopyStr(Ctx->AccessToken, "");
     Ctx->RefreshToken=CopyStr(Ctx->RefreshToken, "");
@@ -470,27 +531,27 @@ int OAuthLoad(OAUTH *Ctx, const char *ReqName, const char *iPath)
     S=STREAMOpen(Path,"r");
     if (S)
     {
-				STREAMLock(S, LOCK_SH);
+        STREAMLock(S, LOCK_SH);
         Tempstr=STREAMReadLine(Tempstr, S);
         while (Tempstr)
         {
-						StripTrailingWhitespace(Tempstr);
+            StripTrailingWhitespace(Tempstr);
             ptr=GetToken(Tempstr, "\\S", &Token, GETTOKEN_QUOTES);
             if (strcmp(Token, Name)==0)
             {
                 OAuthParse(Ctx, Tempstr);
                 if (StrValid(Ctx->AccessToken) || StrValid(Ctx->RefreshToken)) result=TRUE;
-								MatchingLines++;
+                MatchingLines++;
             }
             Tempstr=STREAMReadLine(Tempstr, S);
         }
         STREAMClose(S);
     }
 
-		//if the item we were looking for has more than 5 entries in the OAuth credentials file
-		//then there's too many 'old' entries that have been refreshed, and we should clean up
-		//the file
-		if (MatchingLines > 5) OAuthCleanupCredsFile(Path);
+    //if the item we were looking for has more than 5 entries in the OAuth credentials file
+    //then there's too many 'old' entries that have been refreshed, and we should clean up
+    //the file
+    if (MatchingLines > 5) OAuthCleanupCredsFile(Path);
 
 
     DestroyString(Tempstr);
@@ -519,7 +580,7 @@ int OAuthSave(OAUTH *Ctx, const char *Path)
     else S=STREAMOpen(Path,"aE");
     if (S)
     {
-				STREAMLock(S, LOCK_EX);
+        STREAMLock(S, LOCK_EX);
         Tempstr=MCopyStr(Tempstr, "'", Ctx->Name,"' ",NULL);
         for (i=0; Fields[i] !=NULL; i++)
         {

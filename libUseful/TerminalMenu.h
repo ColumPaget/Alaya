@@ -16,6 +16,14 @@ extern "C" {
 //the list node is returned, so you have both the option name, as Node->Tag, and any associated item
 //as Node->Item
 
+// Supported keys are arrows and ctrl-WASD:
+
+//UP: up-arrow, ctrl-w
+//DOWN: down-arrow, ctrl-s
+//SELECT: enter, ctrl-d
+//EXIT MENU: escape, ctrl-a
+
+
 #define TERMMENU_POSITIONED 1
 #define TERMMENU_SELECTED LIST_FLAG_USER1
 
@@ -36,12 +44,31 @@ ListNode *TerminalMenuOnKey(TERMMENU *Menu, int key);
 //selected. Returns the selected option, or returns NULL if escape is pressed
 ListNode *TerminalMenuProcess(TERMMENU *Menu);
 
+//set menu cursor to top
+ListNode *TerminalMenuTop(TERMMENU *Menu);
+
+//move menu cursor up one line
+ListNode *TerminalMenuUp(TERMMENU *Menu);
+
+//move menu cursor down one line
+ListNode *TerminalMenuDown(TERMMENU *Menu);
+
+
 //create a menu from a list of options, and run it.
 //This keeps reading keypresses until an option is selected. 
 //Returns the selected option, or returns NULL if escape is pressed.
 //if TERMMENU_SELECTED is set on the head of Options, then the menu will allow setting
 //'selected' against multiple values
 ListNode *TerminalMenu(STREAM *Term, ListNode *Options, int x, int y, int wid, int high);
+
+//create a menu from a line of text, and run it.
+//Options in the text a seperated by '|' so "This|That|The Other".
+//This keeps reading keypresses until an option is selected. 
+//Returns the selected option as string copied into 'RetStr', or returns NULL if escape is pressed.
+//if TERMMENU_SELECTED is set on the head of Options, then the menu will allow setting
+//'selected' against multiple values
+char *TerminalMenuFromText(char *RetStr, STREAM *Term, const char *Options, int x, int y, int wid, int high);
+
 
 #ifdef __cplusplus
 }

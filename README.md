@@ -64,6 +64,7 @@ Comma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for reado
 	-cert:  Certificate for SSL (HTTPS). This can be a certificate chain bundled in .pem format.
 	-ciphers:		List of SSL ciphers to use.
 	-dhparams:		Path to a file containing Diffie Helmann parameters for Perfect Forward Secrecy.
+  -pfs:         Use Perfect Forward Secrecy. Will not generate Diffie Helmann parameters unless -dhgenerate is supplied too
 	-client-cert:		Settings for SSL client certificate authentication. Three levels are available: 'required' means a client MUST supply a certificate, but that it may still be required to log in through normal authentication. 'sufficient' means that a client CAN supply a certificate, and that the certificate is all the authentication that's needed. 'required+sufficient' means that a client MUST provide a certificate, and that this certificate is sufficient for authentication.
 	-verify-path:		Path to a file, or a directory, containing Authority certificates for verifying client certificates.
 	-cgi:   Directory containing cgi programs. These programs will be accessible even though they are outside of a 'chroot'
@@ -136,26 +137,28 @@ There should be an example config file in the source distribution. It's worth lo
 Config file entries are:
 
 ```
-include=<path>    Include another config file in this config.
+include=<path>    		Include another config file in this config.
 Chroot=<dir>			Specifies directory to serve requests out of
-ChHome						Serve requests out of users home directory
-AllowUsers=<list>			Only allow these users access.
-DenyUsers=<list>			Deny these users access.
-Port=<port>				Port to listen on
-LogFile=<path>    Log file path
-PidFile=<path>    Pid file path
-AuthPath=<path>		Path to native authentication file(s)
+ChHome				Serve requests out of users home directory
+AllowUsers=<list>		Only allow these users access.
+DenyUsers=<list>		Deny these users access.
+Port=<port>			Port to listen on
+LogFile=<path>    		Log file path
+PidFile=<path>    		Pid file path
+AuthPath=<path>			Path to native authentication file(s)
 AuthRealm=<realm>		Realm for HTTP authentication
-BindAddress=<addr>	Interface to serve requests on
-HttpMethods=<list>	List of methods like GET, PUT that are allowed
-AuthMethods=<list>  Which methods (native, shadow, passwd, pam, accesstoken) should be used for user authentication, and in what order. See more in 'AUTHENTICATION' below.
-SSLKey=<path>		Path to SSL key file
-SSLCert=<path>	Path to SSL certificate file
+BindAddress=<addr>		Interface to serve requests on
+HttpMethods=<list>		List of methods like GET, PUT that are allowed
+AuthMethods=<list>  		Which methods (native, shadow, passwd, pam, accesstoken) should be used for user authentication, and in what order. See more in 'AUTHENTICATION' below.
+SSLKey=<path>			Path to SSL key file
+SSLCert=<path>			Path to SSL certificate file
 SSLVersion=<ssl version> 	Lowest SSL Version to use. Can be 'ssl', 'tls', 'tls1.1' or 'tls1.2'. 
 SSLCiphers=<cipher list> 	List of Ciphers to use with SSL (in standard openssl format)
 SSLVerifyPath=<path>		Path to file or directory containing Certificate Authority certificates for peer authentication.
-SSLClientCertificate=<type>		'required', 'sufficient' or 'required+sufficient' (See 'Client Certificates' below)
-SSLDHParams=<path>		Path to an openssl generated Diffie Helman parameters file.
+SSLClientCertificate=<type>	'required', 'sufficient' or 'required+sufficient' (See 'Client Certificates' below)
+SSLDHParams=<path>		Path to an openssl generated Diffie Helman parameters file. Auto-activates Perfect Forward Secrecy.
+PFS=<yes|no>                    Use Perfect Forward Secrecy (not needed if SSLDHParams is supplied. Without SSLDHParams will use ElipticCurve algorithms).
+PerfectForwardSecrecy=<yes|no>  Use Perfect Forward Secrecy (not needed if SSLDHParams is supplied. Without SSLDHParams will use ElipticCurve algorithms).
 Path=<type>,<alias>,<path>	Path to a trusted directory outside of a chroot jail, which is made accessible as a 'virtual' directory under the top-level of the chroot. Currently there are two types of path 'cgi', for cgi programs, and 'files' for a standard directory made available in this way. (See 'VPaths' below)
 FileType=<pattern>,<settings>  Settings for files that match 'pattern'. See 'SETTINGS FOR FILE TYPES' below.
 Event=<type>:<match string>,<match str>,<match str>...:Script
@@ -166,20 +169,20 @@ DefaultGroup=<groupname>	Default group for webserver
 DirListType=<type>  Type of directory listings served. Can be 'none', 'basic', 'fancy' or 'interactive', with other flags to see optional properties. See 'DIRECTORY LISTINGS' below.
 Compression=<yes|no|partial> Use HTTP compression. 'Partial' will mean that only internally generated pages are compressed, not downloaded files.
 ScriptHashFile=<path>		Path to a file containing integrity hashes of cgi scripts. 
-ScriptHandler:<type>=<path>		Path to interpreter to handle scripts with the extension <type>
+ScriptHandler:<type>=<path>	Path to interpreter to handle scripts with the extension <type>
 CustomHeader=<full HTTP header>   Custom HTTP header to be added to all server responses.
-LookupClientName 	 If present then lookup client hostnames with DNS and use in logging. The default is just to log the ip-address, as this is faster.
-SanitizeAllowTags=<tag list>		List of HTML tags allowed to be used in 'POST' to cgi-scripts. If left blank, then all are allowed, if set, then all but the listed html elements will be stripped 
+LookupClientName 	 	If present then lookup client hostnames with DNS and use in logging. The default is just to log the ip-address, as this is faster.
+SanitizeAllowTags=<tag list>	List of HTML tags allowed to be used in 'POST' to cgi-scripts. If left blank, then all are allowed, if set, then all but the listed html elements will be stripped 
 UserAgentSettings=UserAgentString,Settings		Settings to be applied when a particular user agent string is seen.
-FileCacheTime=<seconds>		  Amount of time to recommend the browser	caches documents for.
-ListenQueue=<num>           Number of connections to queue waiting for 'accept'. Default is 10.
-HttpKeepAlive=<yes|no>		  Use http keep-alive
-ReusePort=<yes|no>				  Bind server socket with SO_REUSEPORT allowing multiple server processes to bind to the same port (on by default).
-UseNamespaces=<yes|no>		  Use linux namespaces to isolate the connection-handler processes (on by default).
+FileCacheTime=<seconds>		Amount of time to recommend the browser	caches documents for.
+ListenQueue=<num>           	Number of connections to queue waiting for 'accept'. Default is 10.
+HttpKeepAlive=<yes|no>		Use http keep-alive
+ReusePort=<yes|no>		Bind server socket with SO_REUSEPORT allowing multiple server processes to bind to the same port (on by default).
+UseNamespaces=<yes|no>		Use linux namespaces to isolate the connection-handler processes (on by default).
 TcpFastOpen=<https|yes|no>  Use 'tcp fast open'. 'https' only enables this in for encrypted channels, which is the default due to some security concerns.
 
-MaxMemory=<max bytes>			  Maximum amount of memory per alaya process. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
-MaxStack=<max bytes>			  Maximum Stack Size. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
+MaxMemory=<max bytes>		Maximum amount of memory per alaya process. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
+MaxStack=<max bytes>		Maximum Stack Size. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
 PackFormats=<list>	        List of 'pack formats' to offer in the 'download as packed' item on the directory page.
 WebsocketHandler:<path>:<protocol>=<script path>   Specify a program that handles websockets requests to a particular path and protocol.
 DenyProxy=<host>:<port>     Configuration for proxy systems, see 'PROXY' section below

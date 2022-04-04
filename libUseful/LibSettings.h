@@ -117,6 +117,10 @@ int LibUsefulGetBool(const char *Name);
 
 int LibUsefulGetInteger(const char *Name);
 
+
+//returns TRUE if libUseful Debug is active, FALSE otehrwise
+int LibUsefulDebugActive();
+
 //this function gets called at exit to do certain cleaning up. It's no concern of the user.
 //nothing to see here, move along
 void LibUsefulAtExit();

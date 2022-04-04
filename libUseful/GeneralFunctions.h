@@ -33,6 +33,9 @@ int xsetenv(const char *Name, const char *Value);
 //increment a char * by 'count' but DO NOT GO PAST A NULL CHARACTER. Returns number of bytes actually incremented
 int ptr_incr(const char **ptr, int count);
 
+
+const char *traverse_until(const char *ptr, char terminator);
+
 //treat the first character pointed to by 'ptr' as a quote character. Traverse the string until a matching character is
 //found, then return the character after that. This function ignores characters if they are quoted with a preceeding
 //'\' character.
