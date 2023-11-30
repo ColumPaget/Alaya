@@ -77,6 +77,9 @@ int FileChangeExtension(const char *FilePath, const char *NewExt);
 int FileChOwner(const char *Path, const char *Owner);
 int FileChGroup(const char *Path, const char *Group);
 
+//change file mode. 'Mode' can be an octal number like '0666' or a string like 'rw-rw-rw'
+int FileChMod(const char *Path, const char *Mode);
+
 //modify time access and modification times to imply it's been modified just now
 int FileTouch(const char *Path);
 

@@ -267,7 +267,7 @@ TPathItem *PathItemCreate(int Type, const char *URL, const char *Path)
 {
     TPathItem *PI=NULL;
 
-    PI=(TPathItem *) calloc(1,sizeof(TPathItem));
+    PI=(TPathItem *) calloc(1, sizeof(TPathItem));
     PI->Type=Type;
     PI->Path=CopyStr(PI->Path,Path);
     PI->Name=CopyStr(PI->Name,GetBasename((char *) Path));
@@ -280,11 +280,13 @@ void PathItemDestroy(void *pi_ptr)
 {
     TPathItem *PI;
 
+    if (! pi_ptr) return;
     PI=(TPathItem *) pi_ptr;
     Destroy(PI->Path);
     Destroy(PI->URL);
     Destroy(PI->Name);
     Destroy(PI->ContentType);
+
     free(PI);
 }
 
@@ -563,6 +565,7 @@ void DropCapabilities(int Level)
     if (cap_set_flag(cap, CAP_INHERITABLE, NumCapsSet, CapSet, CAP_SET) == -1)  ;
 
     cap_set_proc(cap);
+    cap_free(cap);
 
 #else
 

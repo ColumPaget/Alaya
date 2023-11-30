@@ -197,7 +197,7 @@ static int VPathHandleFilePath(STREAM *S, HTTPSession *Session, TPathItem *VPath
     {
         Flags = HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE;
         if (VPath->Flags & PATHITEM_READONLY) Flags |= DIR_READONLY;
-        HTTPServerSendDocument(S, Session, Tempstr, Flags);
+        AlayaServerSendDocument(S, Session, Tempstr, Flags);
         result=TRUE;
     }
     else if (StrValid(ExternalPath))
@@ -212,7 +212,7 @@ static int VPathHandleFilePath(STREAM *S, HTTPSession *Session, TPathItem *VPath
             else
             {
                 LogToFile(Settings.LogPath,"%s@%s (%s) uploading DENIED to %s in VPATH %s", Session->UserName,Session->ClientHost,Session->ClientIP,DocName,ExternalPath);
-                HTTPServerSendHTML(S, Session, "403 Forbidden","Uploads not allowed to this path.");
+                AlayaServerSendHTML(S, Session, "403 Forbidden","Uploads not allowed to this path.");
             }
         }
         else
@@ -223,7 +223,7 @@ static int VPathHandleFilePath(STREAM *S, HTTPSession *Session, TPathItem *VPath
         result=TRUE;
     }
 //This will send '404'
-//else HTTPServerSendDocument(S, Session, DocName, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
+//else AlayaServerSendDocument(S, Session, DocName, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 
     Destroy(DocName);
     Destroy(Tempstr);
@@ -295,11 +295,11 @@ int VPathProcess(STREAM *S, HTTPSession *Session, int Flags)
         Path=FormatURL(Path, VPathSession, "/");
         Path=MCatStr(Path,"?Logout=",VPathSession->Path,NULL);
         VPathSession->Flags &= ~SESSION_KEEPALIVE;
-        HTTPServerSendResponse(S, VPathSession, "302", "", Path);
+        AlayaServerSendResponse(S, VPathSession, "302", "", Path);
         break;
 
     case PATHTYPE_REDIRECT:
-        HTTPServerSendResponse(S, VPathSession, "302", "", PI->Path);
+        AlayaServerSendResponse(S, VPathSession, "302", "", PI->Path);
         break;
 
     case PATHTYPE_URL:

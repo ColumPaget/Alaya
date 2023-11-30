@@ -9,7 +9,7 @@ Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
 #include "includes.h"
 
 /*
-DataParser functions provide a method for parsing JSON, RSS, and YAML documents and also 'config file' documents
+DataParser functions provide a method for parsing JSON, RSS, and YAML documents and also 'ini file' and 'config file' documents
 as described below.
 
 'ParserParseDocument' is passed the document type and document text (which can be read into a
@@ -61,7 +61,7 @@ Tree=ParserParseDocument("config", Document);
 Curr=ListGetNext(Tree);
 while (Curr)
 {
-if (Curr->ItemType==ITEM_VALUE) printf("atrrib: %s = %s\n",Curr->Tag, (char *) Curr->Item);
+if (ParseItemIsValue(Curr)) printf("atrrib: %s = %s\n",Curr->Tag, (char *) Curr->Item);
 else printf("entity: %s\n",Curr->Tag);
 Curr=ListGetNext(Tree);
 }
@@ -100,6 +100,40 @@ printf("Days Sick: %s\n",ParserGetValue(Student, "sickdays"));
 
 When finished you should free the top level tree by passing it to 'ParserItemsDestroy'. NEVER DO THIS WITH BRANCHES
 OBTAINED VIA ParserOpenItem. Only do it to the root node obtained with ParserParseDocument
+
+'config' style documents contain either
+
+<name> <value>
+<name>:<value>
+<name>=<value>
+
+<group name>
+{
+<name>=<value>
+<name>=<value>
+}
+
+so lines consist of a name, and a value seperated by space, colon or '='
+names can be quoted if they contain spaces, so:
+
+"ultimate answer" = 42
+
+values do not need to be quoted in the same way, as they are read until the end of line
+the value is treated as a string *including any quotes it contains*. Thus you can use
+quotes within values and have those passed to the program. e.g.:
+
+command="tar -zcf /tmp/myfile.tgz /root" user=root group=backup
+
+will set the value to be the entire string, including any quotes
+
+key-value pairs can be grouped into objects like so:
+
+"bill blogs"
+{
+FirstName=Bill
+LastName=Blogs
+Age=immortal
+}
 */
 
 
@@ -108,21 +142,31 @@ OBTAINED VIA ParserOpenItem. Only do it to the root node obtained with ParserPar
 extern "C" {
 #endif
 
-typedef enum {PARSER_JSON, PARSER_XML, PARSER_RSS, PARSER_YAML, PARSER_CONFIG, PARSER_INI, PARSER_URL, PARSER_FORK} EParsers;
+typedef enum {PARSER_JSON, PARSER_XML, PARSER_RSS, PARSER_YAML, PARSER_CONFIG, PARSER_INI, PARSER_URL, PARSER_CMON} EParsers;
 
 //this typedef is simply to create a typename that makes code clearer, you can just use 'ListNode' if you prefer
 typedef struct lnode PARSER;
 
-#define ITEM_ROOT   0
-#define ITEM_VALUE  1
-#define ITEM_ENTITY 2
-#define ITEM_ARRAY  3
+#define ITEM_ROOT    0          //dummy header at top level of the parse tree
+#define ITEM_STRING  1          //text string
+#define ITEM_ENTITY  2          //an object/set with members
+#define ITEM_ARRAY   3          //a list of things
+#define ITEM_INTEGER 4          //integer value (actually number rather than integer)
+#define ITEM_INTERNAL_LIST 100  //list of items that is internal to an entity or array
+#define ITEM_ENTITY_LINE   102  //an entity that should be expressed as a single line when output
+
 
 ListNode *ParserParseDocument(const char *DocType, const char *Doc);
 void ParserItemsDestroy(ListNode *Items);
 ListNode *ParserFindItem(ListNode *Items, const char *Name);
+ListNode *ParserSubItems(ListNode *Node);
 ListNode *ParserOpenItem(ListNode *Items, const char *Name);
+int ParserItemIsValue(ListNode *Node);
 const char *ParserGetValue(ListNode *Items, const char *Name);
+ListNode *ParserAddValue(ListNode *Parent, const char *Name, const char *Value);
+ListNode *ParserNewObject(ListNode *Parent, int Type, const char *Name);
+ListNode *ParserAddArray(ListNode *Parent, const char *Name);
+char *ParserExport(char *RetStr, const char *Format, PARSER *P);
 
 #ifdef __cplusplus
 }

@@ -27,6 +27,7 @@ and 'StrRTruncChar' functions to truncate strings
 #include <string.h> //for strlen, used below in StrLen
 #include "defines.h"
 #include "GeneralFunctions.h"
+#include "StrLenCache.h"
 
 //UsedW with 'MatchTokenFromList'
 #define MATCH_TOKEN_PART 1
@@ -77,22 +78,14 @@ extern "C" {
 //Quote some standard chars in a string with '\'. 
 #define EnquoteStr(Dest, Src) (QuoteCharsInStr((Dest), (Src), "'\"\r\n"))
 
-//free memory up. Doesn't crash if Obj is null
-void Destroy(void *Obj);
-
-
-//thse are used internally, you'll not normally use any of these functions
-int StrLenFromCache(const char *Str);
-void StrLenCacheDel(const char *Str);
-void StrLenCacheUpdate(const char *Str, int incr);
-void StrLenCacheAdd(const char *Str, size_t len);
-
-
 //allocate or reallocate 'Len' bytes of memory to a resizeable string
 char *SetStrLen(char *Str, size_t Len);
 
 //strcmp that won't creash if str is null
 int CompareStr(const char *S1, const char *S2);
+
+//strcasecmp that won't creash if str is null
+int CompareStrNoCase(const char *S1, const char *S2);
 
 //copy Len bytes from Src to Dest, resizing Dest if needed and return Dest
 char *CopyStrLen(char *Dest, const char *Src, size_t Len);

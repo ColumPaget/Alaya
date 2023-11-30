@@ -77,10 +77,10 @@ extern "C" {
 
 #define TERMCHOICE TERMMENU
 
-#define TerminalChoiceCreate TerminalWidgetCreate
 #define TerminalChoiceDestroy TerminalWidgetDestroy
 #define TerminalChoiceSetOptions TerminalWidgetSetOptions
 
+TERMCHOICE *TerminalChoiceCreate(STREAM *Term, const char *Config);
 void TerminalChoiceDraw(TERMCHOICE *MB);
 char *TerminalChoiceOnKey(char *RetStr, TERMCHOICE *MB, int key);
 char *TerminalChoiceProcess(char *RetStr, TERMCHOICE *MB);

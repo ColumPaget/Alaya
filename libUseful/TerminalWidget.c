@@ -44,8 +44,18 @@ void TerminalWidgetParseConfig(TERMWIDGET *TW, const char *Config)
             TW->Flags |= TERMWIDGET_POSITIONED;
             break;
 
+        case 'a':
+            if (strcasecmp(Name, "attribs")==0) TW->Attribs=CopyStr(TW->Attribs, Value);
+            break;
+
         case 'c':
-            if (strcasecmp(Name, "choices")==0) TerminalWidgetSetOptions(TW, Value);
+            if (strcasecmp(Name, "cursor")==0) TW->CursorLeft=CopyStr(TW->CursorLeft, Value);
+            else if (strcasecmp(Name, "choices")==0) TerminalWidgetSetOptions(TW, Value);
+            else if (strcasecmp(Name, "cursor_attribs")==0) TW->CursorAttribs=CopyStr(TW->CursorAttribs, Value);
+            break;
+
+        case 'l':
+            if (strcasecmp(Name, "left-cursor")==0) TW->CursorLeft=CopyStr(TW->CursorLeft, Value);
             break;
 
         case 'o':
@@ -54,13 +64,16 @@ void TerminalWidgetParseConfig(TERMWIDGET *TW, const char *Config)
 
         case 'p':
             if (strcasecmp(Name, "prompt")==0) TW->Text=CopyStr(TW->Text, Value);
-            else if (strcasecmp(Name, "pad-left")==0) TW->MenuPadLeft=CopyStr(TW->MenuPadLeft, Value);
-            else if (strcasecmp(Name, "pad-right")==0) TW->MenuPadRight=CopyStr(TW->MenuPadRight, Value);
             break;
 
+        case 'r':
+            if (strcasecmp(Name, "right-cursor")==0) TW->CursorRight=CopyStr(TW->CursorRight, Value);
+            break;
+
+
         case 's':
-            if (strcasecmp(Name, "select-left")==0) TW->MenuCursorLeft=CopyStr(TW->MenuCursorLeft, Value);
-            else if (strcasecmp(Name, "select-right")==0) TW->MenuCursorRight=CopyStr(TW->MenuCursorRight, Value);
+            if (strcasecmp(Name, "selected_attribs")==0) TW->SelectedAttribs=CopyStr(TW->SelectedAttribs, Value);
+            else if (strcasecmp(Name, "select-right")==0) TW->CursorRight=CopyStr(TW->CursorRight, Value);
             break;
         }
 
@@ -72,23 +85,31 @@ void TerminalWidgetParseConfig(TERMWIDGET *TW, const char *Config)
 }
 
 
-TERMWIDGET *TerminalWidgetCreate(STREAM *TERM, const char *Config)
+TERMWIDGET *TerminalWidgetNew(STREAM *TERM, int x, int y, int width, int high, const char *Config)
 {
     TERMWIDGET *TW;
 
     TW=(TERMWIDGET *) calloc(1, sizeof(TERMWIDGET));
     TW->Term=TERM;
+    TW->x=x;
+    TW->y=y;
+    TW->wid=width;
+    TW->high=high;
     TW->Options=ListCreate();
-    TW->MenuPadLeft=CopyStr(TW->MenuPadLeft, " ");
-    TW->MenuPadRight=CopyStr(TW->MenuPadRight, " ");
-    TW->MenuCursorLeft=CopyStr(TW->MenuCursorLeft, "<");
-    TW->MenuCursorRight=CopyStr(TW->MenuCursorRight, ">");
-
+    TW->Attribs=CopyStr(TW->Attribs, "");
+    TW->CursorAttribs=CopyStr(TW->CursorAttribs, "");
+    TW->SelectedAttribs=CopyStr(TW->SelectedAttribs, "");
+    TW->CursorLeft=CopyStr(TW->CursorLeft, "");
+    TW->CursorRight=CopyStr(TW->CursorRight, "");
     TerminalWidgetParseConfig(TW, Config);
 
     return(TW);
 }
 
+TERMWIDGET *TerminalWidgetCreate(STREAM *TERM, const char *Config)
+{
+    return(TerminalWidgetNew(TERM, 0, 0, 0, 0, Config));
+}
 
 
 void TerminalWidgetDestroy(void *p_TW)
@@ -97,11 +118,11 @@ void TerminalWidgetDestroy(void *p_TW)
 
     TW=(TERMWIDGET *) p_TW;
     Destroy(TW->Text);
-    Destroy(TW->MenuAttribs);
-    Destroy(TW->MenuPadLeft);
-    Destroy(TW->MenuPadRight);
-    Destroy(TW->MenuCursorLeft);
-    Destroy(TW->MenuCursorRight);
+    Destroy(TW->Attribs);
+    Destroy(TW->CursorAttribs);
+    Destroy(TW->SelectedAttribs);
+    Destroy(TW->CursorLeft);
+    Destroy(TW->CursorRight);
     ListDestroy(TW->Options, Destroy);
     Destroy(TW);
 }

@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
 
+#include <locale.h>
 
 char *OSSysInfoInterfaces(char *RetStr)
 {
@@ -32,6 +33,29 @@ char *OSSysInfoInterfaces(char *RetStr)
 }
 
 
+char *OSSysInfoLocaleConf(char *RetStr, int Type)
+{
+    struct lconv *Details;
+
+    RetStr=CopyStr(RetStr, "");
+    setlocale(LC_ALL, "");
+    Details=localeconv();
+    if (Details)
+    {
+        switch (Type)
+        {
+        case OSINFO_CURRENCY:
+            RetStr=CopyStr(RetStr, Details->int_curr_symbol);
+            break;
+        case OSINFO_CURRENCY_SYM:
+            RetStr=CopyStr(RetStr, Details->currency_symbol);
+            break;
+        }
+    }
+
+    return(RetStr);
+}
+
 
 //This is a convinience function for use by modern languages like
 //lua that have an 'os' object that returns information
@@ -41,6 +65,7 @@ const char *OSSysInfoString(int Info)
     struct passwd *pw;
     const char *ptr;
     static char *buf=NULL;
+    int result;
 
     uname(&UtsInfo);
 
@@ -60,13 +85,13 @@ const char *OSSysInfoString(int Info)
 
     case OSINFO_HOSTNAME:
         buf=SetStrLen(buf, HOST_NAME_MAX);
-        gethostname(buf, HOST_NAME_MAX);
+        result=gethostname(buf, HOST_NAME_MAX);
         return(buf);
         break;
 
     case OSINFO_DOMAINNAME:
         buf=SetStrLen(buf, HOST_NAME_MAX);
-        getdomainname(buf, HOST_NAME_MAX);
+        result=getdomainname(buf, HOST_NAME_MAX);
         return(buf);
         break;
 
@@ -80,6 +105,30 @@ const char *OSSysInfoString(int Info)
         if (! ptr) ptr=getenv("TEMP");
         if (! ptr) ptr="/tmp";
         if (ptr) return(ptr);
+        break;
+
+    case OSINFO_LOCALE:
+        return(getenv("LANG"));
+        break;
+
+    case OSINFO_LANG:
+        buf=CopyStr(buf, getenv("LANG"));
+        StrTruncChar(buf, '_');
+        return(buf);
+        break;
+
+    case OSINFO_COUNTRY:
+        buf=CopyStr(buf, getenv("LANG"));
+        StrTruncChar(buf, '.');
+        ptr=strchr(buf, '_');
+        if (ptr) return(ptr+1);
+        return(buf);
+        break;
+
+    case OSINFO_CURRENCY:
+    case OSINFO_CURRENCY_SYM:
+        buf=OSSysInfoLocaleConf(buf, Info);
+        return(buf);
         break;
 
     case OSINFO_INTERFACES:

@@ -56,13 +56,13 @@ TLogFile *LogFileCreate(const char *FileName, int Flags)
     TLogFile *LogFile=NULL;
     STREAM *S=NULL;
 
-    if (! StrLen(FileName)) return(NULL);
+    if (! StrValid(FileName)) return(NULL);
     if (! LogFiles) LogFiles=ListCreate();
     if (! LogFileDefaults) LogFileSetDefaults(LOGFILE_TIMESTAMP | LOGFILE_FLUSH | LOGFILE_LOGPID | LOGFILE_LOGUSER, 100000000, 0, 1);
 
-    if (strcmp(FileName,"STDOUT")==0) S=STREAMFromFD(1);
-    else if (strcmp(FileName,"STDERR")==0) S=STREAMFromFD(2);
-    else if (strcmp(FileName,"SYSLOG")==0) S=STREAMCreate();
+    if (CompareStr(FileName,"STDOUT")==0) S=STREAMFromFD(1);
+    else if (CompareStr(FileName,"STDERR")==0) S=STREAMFromFD(2);
+    else if (CompareStr(FileName,"SYSLOG")==0) S=STREAMCreate();
     else S=LogFileOpen(FileName, Flags);
 
     if (S)
@@ -77,7 +77,7 @@ TLogFile *LogFileCreate(const char *FileName, int Flags)
         LogFile->FlushInterval=LogFileDefaults->FlushInterval;
         LogFile->S=S;
 
-        if (strcmp(FileName,"SYSLOG")==0) LogFile->Flags |= LOGFILE_SYSLOG;
+        if (CompareStr(FileName,"SYSLOG")==0) LogFile->Flags |= LOGFILE_SYSLOG;
         ListAddNamedItem(LogFiles,FileName,LogFile);
         STREAMSetItem(S,"TLogFile",LogFile);
         STREAMSetFlushType(S, FLUSH_FULL, 0, 0);
@@ -95,7 +95,7 @@ TLogFile *LogFileGetEntry(const char *FileName)
     ListNode *Node;
     STREAM *S=NULL;
 
-    if (! StrLen(FileName)) return(NULL);
+    if (! StrValid(FileName)) return(NULL);
     if (! LogFiles) LogFiles=ListCreate();
     if (! LogFileDefaults) LogFileSetDefaults(LOGFILE_TIMESTAMP | LOGFILE_FLUSH | LOGFILE_LOGPID | LOGFILE_LOGUSER, 100000000, 0, 1);
 
@@ -149,7 +149,7 @@ char *LogFileInternalGetRotateDestinationPath(char *RetStr, TLogFile *LogFile)
     char *Tempstr=NULL;
 
     Tempstr=CopyStr(Tempstr, STREAMGetValue(LogFile->S,"RotatePath"));
-    if (StrLen(Tempstr) && strchr(Tempstr,'$'))
+    if (StrValid(Tempstr) && strchr(Tempstr,'$'))
     {
         STREAMSetValue(LogFile->S, "Date",GetDateStr("%Y_%m_%d",NULL));
         STREAMSetValue(LogFile->S, "Time",GetDateStr("%H:%M:%S",NULL));
@@ -171,9 +171,9 @@ STREAM *LogFileInternalDoRotate(TLogFile *LogFile)
 
     if (! LogFile) return(NULL);
     if (! LogFile->S) return(NULL);
-    if (strcmp(LogFile->Path,"SYSLOG")==0) return(LogFile->S);
-    if (strcmp(LogFile->Path,"STDOUT")==0) return(LogFile->S);
-    if (strcmp(LogFile->Path,"STDERR")==0) return(LogFile->S);
+    if (CompareStr(LogFile->Path,"SYSLOG")==0) return(LogFile->S);
+    if (CompareStr(LogFile->Path,"STDOUT")==0) return(LogFile->S);
+    if (CompareStr(LogFile->Path,"STDERR")==0) return(LogFile->S);
     if (getpid() != ParentPID) return(LogFile->S);
 
     if (LogFile->MaxSize > 0)
@@ -236,7 +236,7 @@ int LogFileFindSetValues(const char *FileName, int Flags, int MaxSize, int MaxRo
 {
     TLogFile *LogFile;
 
-    if (StrLen(FileName)==0) LogFile=LogFileDefaults;
+    if (! StrValid(FileName)) LogFile=LogFileDefaults;
     else
     {
         LogFile=LogFileGetEntry(FileName);
@@ -246,7 +246,7 @@ int LogFileFindSetValues(const char *FileName, int Flags, int MaxSize, int MaxRo
     if (LogFile)
     {
         LogFileSetValues(LogFile, Flags, MaxSize, MaxRotate, FlushInterval);
-        if (strcmp(FileName,"SYSLOG")==0) LogFile->Flags |= LOGFILE_SYSLOG;
+        if (CompareStr(FileName,"SYSLOG")==0) LogFile->Flags |= LOGFILE_SYSLOG;
     }
     else return(FALSE);
 
@@ -335,7 +335,7 @@ int LogFileInternalPush(TLogFile *LF, STREAM *S, int Flags, const char *Str)
 
     if (LF->Flags & LOGFILE_REPEATS)
     {
-        if (strcmp(LF->LastMessage, Str)==0)
+        if (CompareStr(LF->LastMessage, Str)==0)
         {
             //LF->LastMessageTime=Now;
             LF->RepeatCount++;

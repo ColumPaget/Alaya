@@ -419,7 +419,7 @@ void HTTPServerPropFind(STREAM *S, HTTPSession *Heads)
 
     XML=HTTPServerPropFindXML(XML,Heads,PropList);
 
-    HTTPServerSendResponse(S, Heads, "207 OK","text/xml",XML);
+    AlayaServerSendResponse(S, Heads, "207 OK","text/xml",XML);
     if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"PROPFIND RESPONSE FOR %s\n%s",Heads->Path,XML);
 
     ListDestroy(PropList,Destroy);
@@ -463,7 +463,7 @@ void HTTPServerPropPatch(STREAM *S,HTTPSession *Heads)
 
     XML=CatStr(XML,"</response></multistatus>\n");
 
-    HTTPServerSendResponse(S, Heads, "207 OK","text/xml",XML);
+    AlayaServerSendResponse(S, Heads, "207 OK","text/xml",XML);
 
     ListDestroy(PropList,Destroy);
 

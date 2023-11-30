@@ -45,10 +45,25 @@ STREAM *STREAMServerInit(const char *URL);
 //mode=<perms> set permissions for a unix server socket. '<perms>' can be an octal value (e.g. 666) or a 'rwx' string (e.g. rw-rw-rw-)
 //perms=<perms> set permissions for a unix server socket. '<perms>' can be an octal value (e.g. 666) or a 'rwx' string (e.g. rw-rw-rw-)
 //permissions=<perms> set permissions for a unix server socket. '<perms>' can be an octal value (e.g. 666) or a 'rwx' string (e.g. rw-rw-rw-)
+//authentication=<method>:<value>    authentication for incoming connections. Multiple methods can be added seperated by commas.
+//auth=<method>:<value>    authentication for incoming connections. Multiple methods can be added seperated by commas.
+
+//Authentication methods include: 
+//ip:<ipaddress>          only accept connections from <ipaddress>
+//cert:<common name>      only accept connections that have a verified certificate named <common name>
+//issuer:<common name>    only accept connections that have a verified certificate signed by issuer: <common name>
+
+//TLS/SSL servers require the inclusion of SSL:CertFile and SSL:KeyFile parameters to indicate the server key and certificate.
+//If client certificate authentication is required then an SSL:VerifyCertFile or SSL:VerifyCertDir parameter must be provided
+//pointing to the file or directory containing CA certificates.
+
+//e.g.:
+//    Serv=STREAMServerNew("tls:0.0.0.0:5000", "rw SSL:CertFile=/home/colum/.certtool/testcert/testcert.crt SSL:KeyFile=/home/colum/.certtool/testcert/testcert.key SSL:VerifyCertFile=/home/colum/.certtool/TestCA/ca.crt Authentication=certificate:testuser@test.com,issuer=TestCA");
+
 STREAM *STREAMServerNew(const char *URL, const char *Config);
 
 
-//Accept a connection on a tcp:// unix:// or tproxy:// socket
+//Accept a connection on a tls:// tcp:// unix:// or tproxy:// socket
 STREAM *STREAMServerAccept(STREAM *Serv);
 
 #ifdef __cplusplus

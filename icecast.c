@@ -1,4 +1,5 @@
 #include "icecast.h"
+#include "ID3.h"
 
 
 static HTTPSession *IcecastCreateSession(const char *Path, HTTPSession *Request, ListNode *Vars, int ICYInterval)
@@ -96,7 +97,7 @@ void IcecastHandleStream(STREAM *Output, HTTPSession *Session, const char *Searc
     Vars=ListCreate();
     SetVar(Vars,"ContentType","audio/mpeg");
     Response=IcecastCreateSession("", Session, Vars, 0);
-    HTTPServerSendHeaders(Output, Response, FALSE);
+    AlayaServerSendHeaders(Output, Response, FALSE);
     STREAMFlush(Output);
 
     Tempstr=MCopyStr(Tempstr,SearchPath,"/*",NULL);

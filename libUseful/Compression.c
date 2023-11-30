@@ -30,7 +30,7 @@ typedef struct
 
 int zlibProcessorWrite(TProcessingModule *ProcMod, const char *InData, unsigned long InLen, char **OutData, unsigned long *OutLen, int Flush)
 {
-    int wrote=0;
+    int bytes_wrote=0;
 #ifdef HAVE_LIBZ
     int val=0;
     zlibData *ZData;
@@ -49,7 +49,7 @@ int zlibProcessorWrite(TProcessingModule *ProcMod, const char *InData, unsigned 
         if (Flush) val=deflate(& ZData->z_out, Z_FINISH);
         else val=deflate(& ZData->z_out, Z_NO_FLUSH);
 
-        wrote=*OutLen-ZData->z_out.avail_out;
+        bytes_wrote=*OutLen-ZData->z_out.avail_out;
         if (val==Z_STREAM_END)
         {
             ProcMod->Flags |= DPM_WRITE_FINAL;
@@ -68,13 +68,13 @@ int zlibProcessorWrite(TProcessingModule *ProcMod, const char *InData, unsigned 
 
 
 #endif
-    return(wrote);
+    return(bytes_wrote);
 }
 
 
 int zlibProcessorRead(TProcessingModule *ProcMod, const char *InData, unsigned long InLen, char **OutData, unsigned long *OutLen, int Flush)
 {
-    int wrote=0;
+    int bytes_read=0;
 
 #ifdef HAVE_LIBZ
     int result=0;
@@ -97,7 +97,7 @@ int zlibProcessorRead(TProcessingModule *ProcMod, const char *InData, unsigned l
         if (Flush) result=inflate(& ZData->z_in, Z_FINISH);
         else result=inflate(& ZData->z_in, Z_NO_FLUSH);
 
-        wrote=(*OutLen)-ZData->z_in.avail_out;
+        bytes_read=(*OutLen)-ZData->z_in.avail_out;
 
         if (result==Z_BUF_ERROR) break;
         switch (result)
@@ -119,14 +119,15 @@ int zlibProcessorRead(TProcessingModule *ProcMod, const char *InData, unsigned l
         {
             (*OutLen)+=BUFSIZ;
             *OutData=(char *) realloc(*OutData,*OutLen);
-            ZData->z_in.next_out=(*OutData) + wrote;
-            ZData->z_in.avail_out=(*OutLen) - wrote;
+            ZData->z_in.next_out=(*OutData) + bytes_read;
+            ZData->z_in.avail_out=(*OutLen) - bytes_read;
         }
 
     }
-
 #endif
-    return(wrote);
+
+    if ((bytes_read==0) && Flush) return(STREAM_CLOSED);
+    return(bytes_read);
 }
 
 

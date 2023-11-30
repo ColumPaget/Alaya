@@ -112,6 +112,7 @@ extern "C" {
 
 int SetGlobalConnectionChain(const char *Chain);
 int STREAMProcessConnectHops(STREAM *S, const char *Value);
+void ConnectionHopCloseAll();
 
 #ifdef __cplusplus
 }

@@ -7,7 +7,6 @@ Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
 #define LIBUSEFUL_EXPECT_H
 
 /*
-
 These functions handle 'chat' style dialogues on a STREAM connection.
 
 Read Stream.h to understand the STREAM object. STREAMS can be pipes to other processes, network connections, etc.

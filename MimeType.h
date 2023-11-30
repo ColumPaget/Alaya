@@ -28,5 +28,6 @@ void LoadFileMagics(const char *MimeTypesPath, const char *MagicsPath);
 TFileMagic *GetContentTypeInfo(const char *ContentType);
 TFileMagic *GetFileTypeInfo(const char *ContentType);
 TFileMagic *GetFileMagicForFile(const char *Path, STREAM *S);
+char *ContentTypeFromFileName(char *RetBuff, char *FName);
 
 #endif

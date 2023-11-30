@@ -2,31 +2,115 @@
 #include "base64.h"
 #include "Http.h"
 
+
+
+//mostly a helper function for environments where integer constants are not convinient
 int EncodingParse(const char *Str)
 {
-    if (strcmp(Str,"8")==0) return(ENCODE_OCTAL);
-    if (strncmp(Str,"oct",3)==0) return(ENCODE_OCTAL);
-    if (strcmp(Str,"10")==0) return(ENCODE_DECIMAL);
-    if (strncmp(Str,"dec",3)==0) return(ENCODE_DECIMAL);
-    if (strcmp(Str,"16")==0) return(ENCODE_HEX);
-    if (strncmp(Str,"hex",3)==0) return(ENCODE_HEX);
-    if (strcmp(Str,"64")==0) return(ENCODE_BASE64);
-    if (strcmp(Str,"b64")==0) return(ENCODE_BASE64);
-    if (strcmp(Str,"base64")==0) return(ENCODE_BASE64);
-    if (strcmp(Str,"i64")==0) return(ENCODE_IBASE64);
-    if (strcmp(Str,"p64")==0) return(ENCODE_PBASE64);
-    if (strcmp(Str,"r64")==0) return(ENCODE_RBASE64);
-    if (strcmp(Str,"rfc4648")==0) return(ENCODE_RBASE64);
-    if (strncmp(Str,"xx",2)==0) return(ENCODE_XXENC);
-    if (strncmp(Str,"uu",2)==0) return(ENCODE_UUENC);
-    if (strcmp(Str,"crypt")==0) return(ENCODE_CRYPT);
-    if (strcmp(Str,"z85")==0) return(ENCODE_Z85);
-    if (strcmp(Str,"quoted-printable")==0) return(ENCODE_QUOTED_MIME);
-    if (strcasecmp(Str,"http")==0) return(ENCODE_QUOTED_HTTP);
-    if (strcmp(Str,"quoted-http")==0) return(ENCODE_QUOTED_HTTP);
+    int Encode=ENCODE_HEX;
 
-    return(ENCODE_NONE);
+    if (StrValid(Str))
+    {
+        switch (*Str)
+        {
+        case '1':
+            if (strcasecmp(Str,"16")==0) Encode=ENCODE_HEX;
+            else if (strcasecmp(Str,"10")==0) Encode=ENCODE_DECIMAL;
+            break;
+
+        case '6':
+        case '8':
+            if (strcasecmp(Str,"64")==0) Encode=ENCODE_BASE64;
+            else if (strcasecmp(Str,"8")==0) Encode=ENCODE_OCTAL;
+            break;
+
+        case 'a':
+        case 'A':
+            if (strcasecmp(Str,"a85")==0) Encode=ENCODE_ASCII85;
+            else if (strcasecmp(Str,"ascii85")==0) Encode=ENCODE_ASCII85;
+            else if (strcasecmp(Str,"asci85")==0) Encode=ENCODE_ASCII85;
+            break;
+
+        case 'b':
+        case 'B':
+            if (strcasecmp(Str,"base64")==0) Encode=ENCODE_BASE64;
+            else if (strcasecmp(Str,"b64")==0) Encode=ENCODE_BASE64;
+            break;
+
+        case 'c':
+        case 'C':
+            if (CompareStr(Str,"crypt")==0) Encode=ENCODE_CRYPT;
+            break;
+
+        case 'd':
+        case 'D':
+            if (strcasecmp(Str,"dec")==0) Encode=ENCODE_DECIMAL;
+            else if (strcasecmp(Str,"decimal")==0) Encode=ENCODE_DECIMAL;
+            break;
+
+        case 'h':
+        case 'H':
+            if (strcasecmp(Str,"hex")==0) Encode=ENCODE_HEX;
+            else if (strcasecmp(Str,"hexupper")==0) Encode=ENCODE_HEXUPPER;
+            else if (strcasecmp(Str,"http")==0) Encode=ENCODE_QUOTED_HTTP;
+            break;
+
+        case 'o':
+        case 'O':
+            if (strcasecmp(Str,"oct")==0) Encode=ENCODE_OCTAL;
+            else if (strcasecmp(Str,"octal")==0) Encode=ENCODE_OCTAL;
+            break;
+
+        case 'i':
+        case 'I':
+            if (strcasecmp(Str,"ibase64")==0) Encode=ENCODE_IBASE64;
+            else if (strcasecmp(Str,"i64")==0) Encode=ENCODE_IBASE64;
+            break;
+
+        case 'p':
+        case 'P':
+            if (strcasecmp(Str,"pbase64")==0) Encode=ENCODE_PBASE64;
+            else if (strcasecmp(Str,"p64")==0) Encode=ENCODE_PBASE64;
+            break;
+
+        case 'q':
+        case 'Q':
+            if (CompareStr(Str,"quoted-printable")==0) Encode=ENCODE_QUOTED_MIME;
+            if (CompareStr(Str,"quoted-http")==0) Encode=ENCODE_QUOTED_HTTP;
+            break;
+
+
+        case 'r':
+        case 'R':
+            if (CompareStr(Str,"r64")==0) Encode=ENCODE_RBASE64;
+            if (CompareStr(Str,"rfc4648")==0) Encode=ENCODE_RBASE64;
+            break;
+
+        case 'u':
+        case 'U':
+            if (strcasecmp(Str,"uu")==0) Encode=ENCODE_UUENC;
+            else if (strcasecmp(Str,"uuencode")==0) Encode=ENCODE_UUENC;
+            else if (strcasecmp(Str,"uuenc")==0) Encode=ENCODE_UUENC;
+            break;
+
+        case 'x':
+        case 'X':
+            if (strcasecmp(Str,"xx")==0) Encode=ENCODE_XXENC;
+            else if (strcasecmp(Str,"xxencode")==0) Encode=ENCODE_XXENC;
+            else if (strcasecmp(Str,"xxenc")==0) Encode=ENCODE_XXENC;
+            break;
+
+        case 'z':
+        case 'Z':
+            if (strcasecmp(Str,"z85")==0) Encode=ENCODE_Z85;
+            break;
+        }
+    }
+
+    return(Encode);
 }
+
+
 
 
 char *Ascii85(char *RetStr, const char *Bytes, int ilen, const char *CharMap)

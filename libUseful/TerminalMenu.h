@@ -1,3 +1,8 @@
+/*
+Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
+* SPDX-License-Identifier: GPL-3.0
+*/
+
 #ifndef LIBUSEFUL_TERMINAL_MENU_H
 #define LIBUSEFUL_TERMINAL_MENU_H
 

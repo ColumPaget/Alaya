@@ -53,7 +53,7 @@ extern "C" {
 #if __BIG_ENDIAN__
 # define htonll(x) (x)
 #else
-# define htonll(x) ( (uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32) )
+# define htonll(x) ( ( (uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32) )
 #endif
 #endif
 
@@ -61,7 +61,7 @@ extern "C" {
 #if __BIG_ENDIAN__
 # define ntohll(x) (x)
 #else
-# define ntohll(x) ( (uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32) )
+# define ntohll(x) ( ( (uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32) )
 #endif
 #endif
 

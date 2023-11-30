@@ -5,6 +5,8 @@ Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
 
 /*
 
+These functions relate to CLIENT SIZE http, https
+
 For basic http usage (getting webpages) you don't need to use most of this stuff. You can just pass the URL to 'STREAMOpen' like so:
 
 STREAM *S;
@@ -76,7 +78,7 @@ Note, 'hostauth' is not a name/value pair, just a config flag that enables sendi
 #include "includes.h"
 #include "defines.h"
 #include "Stream.h"
-
+#include "HttpUtil.h"
 
 //These values can be set either by 'HTTPSetFlags' for all connections or in the 'Flags' member
 //of an HTTPInfoStruct for a particular conection
@@ -221,6 +223,8 @@ char *HTTPDigest(char *RetStr, const char *Method, const char *Logon, const char
 
 
 void HTTPInfoSetAuth(HTTPInfoStruct *Auth, const char *Logon, const char *Password, int Type);
+
+int HTTPConnectOkay(STREAM *S);
 
 #ifdef __cplusplus
 }

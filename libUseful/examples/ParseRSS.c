@@ -18,7 +18,7 @@ P=ParserParseDocument("rss",Tempstr);
 Curr=ListGetNext(P);
 while (Curr)
 {
-if (Curr->ItemType==ITEM_VALUE) printf("%s: %s\n",Curr->Tag, (char *) Curr->Item);
+if (Curr->ItemType==ITEM_STRING) printf("%s: %s\n",Curr->Tag, (char *) Curr->Item);
 else
 {
 	SubItem=ParserOpenItem(P, Curr->Tag);

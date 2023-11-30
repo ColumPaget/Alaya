@@ -94,8 +94,11 @@ Unicode:NamesFile     path to file that maps names->unicode code points
 
 
 
-#define  LU_ATEXIT_REGISTERED 1
-#define  LU_CONTAINER         2
+#define  LU_ATEXIT_REGISTERED   1
+#define  LU_CONTAINER           2
+#define  LU_STRLEN_NOCACHE      4
+#define  LU_MLOCKALL            8
+#define  LU_RESIST_PTRACE      16
 
 extern int LibUsefulFlags;
 
@@ -124,6 +127,7 @@ int LibUsefulDebugActive();
 //this function gets called at exit to do certain cleaning up. It's no concern of the user.
 //nothing to see here, move along
 void LibUsefulAtExit();
+void LibUsefulSetupAtExit();
 
 #ifdef __cplusplus
 };

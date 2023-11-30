@@ -304,7 +304,7 @@ int WebsocketConnect(STREAM *S, HTTPSession *Session)
 
         SetVar(Response->Headers,"Sec-WebSocket-Protocol",Proto);
         Response->ResponseCode=CopyStr(Response->ResponseCode, "101 Switching Protocols");
-        HTTPServerSendHeaders(S, Response, HEADERS_KEEPALIVE);
+        AlayaServerSendHeaders(S, Response, HEADERS_KEEPALIVE);
         STREAMWriteLine("\r\n",S);
         if (Session->MethodID==METHOD_WEBSOCKET75)
         {
@@ -317,7 +317,7 @@ int WebsocketConnect(STREAM *S, HTTPSession *Session)
     }
     else
     {
-        HTTPServerSendResponse(S, Session, "404 Not Found","","");
+        AlayaServerSendResponse(S, Session, "404 Not Found","","");
         LogFileFlushAll(TRUE);
     }
 

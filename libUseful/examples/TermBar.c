@@ -8,21 +8,21 @@ int KeyCallback(STREAM *S, int key)
 {
 char *Tempstr=NULL;
 
-if (key==KEY_F4) TerminalBarUpdate(UpperTB, "you pressed F4");
-if (key==KEY_F5) TerminalBarUpdate(UpperTB, "you pressed F5");
-if (key==KEY_F7) TerminalBarUpdate(UpperTB, "you pressed F7");
-if (key==KEY_MENU) TerminalBarUpdate(UpperTB, "you pressed Menu");
-if (key==KEY_WIN) TerminalBarUpdate(UpperTB, "you pressed win");
-if (key==KEY_CTRL_WIN) TerminalBarUpdate(UpperTB, "you pressed crtrl win");
+if (key==TKEY_F4) TerminalBarUpdate(UpperTB, "you pressed F4");
+if (key==TKEY_F5) TerminalBarUpdate(UpperTB, "you pressed F5");
+if (key==TKEY_F7) TerminalBarUpdate(UpperTB, "you pressed F7");
+if (key==TKEY_MENU) TerminalBarUpdate(UpperTB, "you pressed Menu");
+if (key==TKEY_WIN) TerminalBarUpdate(UpperTB, "you pressed win");
+if (key==TKEY_CTRL_WIN) TerminalBarUpdate(UpperTB, "you pressed crtrl win");
 
 
-if (key==KEY_HOME) 
+if (key==TKEY_HOME) 
 {
 	UpperTB->ForeColor=ANSI_RED;
 	UpperTB->BackColor=ANSI_YELLOW;
 	UpperTB->Flags=ANSI_INVERSE;
-	UpperTB->MenuCursorLeft=CopyStr(UpperTB->MenuCursorLeft," {");
-	UpperTB->MenuCursorRight=CopyStr(UpperTB->MenuCursorRight,"} ");
+	UpperTB->CursorLeft=CopyStr(UpperTB->CursorLeft," {");
+	UpperTB->CursorRight=CopyStr(UpperTB->CursorRight,"} ");
 	Tempstr=TerminalBarMenu(Tempstr, UpperTB, "this,that,the other");
 	printf("%s\r\n",Tempstr);
 }

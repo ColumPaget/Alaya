@@ -35,6 +35,13 @@ const char *IPtoStr(unsigned long IP);
 //convert a string representation of IP4 address to an integer representation
 unsigned long StrtoIP(const char *IPStr);
 
+//new functions that use inet_pton and inet_ntop
+void StrtoIP6(const char *Str, struct in6_addr *dest);
+
+char *IP4toStr(char *RetStr, unsigned long IP);
+
+char *IP6toStr(char *RetStr, struct in6_addr *IP);
+
 
 #ifdef __cplusplus
 }

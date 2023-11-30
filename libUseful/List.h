@@ -63,9 +63,10 @@ typedef struct lnode
     struct lnode *Next;
     struct lnode *Prev;
     char *Tag;
+//in map heads ItemType is used to hold the number of buckets
+//in bucket chain heads, it holds the chain number
     uint16_t ItemType;
     uint16_t Flags;
-//in map heads ItemType is used to hold the number of buckets
     struct lnode *Head;
     void *Item;
     struct lnode *Side;

@@ -148,3 +148,49 @@ unsigned long StrtoIP(const char *Str)
 }
 
 
+
+void StrtoIP6(const char *Str, struct in6_addr *dest)
+{
+    char *Token=NULL;
+    const char *ptr;
+
+    if (StrValid(Str))
+    {
+        //if they pass in an IP4, we have to prefix it with ::ffff: as this is a range
+        //set aside to easy allocation of IP6 addresses to servers with existing IP4
+        if (IsIP4Address(Str))
+        {
+            Token=MCopyStr(Token,"::ffff:",Str,NULL);
+        }
+        else
+        {
+            ptr=Str;
+            if (*ptr == '[')
+            {
+                ptr=GetToken(ptr+1, "]", &Token, 0);
+                ptr=Token;
+            }
+        }
+
+        inet_pton(AF_INET6, ptr, dest);
+    }
+
+    Destroy(Token);
+}
+
+char *IP4toStr(char *RetStr, unsigned long IP)
+{
+    RetStr=SetStrLen(RetStr, INET6_ADDRSTRLEN + 1);
+    inet_ntop(AF_INET6, &IP, RetStr, INET6_ADDRSTRLEN);
+
+    return(RetStr);
+}
+
+
+char *IP6toStr(char *RetStr, struct in6_addr *IP)
+{
+    RetStr=SetStrLen(RetStr, INET6_ADDRSTRLEN + 1);
+    inet_ntop(AF_INET6, IP, RetStr, INET6_ADDRSTRLEN);
+
+    return(RetStr);
+}

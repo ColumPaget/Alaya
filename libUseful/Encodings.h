@@ -114,7 +114,6 @@ extern "C" {
 
 
 int EncodingParse(const char *Str);
-
 char *EncodeBytes(char *Buffer, const char *Bytes, int len, int Encoding);
 int DecodeBytes(char **Return, const char *Text, int Encoding);
 char *DecodeToText(char *RetStr, const char *Text, int Encoding);

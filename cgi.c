@@ -1,5 +1,6 @@
 #include "cgi.h"
 #include "server.h"
+#include "ChrootHelper.h"
 
 int CGIExecProgram(STREAM *ClientCon, HTTPSession *Session, const char *ScriptPath)
 {
@@ -21,13 +22,13 @@ int CGIExecProgram(STREAM *ClientCon, HTTPSession *Session, const char *ScriptPa
 
     if (geteuid()==0)
     {
-        HTTPServerSendHTML(ClientCon, NULL, "403 Forbidden","Alaya will not run .cgi programs as 'root'.<br>\r\nTry setting 'Default User' in config file or command line.");
+        AlayaServerSendHTML(ClientCon, NULL, "403 Forbidden","Alaya will not run .cgi programs as 'root'.<br>\r\nTry setting 'Default User' in config file or command line.");
         LogToFile(Settings.LogPath, "Failed to switch user to '%s' for running a .cgi program. Will not run programs as 'root'. Set 'DefaultUser' in config file or command line.", Session->RealUser);
     }
     else
     {
         Session->ResponseCode=CopyStr(Session->ResponseCode,"200 OK");
-        HTTPServerSendHeaders(ClientCon, Session, HEADERS_CGI);
+        AlayaServerSendHeaders(ClientCon, Session, HEADERS_CGI);
         STREAMFlush(ClientCon);
 
         SetupEnvironment(Session, ScriptPath);
@@ -42,7 +43,7 @@ int CGIExecProgram(STREAM *ClientCon, HTTPSession *Session, const char *ScriptPa
         else execl(ScriptPath,ScriptPath,NULL);
 
         /*If this code gets executed, then 'execl' failed*/
-        HTTPServerSendHTML(ClientCon, Session, "403 Forbidden","You don't have permission for that.");
+        AlayaServerSendHTML(ClientCon, Session, "403 Forbidden","You don't have permission for that.");
 
         //Logging won't work after we've closed all the file descriptors!
         LogToFile(Settings.LogPath,"Cannot execute script: %s",ScriptPath);

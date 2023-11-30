@@ -205,7 +205,7 @@ void UploadSelectPage(STREAM *S, HTTPSession *Session, const char *Path)
 
     HTML=MCatStr(HTML,"</form></body></html>\r\n",NULL);
 
-    HTTPServerSendResponse(S, Session, "200 OK","text/html",HTML);
+    AlayaServerSendResponse(S, Session, "200 OK","text/html",HTML);
 
     Destroy(HTML);
     Destroy(Tempstr);

@@ -1,23 +1,37 @@
 #include "TerminalChoice.h"
+#include "TerminalTheme.h"
+
+TERMCHOICE *TerminalChoiceCreate(STREAM *Term, const char *Config)
+{
+    TERMCHOICE *TC;
+
+    TC=TerminalWidgetCreate(Term, "cursor_left=< cursor_right=>");
+    TerminalThemeApply(TC, "Choice");
+    TerminalWidgetParseConfig(TC, Config);
+    return(TC);
+}
 
 void TerminalChoiceDraw(TERMCHOICE *Chooser)
 {
     ListNode *Curr;
-    char *Tempstr=NULL;
+    char *Tempstr=NULL, *LPad=NULL, *RPad=NULL;
 
     if (Chooser->Flags & TERMMENU_POSITIONED) TerminalCommand(TERM_CURSOR_MOVE, Chooser->x, Chooser->y, Chooser->Term);
     else Tempstr=CopyStr(Tempstr, "\r");
 
     if (StrValid(Chooser->Text)) Tempstr=CatStr(Tempstr, Chooser->Text);
 
+    LPad=PadStr(LPad, ' ', TerminalStrLen(Chooser->CursorLeft));
+    RPad=PadStr(RPad, ' ', TerminalStrLen(Chooser->CursorRight));
+
     Curr=ListGetNext(Chooser->Options);
     while (Curr)
     {
         if (Chooser->Options->Side==Curr)
         {
-            Tempstr=MCatStr(Tempstr, Chooser->MenuCursorLeft, Curr->Tag, Chooser->MenuCursorRight, NULL);
+            Tempstr=MCatStr(Tempstr, Chooser->CursorAttribs, Chooser->CursorLeft, Curr->Tag, Chooser->CursorRight, "~0", NULL);
         }
-        else Tempstr=MCatStr(Tempstr, Chooser->MenuPadLeft,Curr->Tag, Chooser->MenuPadRight, NULL);
+        else Tempstr=MCatStr(Tempstr, LPad, Curr->Tag, RPad, NULL);
 
         Curr=ListGetNext(Curr);
     }
@@ -26,6 +40,8 @@ void TerminalChoiceDraw(TERMCHOICE *Chooser)
     STREAMFlush(Chooser->Term);
 
     Destroy(Tempstr);
+    Destroy(LPad);
+    Destroy(RPad);
 }
 
 

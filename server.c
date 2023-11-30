@@ -212,7 +212,7 @@ void HTTPServerParseCommand(HTTPSession *Session, STREAM *S, char *Command)
     {
         Session->Cipher=CopyStr(Session->Cipher,STREAMGetValue(S,"SSL:Cipher"));
         Token=MCatStr(Token,"  SSL-CIPHER=", Session->Cipher, NULL);
-        if (! auth_client_certificate(Session,S)) exit(1);
+        if (! AuthClientCertificate(Session,S)) exit(1);
 
         //Set the Username to be the common name signed in the certificate. If it doesn't
         //authenticate against a user then we can query for a username later
@@ -471,7 +471,7 @@ int HTTPServerReadHeaders(HTTPSession *Session)
 
 
 
-void HTTPServerSendHeader(STREAM *S, const char *Header, const char *Value)
+void AlayaServerSendHeader(STREAM *S, const char *Header, const char *Value)
 {
     char *Tempstr=NULL;
 
@@ -482,7 +482,7 @@ void HTTPServerSendHeader(STREAM *S, const char *Header, const char *Value)
 }
 
 
-void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
+void AlayaServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
 {
     char *Tempstr=NULL, *AuthType=NULL;
     ListNode *Curr;
@@ -491,9 +491,9 @@ void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
     STREAMWriteLine(Tempstr,S);
     if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,">> %s",Tempstr);
 
-    HTTPServerSendHeader(S,"Date",GetDateStr("%a, %d %b %Y %H:%M:%S %Z",NULL));
+    AlayaServerSendHeader(S,"Date",GetDateStr("%a, %d %b %Y %H:%M:%S %Z",NULL));
 
-    if (Session->LastModified > 0) HTTPServerSendHeader(S,"Last-Modified",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z", Session->LastModified,Settings.Timezone));
+    if (Session->LastModified > 0) AlayaServerSendHeader(S,"Last-Modified",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z", Session->LastModified,Settings.Timezone));
 
     if (Flags & HEADERS_AUTH)
     {
@@ -503,10 +503,10 @@ void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
         if (Settings.AuthFlags & FLAG_AUTH_DIGEST)
         {
             Tempstr=FormatStr(Tempstr,"Digest realm=\"%s\", algorithm=\"sha256\" qop=\"auth\", nonce=\"%x\"", Settings.AuthRealm, rand());
-            HTTPServerSendHeader(S,AuthType,Tempstr);
+            AlayaServerSendHeader(S,AuthType,Tempstr);
 
             Tempstr=FormatStr(Tempstr,"Digest realm=\"%s\", qop=\"auth\", nonce=\"%x\"", Settings.AuthRealm, rand());
-            HTTPServerSendHeader(S,AuthType,Tempstr);
+            AlayaServerSendHeader(S,AuthType,Tempstr);
 
             LogToFile(Settings.LogPath, "OFFER AUTH DIGEST: %s  %s\n", AuthType, Tempstr);
         }
@@ -514,7 +514,7 @@ void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
         if (Settings.AuthFlags & FLAG_AUTH_BASIC)
         {
             Tempstr=MCopyStr(Tempstr,"Basic realm=\"",Settings.AuthRealm,"\"",NULL);
-            HTTPServerSendHeader(S,AuthType,Tempstr);
+            AlayaServerSendHeader(S,AuthType,Tempstr);
         }
     }
 
@@ -524,7 +524,7 @@ void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
     Curr=ListGetNext(Session->Headers);
     while (Curr)
     {
-        HTTPServerSendHeader(S, Curr->Tag, (char *) Curr->Item);
+        AlayaServerSendHeader(S, Curr->Tag, (char *) Curr->Item);
         Curr=ListGetNext(Curr);
     }
 
@@ -533,7 +533,7 @@ void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
     Curr=ListGetNext(Settings.CustomHeaders);
     while (Curr)
     {
-        HTTPServerSendHeader(S, Curr->Tag, (char *) Curr->Item);
+        AlayaServerSendHeader(S, Curr->Tag, (char *) Curr->Item);
         Curr=ListGetNext(Curr);
     }
 
@@ -542,37 +542,37 @@ void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
 
     if (Session->MethodID==METHOD_WEBSOCKET)
     {
-        HTTPServerSendHeader(S, "Upgrade", "WebSocket");
-        HTTPServerSendHeader(S, "Connection", "Upgrade");
+        AlayaServerSendHeader(S, "Upgrade", "WebSocket");
+        AlayaServerSendHeader(S, "Connection", "Upgrade");
     }
     else
     {
         if ((Flags & HEADERS_USECACHE) && (Settings.DocumentCacheTime > 0))
         {
             Tempstr=FormatStr(Tempstr,"max-age=%d", Session->CacheTime);
-            HTTPServerSendHeader(S, "Cache-Control", Tempstr);
-            HTTPServerSendHeader(S,"Expires",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",time(NULL) + Session->CacheTime,Settings.Timezone));
+            AlayaServerSendHeader(S, "Cache-Control", Tempstr);
+            AlayaServerSendHeader(S,"Expires",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z",time(NULL) + Session->CacheTime,Settings.Timezone));
         }
         else
         {
-            HTTPServerSendHeader(S, "Cache-Control", "no-cache");
-            HTTPServerSendHeader(S, "Pragma", "no-cache");
+            AlayaServerSendHeader(S, "Cache-Control", "no-cache");
+            AlayaServerSendHeader(S, "Pragma", "no-cache");
         }
 
         //Offer Upgrade to SSL if we have it
         if ((! Session->Flags & HTTP_SSL) &&  SSLAvailable())
         {
-            HTTPServerSendHeader(S, "Upgrade", "TLS/1.0");
+            AlayaServerSendHeader(S, "Upgrade", "TLS/1.0");
         }
 
         if ((Session->Flags & SESSION_KEEPALIVE) && (Flags & HEADERS_KEEPALIVE))
         {
-            HTTPServerSendHeader(S, "Connection", "Keep-Alive");
+            AlayaServerSendHeader(S, "Connection", "Keep-Alive");
             Session->Flags |= SESSION_REUSE;
         }
         else
         {
-            HTTPServerSendHeader(S, "Connection", "close");
+            AlayaServerSendHeader(S, "Connection", "close");
             Session->Flags &= ~SESSION_REUSE;
         }
 
@@ -582,7 +582,7 @@ void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
         		if (StrValid(Session->UserName))
         		{
         			Tempstr=MakeAccessCookie(Tempstr, Session);
-        			HTTPServerSendHeader(S, "Set-Cookie", Tempstr);
+        			AlayaServerSendHeader(S, "Set-Cookie", Tempstr);
         		}
         	}
         */
@@ -593,20 +593,20 @@ void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
 //otherwise we send them here
         if (! (Flags & HEADERS_CGI))
         {
-            HTTPServerSendHeader(S, "DAV", "1");
-            if (StrValid(Session->ContentType)) HTTPServerSendHeader(S,"Content-Type", Session->ContentType);
-            else HTTPServerSendHeader(S,"Content-Type","octet/stream");
+            AlayaServerSendHeader(S, "DAV", "1");
+            if (StrValid(Session->ContentType)) AlayaServerSendHeader(S,"Content-Type", Session->ContentType);
+            else AlayaServerSendHeader(S,"Content-Type","octet/stream");
 
 
             if ((Session->Flags & SESSION_REUSE) || (Session->ContentSize > 0))
             {
                 Tempstr=FormatStr(Tempstr,"%d", Session->ContentSize);
-                HTTPServerSendHeader(S,"Content-Length",Tempstr);
+                AlayaServerSendHeader(S,"Content-Length",Tempstr);
             }
 
             //some clients use 'x-gzip' rather than just 'gzip'
-            if (Session->Flags & SESSION_ENCODE_XGZIP) HTTPServerSendHeader(S,"Content-Encoding","x-gzip");
-            else if (Session->Flags & SESSION_ENCODE_GZIP) HTTPServerSendHeader(S,"Content-Encoding", "gzip");
+            if (Session->Flags & SESSION_ENCODE_XGZIP) AlayaServerSendHeader(S,"Content-Encoding","x-gzip");
+            else if (Session->Flags & SESSION_ENCODE_GZIP) AlayaServerSendHeader(S,"Content-Encoding", "gzip");
 
 
             //Blank line to end headers
@@ -621,7 +621,7 @@ void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
 }
 
 
-void HTTPServerSendResponse(STREAM *S, HTTPSession *Session, const char *ResponseLine, const char *ContentType, const char *Body)
+void AlayaServerSendResponse(STREAM *S, HTTPSession *Session, const char *ResponseLine, const char *ContentType, const char *Body)
 {
     HTTPSession *Response;
     char *Tempstr=NULL;
@@ -666,13 +666,13 @@ void HTTPServerSendResponse(STREAM *S, HTTPSession *Session, const char *Respons
     else Tempstr=CopyStr(Tempstr,Body);
 
 
-    if ((ResponseCode==401) || (ResponseCode==407)) HTTPServerSendHeaders(S, Response,HEADERS_AUTH);
-    else HTTPServerSendHeaders(S, Response, HEADERS_KEEPALIVE);
+    if ((ResponseCode==401) || (ResponseCode==407)) AlayaServerSendHeaders(S, Response,HEADERS_AUTH);
+    else AlayaServerSendHeaders(S, Response, HEADERS_KEEPALIVE);
 
     STREAMWriteBytes(S,Tempstr,Response->ContentSize);
     STREAMFlush(S);
 
-    /* If HTTPServerSendHeaders set SESSION_REUSE then set that in the Session object */
+    /* If AlayaServerSendHeaders set SESSION_REUSE then set that in the Session object */
 //if (Response->Flags & SESSION_REUSE) Session->Flags |= SESSION_REUSE;
 //else Session->Flags &= ~SESSION_REUSE;
 
@@ -684,13 +684,13 @@ void HTTPServerSendResponse(STREAM *S, HTTPSession *Session, const char *Respons
 }
 
 
-void HTTPServerSendHTML(STREAM *S, HTTPSession *Session, const char *Title, const char *Body)
+void AlayaServerSendHTML(STREAM *S, HTTPSession *Session, const char *Title, const char *Body)
 {
     char *Tempstr=NULL;
 
 
     Tempstr=FormatStr(Tempstr,"<html><body><h1>%s</h1>%s</body></html>",Title,Body);
-    HTTPServerSendResponse(S, Session, Title, "text/html",Tempstr);
+    AlayaServerSendResponse(S, Session, Title, "text/html",Tempstr);
 
     Destroy(Tempstr);
 }
@@ -743,14 +743,14 @@ static void HTTPServerFormatExtraHeaders(HTTPSession *Session, ListNode *Vars)
 }
 
 
-void HTTPServerSendFile(STREAM *S, HTTPSession *Session, const char *Path, ListNode *Vars, int Flags)
+void AlayaServerSendFile(STREAM *S, HTTPSession *Session, const char *Path, ListNode *Vars, int Flags)
 {
     STREAM *Doc;
     HTTPSession *Response;
     char *Buffer=NULL, *Tempstr=NULL;
 
     Doc=STREAMFileOpen(Path, SF_RDONLY);
-    if (! Doc) HTTPServerSendHTML(S, Session, "403 Forbidden","You don't have permission for that.");
+    if (! Doc) AlayaServerSendHTML(S, Session, "403 Forbidden","You don't have permission for that.");
     else
     {
         if (Session)
@@ -770,7 +770,7 @@ void HTTPServerSendFile(STREAM *S, HTTPSession *Session, const char *Path, ListN
         		}
         */
 
-        HTTPServerSendHeaders(S, Response, Flags);
+        AlayaServerSendHeaders(S, Response, Flags);
 
         if (Response->Flags & SESSION_ENCODE_GZIP) STREAMAddStandardDataProcessor(S,"compression","gzip","CompressionLevel=1");
         if (Flags & HEADERS_SENDFILE)
@@ -784,7 +784,7 @@ void HTTPServerSendFile(STREAM *S, HTTPSession *Session, const char *Path, ListN
         }
 
 
-        /* If HTTPServerSendHeaders set SESSION_REUSE then set that in the Session object
+        /* If AlayaServerSendHeaders set SESSION_REUSE then set that in the Session object
         if (Response->Flags & SESSION_REUSE) Session->Flags |= SESSION_REUSE;
         else Session->Flags &= ~SESSION_REUSE;
         */
@@ -801,7 +801,7 @@ void HTTPServerSendFile(STREAM *S, HTTPSession *Session, const char *Path, ListN
 
 
 
-void HTTPServerSendDocument(STREAM *S, HTTPSession *Session, const char *Path, int Flags)
+void AlayaServerSendDocument(STREAM *S, HTTPSession *Session, const char *Path, int Flags)
 {
     int result;
     ListNode *Vars;
@@ -814,7 +814,7 @@ void HTTPServerSendDocument(STREAM *S, HTTPSession *Session, const char *Path, i
     else result=LoadFileRealProperties(Path, TRUE, Vars);
 
 
-    if (result==FILE_NOSUCH) HTTPServerSendHTML(S, Session, "404 Not Found","Couldn't find that document.");
+    if (result==FILE_NOSUCH) AlayaServerSendHTML(S, Session, "404 Not Found","Couldn't find that document.");
     else
     {
 
@@ -840,7 +840,7 @@ void HTTPServerSendDocument(STREAM *S, HTTPSession *Session, const char *Path, i
         else
         {
             if (result & FILE_EXEC) Flags |= HEADERS_XSSI;
-            HTTPServerSendFile(S, Session, Path, Vars, Flags);
+            AlayaServerSendFile(S, Session, Path, Vars, Flags);
         }
     }
 
@@ -860,7 +860,7 @@ void HTTPServerHandlePost(STREAM *S, HTTPSession *Session)
     {
         UploadMultipartPost(S, Session);
     }
-    HTTPServerSendResponse(S, Session, "302", "", Session->URL);
+    AlayaServerSendResponse(S, Session, "302", "", Session->URL);
 
     Destroy(Tempstr);
 }
@@ -877,7 +877,7 @@ static void HTTPServerRecieveURL(STREAM *S,HTTPSession *Heads)
 
     Doc=STREAMFileOpen(Heads->Path, SF_CREAT | SF_TRUNC | SF_WRONLY);
 
-    if (! Doc) HTTPServerSendHTML(S, Heads, "403 Forbidden","Can't open document for write.");
+    if (! Doc) AlayaServerSendHTML(S, Heads, "403 Forbidden","Can't open document for write.");
     else
     {
         fchmod(Doc->in_fd,0660);
@@ -888,7 +888,7 @@ static void HTTPServerRecieveURL(STREAM *S,HTTPSession *Heads)
 
         stat(Heads->Path,&FileStat);
         LogToFile(Settings.LogPath,"%s@%s (%s) uploaded %s (%d bytes)",Heads->UserName,Heads->ClientHost,Heads->ClientIP,Heads->Path,FileStat.st_size);
-        HTTPServerSendHTML(S, Heads, "201 Created","");
+        AlayaServerSendHTML(S, Heads, "201 Created","");
     }
 
 
@@ -905,27 +905,27 @@ static void HTTPServerMkDir(STREAM *S, HTTPSession *Heads, int DirFlags)
     result=mkdir(Heads->Path, 0770);
     if (result==0)
     {
-        HTTPServerSendHTML(S, Heads, "201 Created","");
+        AlayaServerSendHTML(S, Heads, "201 Created","");
         if (DirFlags & DIRTYPE_CALDAV) DavPropsIncr(Heads->Path, "ctag");
     }
     else switch (errno)
         {
 
         case EEXIST:
-            HTTPServerSendHTML(S, Heads, "405 Method Not Allowed (exists)","");
+            AlayaServerSendHTML(S, Heads, "405 Method Not Allowed (exists)","");
             break;
 
         case ENOENT:
         case ENOTDIR:
-            HTTPServerSendHTML(S, Heads, "409 Conflict","");
+            AlayaServerSendHTML(S, Heads, "409 Conflict","");
             break;
 
         case ENOSPC:
-            HTTPServerSendHTML(S, Heads, "507 Insufficient Storage","");
+            AlayaServerSendHTML(S, Heads, "507 Insufficient Storage","");
             break;
 
         default:
-            HTTPServerSendHTML(S, Heads, "403 Forbidden","You don't have permission for that.");
+            AlayaServerSendHTML(S, Heads, "403 Forbidden","You don't have permission for that.");
             break;
 
         }
@@ -977,21 +977,21 @@ static void HTTPServerDelete(STREAM *S,HTTPSession *Heads)
     if (S_ISDIR(FileStat.st_mode)) result=HTTPServerDeleteCollection(Heads,Heads->Path);
     else result=unlink(Heads->Path);
 
-    if (result==0) HTTPServerSendHTML(S, Heads, "200 Deleted","");
+    if (result==0) AlayaServerSendHTML(S, Heads, "200 Deleted","");
     else switch (errno)
         {
 
         case ENOENT:
         case ENOTDIR:
-            HTTPServerSendHTML(S, Heads, "404 No such item","");
+            AlayaServerSendHTML(S, Heads, "404 No such item","");
             break;
 
         case EISDIR:
-            HTTPServerSendHTML(S, Heads, "409 Conflict","");
+            AlayaServerSendHTML(S, Heads, "409 Conflict","");
             break;
 
         default:
-            HTTPServerSendHTML(S, Heads, "403 Forbidden","You don't have permission for that.");
+            AlayaServerSendHTML(S, Heads, "403 Forbidden","You don't have permission for that.");
             break;
 
         }
@@ -1015,24 +1015,24 @@ static void HTTPServerCopy(STREAM *S,HTTPSession *Heads)
     switch (result)
     {
     case 0:
-        HTTPServerSendHTML(S, Heads, "201 Created","");
+        AlayaServerSendHTML(S, Heads, "201 Created","");
         break;
 
     case ENOENT:
     case ENOTDIR:
-        HTTPServerSendHTML(S, Heads, "404 No such item","");
+        AlayaServerSendHTML(S, Heads, "404 No such item","");
         break;
 
     case EISDIR:
-        HTTPServerSendHTML(S, Heads, "409 Conflict","");
+        AlayaServerSendHTML(S, Heads, "409 Conflict","");
         break;
 
     case EEXIST:
-        HTTPServerSendHTML(S, Heads, "412 Precondition failed. File exists, but 'Overwrite' set to false","");
+        AlayaServerSendHTML(S, Heads, "412 Precondition failed. File exists, but 'Overwrite' set to false","");
         break;
 
     default:
-        HTTPServerSendHTML(S, Heads, "403 Forbidden","You don't have permission for that.");
+        AlayaServerSendHTML(S, Heads, "403 Forbidden","You don't have permission for that.");
         break;
 
     }
@@ -1064,22 +1064,22 @@ static void HTTPServerMove(STREAM *S,HTTPSession *Heads)
 
 
 
-    if (result==0) HTTPServerSendHTML(S, Heads, "201 Moved","");
+    if (result==0) AlayaServerSendHTML(S, Heads, "201 Moved","");
     else switch (errno)
         {
 
         case ENOENT:
         case ENOTDIR:
-            HTTPServerSendHTML(S, Heads, "404 No such item","");
+            AlayaServerSendHTML(S, Heads, "404 No such item","");
             break;
 
         case EISDIR:
-            HTTPServerSendHTML(S, Heads, "409 Conflict","");
+            AlayaServerSendHTML(S, Heads, "409 Conflict","");
             break;
 
 
         default:
-            HTTPServerSendHTML(S, Heads, "403 Forbidden","You don't have permission for that.");
+            AlayaServerSendHTML(S, Heads, "403 Forbidden","You don't have permission for that.");
             break;
 
         }
@@ -1117,12 +1117,12 @@ static void HTTPServerOptions(STREAM *S,HTTPSession *ClientHeads)
     char *Tempstr=NULL;
 
     STREAMWriteLine("HTTP/1.1 200 OK\r\n",S);
-    HTTPServerSendHeader(S, "Date", GetDateStr("Date: %a, %d %b %Y %H:%M:%S %Z",Settings.Timezone));
-    HTTPServerSendHeader(S, "Content-Length", "0");
-    HTTPServerSendHeader(S, "Public", "OPTIONS, TRACE, GET, HEAD, DELETE, PUT, POST, COPY, MOVE, MKCOL, PROPFIND, PROPPATCH, LOCK, UNLOCK, SEARCH, MKCALENDAR, REPORT, calendar-access");
-    HTTPServerSendHeader(S, "Allow", "OPTIONS, TRACE, GET, HEAD, DELETE, PUT, POST, COPY, MOVE, MKCOL, PROPFIND, PROPPATCH, LOCK, UNLOCK, SEARCH, MKCALENDAR, REPORT, calendar-access");
-    HTTPServerSendHeader(S, "DASL", "");
-    HTTPServerSendHeader(S, "DAV", "1");
+    AlayaServerSendHeader(S, "Date", GetDateStr("Date: %a, %d %b %Y %H:%M:%S %Z",Settings.Timezone));
+    AlayaServerSendHeader(S, "Content-Length", "0");
+    AlayaServerSendHeader(S, "Public", "OPTIONS, TRACE, GET, HEAD, DELETE, PUT, POST, COPY, MOVE, MKCOL, PROPFIND, PROPPATCH, LOCK, UNLOCK, SEARCH, MKCALENDAR, REPORT, calendar-access");
+    AlayaServerSendHeader(S, "Allow", "OPTIONS, TRACE, GET, HEAD, DELETE, PUT, POST, COPY, MOVE, MKCOL, PROPFIND, PROPPATCH, LOCK, UNLOCK, SEARCH, MKCALENDAR, REPORT, calendar-access");
+    AlayaServerSendHeader(S, "DASL", "");
+    AlayaServerSendHeader(S, "DAV", "1");
     STREAMWriteLine("\r\n", S);
 
     Destroy(Tempstr);
@@ -1186,7 +1186,7 @@ static int HTTPServerChroot(HTTPSession *Session)
         if (chdir(ChrootDir) !=0)
         {
             LogToFile(Settings.LogPath,"ERROR: CHDIR FAILED: %d %s %s",getuid(),ChrootDir,strerror(errno));
-            HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to home-directory");
+            AlayaServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to home-directory");
             LogFileFlushAll(TRUE);
             _exit(1);
         }
@@ -1245,7 +1245,7 @@ static int HTTPServerSetUserContext(HTTPSession *Session)
     {
         if (setgid(Session->GroupID) != 0)
         {
-            HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user-group");
+            AlayaServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user-group");
             LogToFile(Settings.LogPath,"ERROR: Failed to switch group to %s/%d. Exiting", Session->RealUser, Session->RealUserUID);
             _exit(1);
         }
@@ -1254,7 +1254,7 @@ static int HTTPServerSetUserContext(HTTPSession *Session)
     {
         if (setgid(Settings.DefaultGroupID) != 0)
         {
-            HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user-group");
+            AlayaServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user-group");
             LogToFile(Settings.LogPath,"ERROR: Failed to switch group to %s/%d. Exiting", Session->RealUser, Session->RealUserUID);
             _exit(1);
         }
@@ -1265,7 +1265,7 @@ static int HTTPServerSetUserContext(HTTPSession *Session)
     {
         if (setresuid(Session->RealUserUID, Session->RealUserUID, Session->RealUserUID) !=0)
         {
-            HTTPServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user");
+            AlayaServerSendHTML(Session->S, Session, "500 Internal Server Error","Problem switching to configured user");
             LogToFile(Settings.LogPath,"ERROR: Failed to switch user to %s/%d. Exiting", Session->RealUser, Session->RealUserUID);
             _exit(1);
         }
@@ -1365,7 +1365,7 @@ static int HTTPServerAuthenticate(HTTPSession *Session)
 
         //The FLAG_SSL_CERT_REQUIRED flag might have been set by user settings
         //during authentication, so check it again here
-        if (! auth_client_certificate(Session, Session->S)) result=FALSE;
+        if (! AuthClientCertificate(Session, Session->S)) result=FALSE;
 
         if (result) HTTPServerHandleRegister(Session, LOGGED_IN);
         else HTTPServerHandleRegister(Session, LOGIN_FAIL);
@@ -1531,28 +1531,28 @@ int HTTPServerProcessActions(STREAM *S, HTTPSession *Session)
     case ACT_EDIT:
         Value=MCopyStr(Value, Arg1, "?format=edit", NULL);
         Session->LastModified=0;
-        HTTPServerSendResponse(S, Session, "302", "", Value);
+        AlayaServerSendResponse(S, Session, "302", "", Value);
         result=TRUE;
         break;
 
     case ACT_EDIT_WITH_ACCESSTOKEN:
         Value=MCopyStr(Value, Arg1, "?format=editaccesstoken", NULL);
         Session->LastModified=0;
-        HTTPServerSendResponse(S, Session, "302", "", Value);
+        AlayaServerSendResponse(S, Session, "302", "", Value);
         result=TRUE;
         break;
 
     case ACT_DEL:
         Value=MCopyStr(Value, Arg1, "?format=delete", NULL);
         Session->LastModified=0;
-        HTTPServerSendResponse(S, Session, "302", "", Value);
+        AlayaServerSendResponse(S, Session, "302", "", Value);
         result=TRUE;
         break;
 
     case ACT_DEL_SELECTED:
         Value=MCopyStr(Value, Arg1, "?format=delete-selected&", Arg2, NULL);
         Session->LastModified=0;
-        HTTPServerSendResponse(S, Session, "302", "", Value);
+        AlayaServerSendResponse(S, Session, "302", "", Value);
         result=TRUE;
         break;
 
@@ -1561,7 +1561,7 @@ int HTTPServerProcessActions(STREAM *S, HTTPSession *Session)
         {
             Value=MCopyStr(Value, Arg1, "?format=rename&", Arg2, NULL);
             Session->LastModified=0;
-            HTTPServerSendResponse(S, Session, "302", "", Value);
+            AlayaServerSendResponse(S, Session, "302", "", Value);
             result=TRUE;
         }
         break;
@@ -1571,26 +1571,26 @@ int HTTPServerProcessActions(STREAM *S, HTTPSession *Session)
         {
             Value=MCopyStr(Value,Arg1,"?format=mkdir&",Arg2,NULL);
             Session->LastModified=0;
-            HTTPServerSendResponse(S, Session, "302", "", Value);
+            AlayaServerSendResponse(S, Session, "302", "", Value);
             result=TRUE;
         }
         break;
 
     case ACT_M3U:
         Value=MCopyStr(Value,Arg1,"?format=m3u&",Arg2,NULL);
-        HTTPServerSendResponse(S, Session, "302", "", Value);
+        AlayaServerSendResponse(S, Session, "302", "", Value);
         result=TRUE;
         break;
 
     case ACT_GET:
-        HTTPServerSendResponse(S, Session, "302", "", Arg1);
+        AlayaServerSendResponse(S, Session, "302", "", Arg1);
         result=TRUE;
         break;
 
     case ACT_SAVE_PROPS:
         Value=MCopyStr(Value, Arg1, "?format=saveprops", FileProperties, NULL);
         Session->LastModified=0;
-        HTTPServerSendResponse(S, Session, "302", "", Value);
+        AlayaServerSendResponse(S, Session, "302", "", Value);
         result=TRUE;
         break;
 
@@ -1598,13 +1598,13 @@ int HTTPServerProcessActions(STREAM *S, HTTPSession *Session)
         Value=MCopyStr(Value, Arg1, "?format=pack&", Arg2, NULL);
         Session->LastModified=0;
         LogToFile(Settings.LogPath,"PACK: %s", Value);
-        HTTPServerSendResponse(S, Session, "302", "", Value);
+        AlayaServerSendResponse(S, Session, "302", "", Value);
         result=TRUE;
         break;
 
     case ACT_UPLOAD:
         Value=MCopyStr(Value,Arg1,"?format=upload",NULL);
-        HTTPServerSendResponse(S, Session, "302", "", Value);
+        AlayaServerSendResponse(S, Session, "302", "", Value);
         result=TRUE;
         break;
     }
@@ -1667,7 +1667,7 @@ void HTTPServerFindAndSendDocument(STREAM *S, HTTPSession *Session, int Flags)
         //scripting. But not today.
         // if (PI && (PI->Flags & PATHITEM_EXEC)) HTTPServerExecCGI(S, Session, Path);
         //else
-        HTTPServerSendDocument(S, Session, Path, Flags);
+        AlayaServerSendDocument(S, Session, Path, Flags);
     }
     Destroy(Path);
 }
@@ -1699,8 +1699,8 @@ void HTTPServerHandleHTTPConnection(HTTPSession *Session)
             }
             else
             {
-                if (IsProxyMethod(Session->MethodID)) HTTPServerSendHTML(Session->S, Session, "407 UNAUTHORIZED","Proxy server requires authentication.");
-                else HTTPServerSendHTML(Session->S, Session, "401 UNAUTHORIZED","Server requires authentication.");
+                if (IsProxyMethod(Session->MethodID)) AlayaServerSendHTML(Session->S, Session, "407 UNAUTHORIZED","Proxy server requires authentication.");
+                else AlayaServerSendHTML(Session->S, Session, "401 UNAUTHORIZED","Server requires authentication.");
 
                 if (Session->AuthFlags & FLAG_AUTH_PRESENT) LogToFile(Settings.LogPath,"AUTHENTICATE FAIL: %s@%s for '%s %s' against %s %s\n", Session->UserName, Session->ClientIP, Session->Method, Session->Path,Settings.AuthPath,Settings.AuthMethods);
             }
@@ -1712,10 +1712,10 @@ void HTTPServerHandleHTTPConnection(HTTPSession *Session)
 
 
 
-        if (! HTTPMethodAllowed(Session)) HTTPServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
+        if (! HTTPMethodAllowed(Session)) AlayaServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
         else if (! HTTPServerValidateURL(Session, &Tempstr))
         {
-            HTTPServerSendHTML(Session->S, Session, "403 Forbidden","Bad pattern found in URL");
+            AlayaServerSendHTML(Session->S, Session, "403 Forbidden","Bad pattern found in URL");
             LogToFile(Settings.LogPath,"ERROR: Bad pattern '%s' found in URL '%s' from %s@%s (%s)", Tempstr, Session->URL, Session->UserName, Session->ClientHost, Session->ClientIP);
         }
         else if (AuthOkay)
@@ -1810,7 +1810,7 @@ void HTTPServerHandleHTTPConnection(HTTPSession *Session)
 
 
             default:
-                HTTPServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
+                AlayaServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
                 break;
             }
         }

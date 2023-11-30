@@ -14,6 +14,13 @@ support for binary data. They allow reading data into a buffer and then reading 
 character by character or as Int16 or Int32 types
 */
 
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #define RAWDATARead(RD, S, len) (RAWDATAReadAt(RD, S, 0, len))
 #define RAWDATASave(RD, S) (RAWDATAWriteAt(RD, S, 0, 0))
 
@@ -22,7 +29,7 @@ typedef struct
     size_t BuffLen;
     size_t DataLen;
     char *Buffer;
-		size_t pos;
+    size_t pos;
 } RAWDATA;
 
 
@@ -42,5 +49,13 @@ long RAWDATAFindChar(RAWDATA *RD, size_t offset, char Char);
 
 char *RAWDATACopyStr(char *RetStr, RAWDATA *RD);
 char *RAWDATACopyStrLen(char *RetStr, RAWDATA *RD, int len);
+
+
+#ifdef __cplusplus
+}
+#endif
+
+
+
 
 #endif

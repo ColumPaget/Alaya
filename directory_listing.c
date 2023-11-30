@@ -228,10 +228,12 @@ static int LoadDir(const char *Path, HTTPSession *Session, int Flags, TPathItem 
             File->Mtime=Stat.st_mtime;
             File->Size=Stat.st_size;
         }
+	//can't get infor on file, just insert path
+        else File=PathItemCreate(PATHTYPE_FILE, URL, Glob.gl_pathv[i]);
+
         Files[fcount]=File;
         fcount++;
     }
-
 
     switch (Flags & SORT_TYPE_MASK)
     {
@@ -680,7 +682,7 @@ static void DirectorySendDirList(STREAM *S, HTTPSession *Session, const char *Pa
 
 
     Tempstr=FinalizeDirListHTML(Tempstr, Session, Path, HTML, p_MimeIconsURL, HasMedia | Settings.DirListFlags);
-    HTTPServerSendResponse(S, Session, "200 OK","text/html",Tempstr);
+    AlayaServerSendResponse(S, Session, "200 OK","text/html",Tempstr);
 
     Destroy(Tempstr);
     Destroy(HTML);
@@ -738,7 +740,7 @@ static void DirectorySendM3U(STREAM *S, HTTPSession *Session, const char *Path, 
 
     Tempstr=MCopyStr(Tempstr,Path,".m3u",NULL);
     SetVar(Session->Headers,"Content-disposition",Tempstr);
-    HTTPServerSendResponse(S, Session, "200 OK","audio/x-mpegurl",M3U);
+    AlayaServerSendResponse(S, Session, "200 OK","audio/x-mpegurl",M3U);
 
     Destroy(AccessToken);
     Destroy(Tempstr);
@@ -765,7 +767,7 @@ static void DirectorySendCSV(STREAM *S, HTTPSession *Session, const char *Path, 
 
     Tempstr=MCopyStr(Tempstr,Path,".csv",NULL);
     SetVar(Session->Headers,"Content-disposition",Tempstr);
-    HTTPServerSendResponse(S, Session, "200 OK","text/csv",CSV);
+    AlayaServerSendResponse(S, Session, "200 OK","text/csv",CSV);
 
     Destroy(Tempstr);
     Destroy(SizeStr);
@@ -842,13 +844,13 @@ static int DirectorySendPackedDir(STREAM *S, HTTPSession *Session, const char *D
                 {
                     if (strcasecmp(Name,"tar")==0)
                     {
-                        HTTPServerSendHeaders(S, Response, 0);
+                        AlayaServerSendHeaders(S, Response, 0);
                         TarFiles(S, PackList);
                     }
                 }
                 else
                 {
-                    HTTPServerSendHeaders(S, Response, 0);
+                    AlayaServerSendHeaders(S, Response, 0);
                     Tempstr=MCopyStr(Tempstr,Value,PackList,NULL);
                     Pipe=STREAMSpawnCommand(Tempstr, "");
                     STREAMSendFile(Pipe, S, 0, SENDFILE_KERNEL| SENDFILE_LOOP);
@@ -896,7 +898,7 @@ int DirectoryTryIndex(STREAM *S, HTTPSession *Session, const char *Path)
         if (access(Tempstr,F_OK)==0)
         {
             Session->Path=CopyStr(Session->Path,Tempstr);
-            HTTPServerSendDocument(S, Session, Tempstr, HEADERS_SENDFILE | HEADERS_KEEPALIVE);
+            AlayaServerSendDocument(S, Session, Tempstr, HEADERS_SENDFILE | HEADERS_KEEPALIVE);
             DirSent=TRUE;
             break;
         }
@@ -958,7 +960,7 @@ void DirectorySendToParentDir(STREAM *S, HTTPSession *Session)
     char *Path=NULL, *Tempstr=NULL;
 
     Path=ParentDirectory(Path, Session->Path);
-    HTTPServerSendResponse(S, Session, "302", "", Path);
+    AlayaServerSendResponse(S, Session, "302", "", Path);
 
     Destroy(Tempstr);
     Destroy(Path);
@@ -1006,19 +1008,54 @@ void DirectoryDeleteSelected(STREAM *S, HTTPSession *Session, const char *Dir)
 }
 
 
+void FreeFileList(int NoOfFiles, TPathItem **Files)
+{
+int i;
+
+if (! Files) return;
+for (i=0; i < NoOfFiles; i++)
+{
+PathItemDestroy(Files[i]);
+}
+free(Files);
+}
+
+
+void DirectorySendFormatted(STREAM *S, HTTPSession *Session, const char *Path, int Format, int FormatFlags, int Flags)
+{
+TPathItem **Files=NULL;
+int max;
+
+            max=LoadDir(Path, Session, FormatFlags, &Files);
+
+            switch (Format)
+            {
+            case ACTION_M3U:
+                DirectorySendM3U(S,Session,Path,max,Files);
+                break;
+            case ACTION_CSV:
+                DirectorySendCSV(S,Session,Path,max,Files);
+                break;
+            case ACTION_HTML:
+                DirectorySendDirList(S,Session,Path,FormatFlags,max,Flags,Files);
+                break;
+            }
+
+	    FreeFileList(max, Files);
+}
+
 
 int DirectorySend(STREAM *S, HTTPSession *Session, const char *Path, ListNode *Vars, int Flags)
 {
     int DirSent=FALSE;
     char *Tempstr=NULL, *Token=NULL;
-    int FormatFlags=0, Format, max=0;
-    TPathItem **Files;
+    int FormatFlags=0, Format;
     int result=FALSE;
 
 //Maybe we can get out of sending the directory. Check 'IfModifiedSince'
     if ((Session->IfModifiedSince > 0) && (Session->LastModified > 0) && (Session->LastModified <= Session->IfModifiedSince))
     {
-//		HTTPServerSendHTML(S, Session, "304 Not Modified","");
+//		AlayaServerSendHTML(S, Session, "304 Not Modified","");
 //		return;
     }
 
@@ -1041,20 +1078,7 @@ int DirectorySend(STREAM *S, HTTPSession *Session, const char *Path, ListNode *V
         case ACTION_HTML:
         case ACTION_M3U:
         case ACTION_CSV:
-            max+=LoadDir(Path, Session, FormatFlags, &Files);
-
-            switch (Format)
-            {
-            case ACTION_M3U:
-                DirectorySendM3U(S,Session,Path,max,Files);
-                break;
-            case ACTION_CSV:
-                DirectorySendCSV(S,Session,Path,max,Files);
-                break;
-            case ACTION_HTML:
-                DirectorySendDirList(S,Session,Path,FormatFlags,max,Flags,Files);
-                break;
-            }
+		DirectorySendFormatted(S, Session, Path, Format, FormatFlags, Flags);
             break;
 
         //TAR doesn't send a list of files, it sends the actual files, so it doesn't need to use
@@ -1078,7 +1102,7 @@ int DirectorySend(STREAM *S, HTTPSession *Session, const char *Path, ListNode *V
             Tempstr=CatStr(Tempstr,Token);
             LogToFile(Settings.LogPath,"MKDIR: [%s] [%s] [%s]\n",Path,Token,Tempstr);
             mkdir(Tempstr, 0770);
-            HTTPServerSendResponse(S, Session, "302", "", Session->Path);
+            AlayaServerSendResponse(S, Session, "302", "", Session->Path);
             break;
 
         case ACTION_DELETE:
@@ -1088,7 +1112,7 @@ int DirectorySend(STREAM *S, HTTPSession *Session, const char *Path, ListNode *V
 
         case ACTION_DELETE_SELECTED:
             DirectoryDeleteSelected(S, Session, Path);
-            HTTPServerSendResponse(S, Session, "302", "", Session->Path);
+            AlayaServerSendResponse(S, Session, "302", "", Session->Path);
             break;
 
         case ACTION_RENAME:
@@ -1110,15 +1134,16 @@ int DirectorySend(STREAM *S, HTTPSession *Session, const char *Path, ListNode *V
             LogToFile(Settings.LogPath,"SAVEPROPS: [%s]\n",Path);
             FileDetailsSaveProps(S, Session, Path);
             Tempstr=MCopyStr(Tempstr,Session->URL,"?format=edit",NULL);
-            HTTPServerSendResponse(S, Session, "302", "", Tempstr);
+            AlayaServerSendResponse(S, Session, "302", "", Tempstr);
             break;
 
 
         default:
-            HTTPServerSendHTML(S, Session, "403 Index Listing Forbidden","This server is not configured to list directories.");
+            AlayaServerSendHTML(S, Session, "403 Index Listing Forbidden","This server is not configured to list directories.");
             break;
         }
     }
+
 
     Destroy(Tempstr);
     Destroy(Token);

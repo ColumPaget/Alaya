@@ -2,6 +2,7 @@
 #include "server.h"
 #include "proxy.h"
 #include "cgi.h"
+#include "Authenticate.h"
 
 //These functions relate to requests for data from outside of the current
 //path and possibly outside of chroot. These scripts/documents are served
@@ -434,7 +435,7 @@ pid_t HandleCGIExecRequest(STREAM *ClientCon, const char *Data)
 
     if (access(ScriptPath,F_OK) !=0)
     {
-        HTTPServerSendHTML(ClientCon, Response, "404 Not Found","Couldn't find that script.");
+        AlayaServerSendHTML(ClientCon, Response, "404 Not Found","Couldn't find that script.");
         LogToFile(Settings.LogPath,"No such script: %s in path %s = %s",Response->Path,Response->SearchPath,ScriptPath);
     }
     else if (
@@ -442,7 +443,7 @@ pid_t HandleCGIExecRequest(STREAM *ClientCon, const char *Data)
         (! CheckScriptIntegrity(ScriptPath))
     )
     {
-        HTTPServerSendHTML(ClientCon, Response, "403 Forbidden","You don't have permission for that.");
+        AlayaServerSendHTML(ClientCon, Response, "403 Forbidden","You don't have permission for that.");
         LogToFile(Settings.LogPath,"Cannot execute script: %s",ScriptPath);
     }
     else
@@ -516,7 +517,7 @@ pid_t HandleGetFileRequest(STREAM *ClientCon, const char *Data)
 
         STREAMWriteLine("READY\n",ClientCon);
         STREAMFlush(ClientCon);
-        HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
+        AlayaServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
 
         //exit 1 means that we can keep connection alive for re-use
         LogFileFlushAll(TRUE);
@@ -630,8 +631,8 @@ pid_t HandleIconRequest(STREAM *ClientCon, const char *Data)
             ptr=GetToken(ptr,":",&Value,0);
         }
 
-        //HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
-        HTTPServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE);
+        //AlayaServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
+        AlayaServerSendDocument(ClientCon, Response, Tempstr, HEADERS_SENDFILE|HEADERS_USECACHE);
         //exit 1 means we can keep connection alive for reuse
         LogFileFlushAll(TRUE);
         _exit(1);
@@ -940,7 +941,7 @@ int ChrootProcessRequest(STREAM *S, HTTPSession *Session, const char *Type, cons
 {
     char *Tempstr=NULL;
     char *ResponseLine=NULL, *Headers=NULL, *ptr;
-    off_t ContentLength=0;
+    off_t ContentLength=0, BytesSent=0;
     int KeepAlive=FALSE, RetVal=FALSE;
 
 
@@ -957,7 +958,7 @@ int ChrootProcessRequest(STREAM *S, HTTPSession *Session, const char *Type, cons
     if (! StrValid(Tempstr))
     {
         Destroy(Tempstr);
-        return(NULL);
+        return(FALSE);
     }
 
 //then send it the post data if there is any.
@@ -1027,7 +1028,7 @@ int ChrootProcessRequest(STREAM *S, HTTPSession *Session, const char *Type, cons
 
 //Read remaining data from CGI
     STREAMSetFlushType(S, FLUSH_ALWAYS, 0, 0);
-    if ((! KeepAlive) || (ContentLength > 0)) STREAMSendFile(ParentProcessPipe, S, ContentLength,SENDFILE_KERNEL|SENDFILE_LOOP);
+    if ((! KeepAlive) || (ContentLength > 0)) BytesSent+=STREAMSendFile(ParentProcessPipe, S, ContentLength, SENDFILE_KERNEL|SENDFILE_LOOP);
     STREAMFlush(S);
 
 
@@ -1036,6 +1037,8 @@ int ChrootProcessRequest(STREAM *S, HTTPSession *Session, const char *Type, cons
     if (KeepAlive) Session->Flags |= SESSION_KEEPALIVE | SESSION_REUSE;
     else Session->Flags &= ~(SESSION_KEEPALIVE | SESSION_REUSE);
 
+    if (BytesSent==0) LogToFile(Settings.LogPath,"WARN: CGI SCRIPT SENT NO DATA. Maybe it lacks a blank line to seperate body from headers?");
+    else if ((ContentLength > 0) && (BytesSent != ContentLength)) LogToFile(Settings.LogPath,"WARN: CGI SCRIPT SENT LESS DATA THAN EXPECTED: ContentLength: %lu Sent: %lu", ContentLength, BytesSent);
 
     Destroy(Tempstr);
     Destroy(Headers);

@@ -1,7 +1,7 @@
 #include "Smtp.h"
 #include "Encodings.h"
 #include "URL.h"
-#include "inet.h"
+#include "Inet.h"
 
 #define CAP_HELO 1
 #define CAP_EHLO 2

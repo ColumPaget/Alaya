@@ -3,6 +3,10 @@
 
 #include "includes.h"
 
+// handles parsing a command line, and safely handling iterating through
+// the list of items. Thus, if there is an item that expects to have an
+// argument, but the argument isn't there, CommandLineNext will just return ""
+
 typedef struct
 {
 unsigned int argc;

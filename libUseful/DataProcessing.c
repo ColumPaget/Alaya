@@ -114,7 +114,7 @@ int PipeCommandProcessorInit(TProcessingModule *ProcMod, const char *Args)
         ptr=GetNameValuePair(ptr,"\\S","=",&Name,&Value);
     }
 
-    if (! StrLen(Tempstr) )
+    if (! StrValid(Tempstr) )
     {
         DestroyString(Name);
         DestroyString(Value);
@@ -125,7 +125,7 @@ int PipeCommandProcessorInit(TProcessingModule *ProcMod, const char *Args)
     GetToken(Tempstr,"\\S",&Name,0);
     Value=FindFileInPath(Value,Name,getenv("PATH"));
 
-    if (! StrLen(Value) )
+    if (! StrValid(Value) )
     {
         DestroyString(Name);
         DestroyString(Value);
@@ -189,7 +189,7 @@ void InitialiseEncryptionComponents(const char *Args, char **Cipher, char **Inpu
     ptr=GetNameValuePair(Args,"\\S","=",&Name,&Value);
     while (ptr)
     {
-        if (StrLen(Name))
+        if (StrValid(Name))
         {
             if (strcasecmp(Name,"Cipher")==0)
             {
@@ -352,7 +352,7 @@ int libCryptoProcessorInit(TProcessingModule *ProcMod, const char *Args)
 //Tempstr here holds the cipher name
     InitialiseEncryptionComponents(Args, &Tempstr, &Data->InputVector, &Data->InputVectorLen, & Data->Key, &Data->KeyLen,&ProcMod->Flags);
 
-    if (StrLen(ProcMod->Name)==0) ProcMod->Name=CopyStr(ProcMod->Name,Tempstr);
+    if (! StrValid(ProcMod->Name)) ProcMod->Name=CopyStr(ProcMod->Name,Tempstr);
 
     switch(val)
     {

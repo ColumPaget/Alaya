@@ -26,8 +26,8 @@ int TextLen;
 char *Text;
 char *MenuPadLeft;
 char *MenuPadRight;
-char *MenuCursorLeft;
-char *MenuCursorRight;
+char *CursorLeft;
+char *CursorRight;
 ListNode *MenuItems;
 STREAM *Term;
 } TERMBAR;
@@ -40,10 +40,10 @@ void TerminalBarDestroy(TERMBAR *TB);
 // Change config of a terminal bar. Options key=value strings. Recognized keys are:
 //    MenuPadLeft   //string that menu options should be left padded with
 //    MenuPadRight  //string that menu options should be right padded with
-//    MenuCursorLeft   //string that SELECTED menu options should be left padded with
-//    MenuCursorRight  //string that SELECTED menu options should be right padded with
+//    CursorLeft   //string that SELECTED menu options should be left padded with
+//    CursorRight  //string that SELECTED menu options should be right padded with
 //    forecolor, backcolor, bold, inverse, underline, blink     //attributes
-//    e.g.   forecolor=red backcolor=yellow 'MenuPadLeft=  ' 'MenuPadRight=  ' 'MenuCursorLeft= >' 'MenuCursorRight=< '
+//    e.g.   forecolor=red backcolor=yellow 'MenuPadLeft=  ' 'MenuPadRight=  ' 'CursorLeft= >' 'CursorRight=< '
 void TerminalBarSetConfig(TERMBAR *TB, const char *Config);
 
 

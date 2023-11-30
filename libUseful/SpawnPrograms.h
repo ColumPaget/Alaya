@@ -67,9 +67,9 @@ coredumps=value  resource limit for max size of coredump files
 procs=value      resource limit for max number of processes ON A PER USER BASIS.
 
 +stderr          combine spawned program's stderr and stdout on the pipe/STREAM used to talk to it
-stderr2null      send spawned program's stderr to /dev/null
-stdout2null      send spawned program's stdout to /dev/null
-
+ptystderr        only for STREAMSpawnCommandAndPty. Send stderr from the spawned process to the pty.
+stderr2null      redirect spawned program's stderr to /dev/null
+stdout2null      redirect spawned program's stdout to /dev/null
 innull           redirect spawned program's stdin to /dev/null
 outnull          redirect spawned program's stdout and stderr to /dev/null
 errnull          redirect spawned program's stderr to /dev/null
@@ -96,13 +96,31 @@ pid_t SpawnWithIO(const char *CommandLine, const char *Config, int StdIn, int St
 #define Spawn(ProgName, Config) SpawnWithIO((ProgName), (Config), 0, 1, 2)
 
 
-/* This creates a child process that we can talk to using a couple of pipes*/
+// This creates a child process that we can talk to using a couple of pipes. The child process runs the function 'Func'. 'Data' is any userdata we want passed.
 pid_t PipeSpawnFunction(int *infd,int  *outfd,int  *errfd, BASIC_FUNC Func, void *Data, const char *Config);
+
+// This creates a child process that we can talk to using a couple of pipes. The child process execs 'Command'
 pid_t PipeSpawn(int *infd,int  *outfd,int  *errfd, const char *Command, const char *Config);
+
+// This creates a child process that we can talk to using a pty. The child process runs the function 'Func'. 'Data' is any userdata we want passed.
 pid_t PseudoTTYSpawnFunction(int *ret_pty, BASIC_FUNC Func, void *Data, int Flags, const char *Config);
+
+// This creates a child process that we can talk to using a pty. The child process execs 'Command'
 pid_t PseudoTTYSpawn(int *pty, const char *Command, const char *Config);
-STREAM *STREAMSpawnCommand(const char *Command, const char *Config);
+
+// This creates a child process that we can talk to using a STREAM. The child process runs the function 'Func'. 'Data' is any userdata we want passed.
 STREAM *STREAMSpawnFunction(BASIC_FUNC Func, void *Data, const char *Config);
+
+// This creates a child process that we can talk to using a STREAM. The child process execs 'Command'
+STREAM *STREAMSpawnCommand(const char *Command, const char *Config);
+
+// This creates a child process that we can talk to using a STREAM. The child process execs 'Command'. CmdS is the stream to the processes stdin, and PtyS is the stream to the pseudo terminal that the process sees as it's controlling terminal.
+// In adition to the usual command it takes ptystderr, which sends the processes stderr to PtyS
+int STREAMSpawnCommandAndPty(const char *Command, const char *Config, STREAM **CmdS, STREAM **PtyS);
+
+//wait for a process connected on 'S' to exit. This will consume any further output
+//from the process and throw it away
+int STREAMSpawnWaitExit(STREAM *S);
 
 #ifdef __cplusplus
 }

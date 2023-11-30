@@ -241,7 +241,7 @@ SECURESTORE *SecureStoreLoad(const char *Path)
     SECURESTORE *Store=NULL;
     struct stat FStat;
     char *addr;
-    int fd, Flags=0;
+    int fd, result, Flags=0;
 
     fd=open(Path, O_RDONLY);
     if (fd > -1)
@@ -249,7 +249,7 @@ SECURESTORE *SecureStoreLoad(const char *Path)
         stat(Path, &FStat);
         Store=SecureStoreCreate(FStat.st_size);
         Store->Divisor=':';
-        read(fd, &Store->Data, FStat.st_size);
+        result=read(fd, &Store->Data, FStat.st_size);
         SecureLockMem(Store->Data, Store->Size, SMEM_PARANOID);
         close(fd);
     }
@@ -344,11 +344,7 @@ char *CredsStoreWriteField(char *Dest, const char *Field)
 SECURESTORE *CredsStoreCreate()
 {
     CredsStore=SecureStoreCreate(0);
-    if (! (LibUsefulFlags & LU_ATEXIT_REGISTERED))
-    {
-        atexit(LibUsefulAtExit);
-        LibUsefulFlags |= LU_ATEXIT_REGISTERED;
-    }
+    LibUsefulSetupAtExit();
 
     return(CredsStore);
 }

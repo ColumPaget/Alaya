@@ -264,6 +264,7 @@ int Authenticate(HTTPSession *Session)
 
     AuthenticationsTried=CopyStr(AuthenticationsTried, "");
 
+ LogToFile(Settings.LogPath, "AUTH: Authentication '%s'. Password: '%s'", Session->UserName, Session->Password);
     if (! CheckServerAllowDenyLists(Session->UserName))
     {
         LogToFile(Settings.LogPath, "AUTH: Authentication failed for UserName '%s'. User not allowed to log in",Session->UserName);
@@ -423,6 +424,7 @@ const char *GetDefaultUser()
         Session->Password=CopyStr(Session->Password, "");
         if (AuthPasswdFile(Session, NULL, NULL) != USER_UNKNOWN) break;
     }
+    HTTPSessionDestroy(Session);
 
     return(Possibilities[i]);
 }
@@ -444,10 +446,7 @@ int CheckUserExists(const char *UserName)
     if (AuthShadowFile(Session) != USER_UNKNOWN) result=TRUE;
     if (AuthNativeCheck(Session, FALSE, NULL, NULL, NULL) != USER_UNKNOWN) result=TRUE;
 
-    Destroy(Session->UserName);
-    Destroy(Session->Password);
-
-    free(Session);
+    HTTPSessionDestroy(Session);
 
     return(result);
 }

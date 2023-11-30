@@ -11,7 +11,7 @@ void Lookup(ListNode *Map, const char *Name)
 ListNode *Node;
 
 Node=ListFindNamedItem(Map, Name);
-if (Node) printf("%s  %s %s\n",Node->Tag,Node->Item,Node->Prev->Item);
+//if (Node) printf("%s  %s %s\n",Node->Tag,Node->Item,Node->Prev->Item);
 }
 
 
@@ -56,7 +56,7 @@ STREAMClose(S);
 
 void Test(ListNode *List, const char *Type)
 {
-long start, end, i, lookups=1000;
+long start, end, i, lookups=10000;
 
 start=GetTime(TIME_CENTISECS);
 LoadCSV(List);
@@ -64,7 +64,7 @@ end=GetTime(TIME_CENTISECS);
 printf("Time to load a million records into a %s: %f secs\n", Type, (float) (end-start) /100.0);
 
 start=GetTime(TIME_CENTISECS);
-for (i=0; i < lookups; i++) Lookup(List, "freshcode.club");
+for (i=0; i < lookups; i++) Lookup(List, "zyber.co.nz");
 end=GetTime(TIME_CENTISECS);
 printf("Time to do %d lookups in a million record %s %f secs\n", lookups, Type, (float) (end-start) /100.0);
 }
@@ -77,7 +77,7 @@ ListNode *List;
 if (access("majestic_million.csv",F_OK) !=0) DownloadTestFile();
 
 List=ListCreate();
-Test(List, "LIST");
+//Test(List, "LIST");
 ListDestroy(List, Destroy);
 
 List=MapCreate(1000, 0);

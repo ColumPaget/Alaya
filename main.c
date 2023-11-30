@@ -33,10 +33,6 @@ ListNode *Connections=NULL;
 STREAM *ParentProcessPipe=NULL;
 
 
-//used in order to overwrite argc and argv to display connection info in 'ps' listings
-int alaya_argc=0;
-char *alaya_argv[];
-
 void SigHandler(int sig)
 {
     if (sig==SIGHUP) Settings.Flags |= FLAG_SIGHUP_RECV;
@@ -324,7 +320,7 @@ int ServiceSocketsInit(ListNode *Connections)
 }
 
 
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     STREAM *S;
     int fd;
@@ -432,4 +428,6 @@ main(int argc, char *argv[])
 
     LogFileFlushAll(TRUE);
     Destroy(Tempstr);
+
+return(0);
 }

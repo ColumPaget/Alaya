@@ -46,23 +46,12 @@ pid_t demonize();
 //singply try to close all file descriptors from 3 to 1024, leaving stdin, stdout and stderr alone
 void CloseOpenFiles();
 
-//switch user or group by id (call SwitchGID first, or you may not have permissions to switch user)
-int SwitchUID(int uid);
-int SwitchGID(int gid);
-
-//switch user or group by name (call SwitchGgroup first, or you may not have permissions to switch user)
-int SwitchUser(const char *User);
-int SwitchGroup(const char *Group);
-
-//returns a string pointing to a users home directory. DO NOT FREE THIS STRING. Take a copy of it, as it's
-//an internal buffer and will change on the next call to this function
-char *GetCurrUserHomeDir();
-
 //write a file containing the current pid. The file can either be an absolute path to a file anywhere
 //or a relative path that creates a file in /var/run. The file is locked with flock
 //returns a file descriptor to the current file
 int WritePidFile(const char *ProgName);
 
+//create/use a lockfile at 'FilePath'. If file is locked already then wait 'Timeout' for it to be free
 int CreateLockFile(const char *FilePath, int Timeout);
 
 //pass argv from main to this function if you want to rewrite the process name that you see in 'ps'
@@ -91,12 +80,16 @@ ctrl_tty        set controlling tty of process to be it's standard-in. Signals a
                 via the console the program is running on. So if your overall program is running on /dev/tty1, switch it to believe it's
                 tty is really whatever is on stdin
 
-ctty=<fd>       set controlling tty of process to be 'fd' (where fd is a file descriptor number). Same as ctrl_tty above, but using an
-                arbitary file descriptor rather than stdin.
+ctty=<fd>       set controlling tty of process to be 'fd' (where fd is a file descriptor number). 
+                Same as ctrl_tty above, but using an arbitary file descriptor rather than stdin.
 
 innull          redirect process stdin to /dev/null
 outnull         redirect process stdout and stderr to /dev/null
 errnull         redirect process stderr to /dev/null
+
+stdin=<fd>      redirect process stdin to file descriptor <fd>
+stdout=<fd>     redirect process stdout to file descriptor <fd>
+stderr=<fd>     redirect process stderr to file descriptor <fd>
 
 sigdef          set all signal handlers to the default values (throw away any sighandlers set by parent process)
 sigdefault      set all signal handlers to the default values (throw away any sighandlers set by parent process)

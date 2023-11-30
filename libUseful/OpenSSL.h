@@ -102,6 +102,15 @@ void OpenSSLClose(STREAM *S);
 //with SSL/TLS  this will return TRUE, FALSE otherwise
 int OpenSSLAutoDetect(STREAM *S);
 
+//call certificate verification code. This is normally called automatically by libUseful,
+//and populates the results into SSL:CertificateVerify or SSL:CertificateSubject and SSL:CertificateIssuer.
+//If called on a client side connection it will verify the server certificate,
+//if called on an ACCEPTED server side connection, it will check any client authentication certificates provided
+//'Flags' can be any of the LU_SSL_ flags listed above
+int OpenSSLVerifyCertificate(STREAM *S, int Flags);
+
+
+char *OpenSSLCertDetailsGetCommonName(char *RetStr, const char *CertDetails);
 
 //you can call this to generate a new, random set of DHParams when a server starts up
 //but I wouldn't if I were you. It takes a long time and this function is likely going

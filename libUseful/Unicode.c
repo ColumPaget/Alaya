@@ -137,7 +137,7 @@ char *UnicodeEncodeChar(char *RetStr, int UnicodeLevel, int Code)
     else
     {
         Tempstr=CopyStr(Tempstr, "?");
-        if ((UnicodeLevel > 2) && (Code < 0x1FFFF)) Tempstr=FormatStr(Tempstr,"%c%c%c%c", (Code >> 18) | 240, ((Code >> 12) & 63) | 128, ((Code >> 6) & 63) | 128, (Code & 63) | 128);
+        if ((UnicodeLevel > 2) && (Code < 0x110000)) Tempstr=FormatStr(Tempstr,"%c%c%c%c", (Code >> 18) | 240, ((Code >> 12) & 63) | 128, ((Code >> 6) & 63) | 128, (Code & 63) | 128);
     }
 
     RetStr=CatStr(RetStr,Tempstr);

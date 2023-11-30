@@ -1,7 +1,7 @@
 #include "auth_client_certificate.h"
 
 //Will only return false if FLAG_SSL_CERT_REQUIRED is set
-int auth_client_certificate(HTTPSession *Session, STREAM *S)
+int AuthClientCertificate(HTTPSession *Session, STREAM *S)
 {
     const char *ptr;
     int result=TRUE;

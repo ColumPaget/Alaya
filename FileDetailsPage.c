@@ -125,7 +125,7 @@ void DirectoryItemEdit(STREAM *S, HTTPSession *Session, const char *Path, int Fl
     HTML=CatStr(HTML,"</table>");
     HTML=CatStr(HTML,"</form></body></html>");
 
-    HTTPServerSendResponse(S, Session, "200 OKAY", "text/html",HTML);
+    AlayaServerSendResponse(S, Session, "200 OKAY", "text/html",HTML);
 
     Destroy(Tempstr);
     Destroy(Salt);

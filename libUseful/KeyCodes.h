@@ -13,9 +13,11 @@
 //defined if they are not already defined (probably because linux/input.h isn't present) 
 
 
-#define KEYMOD_SHIFT 1
-#define KEYMOD_CTRL  2
-#define KEYMOD_ALT   4
+#define KEYMOD_SHIFT   1
+#define KEYMOD_CTRL    2
+#define KEYMOD_ALT     4
+#define KEYMOD_ALT2    8
+#define KEYMOD_SUPER  64
 
 //Keycode definitions
 #define ESCAPE 0x1b
@@ -299,8 +301,6 @@
 #define TKEY_COPY        0x226
 #define TKEY_CUT         0x227
 #define TKEY_CLEAR       0x228
-#define TKEY_FOCUS_IN    0x229
-#define TKEY_FOCUS_OUT   0x22A
 #define TKEY_STOP        0x22B
 
 
@@ -327,8 +327,6 @@
 #define TKEY_SHIFT_HOME  0x1145
 #define TKEY_SHIFT_END   0x1146
 #define TKEY_SHIFT_PAUSE 0x1147
-#define TKEY_SHIFT_FOCUS_IN  0x1148
-#define TKEY_SHIFT_FOCUS_OUT 0x1149
 #define TKEY_SHIFT_INSERT 0x114A
 #define TKEY_SHIFT_DELETE 0x114B
 #define TKEY_SHIFT_PGUP   0x114C
@@ -360,8 +358,6 @@
 #define TKEY_CTRL_HOME  0x2145
 #define TKEY_CTRL_END   0x2146
 #define TKEY_CTRL_PAUSE 0x2147
-#define TKEY_CTRL_FOCUS_IN  0x2148
-#define TKEY_CTRL_FOCUS_OUT 0x2149
 #define TKEY_CTRL_INSERT 0x214A
 #define TKEY_CTRL_DELETE 0x214B
 #define TKEY_CTRL_PGUP   0x214C
@@ -393,8 +389,6 @@
 #define TKEY_ALT_HOME  0x3145
 #define TKEY_ALT_END   0x3146
 #define TKEY_ALT_PAUSE 0x3147
-#define TKEY_ALT_FOCUS_IN  0x3148
-#define TKEY_ALT_FOCUS_OUT 0x3149
 #define TKEY_ALT_INSERT 0x314A
 #define TKEY_ALT_DELETE 0x314B
 #define TKEY_ALT_PGUP   0x314C
@@ -422,16 +416,22 @@
 #define MOUSE_BTN_7 0xFF07
 #define MOUSE_BTN_8 0xFF08 //from here on in is gaming mice!
 #define MOUSE_BTN_9 0xFF09
-#define MOUSE_BTN_10 0xFF010
-#define MOUSE_BTN_11 0xFF011
-#define MOUSE_BTN_12 0xFF012
-#define MOUSE_BTN_13 0xFF012
-#define MOUSE_BTN_14 0xFF014
-#define MOUSE_BTN_15 0xFF015
-#define MOUSE_BTN_16 0xFF016
-#define MOUSE_BTN_17 0xFF017
-#define MOUSE_BTN_18 0xFF018
-#define MOUSE_BTN_19 0xFF019
-#define MOUSE_BTN_20 0xFF020
+#define MOUSE_BTN_10 0xFF00A
+#define MOUSE_BTN_11 0xFF00B
+#define MOUSE_BTN_12 0xFF00C
+#define MOUSE_BTN_13 0xFF00D
+#define MOUSE_BTN_14 0xFF00E
+#define MOUSE_BTN_15 0xFF00F
+#define MOUSE_BTN_16 0xFF010
+#define MOUSE_BTN_17 0xFF011
+#define MOUSE_BTN_18 0xFF012
+#define MOUSE_BTN_19 0xFF013
+#define MOUSE_BTN_20 0xFF014
+
+#define XTERM_CLIPBOARD 0xFFFF1
+#define XTERM_SELECTION 0xFFFF2
+#define XTERM_FOCUS_IN  0xFFFFA
+#define XTERM_FOCUS_OUT 0xFFFFB
+
 
 #endif

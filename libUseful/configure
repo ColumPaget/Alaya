@@ -1563,6 +1563,73 @@ fi
 
 } # ac_fn_c_try_link
 
+# ac_fn_c_check_func LINENO FUNC VAR
+# ----------------------------------
+# Tests whether FUNC exists, setting the cache variable VAR accordingly
+ac_fn_c_check_func ()
+{
+  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $2" >&5
+$as_echo_n "checking for $2... " >&6; }
+if eval \${$3+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+/* Define $2 to an innocuous variant, in case <limits.h> declares $2.
+   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
+#define $2 innocuous_$2
+
+/* System header to define __stub macros and hopefully few prototypes,
+    which can conflict with char $2 (); below.
+    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
+    <limits.h> exists even on freestanding compilers.  */
+
+#ifdef __STDC__
+# include <limits.h>
+#else
+# include <assert.h>
+#endif
+
+#undef $2
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char $2 ();
+/* The GNU C library defines this for functions which it implements
+    to always fail with ENOSYS.  Some functions are actually named
+    something starting with __ and the normal name is an alias.  */
+#if defined __stub_$2 || defined __stub___$2
+choke me
+#endif
+
+int
+main ()
+{
+return $2 ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  eval "$3=yes"
+else
+  eval "$3=no"
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+fi
+eval ac_res=\$$3
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+  eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
+
+} # ac_fn_c_check_func
+
 # ac_fn_c_check_header_mongrel LINENO HEADER VAR INCLUDES
 # -------------------------------------------------------
 # Tests whether HEADER exists, giving a warning if it cannot be compiled using
@@ -1680,73 +1747,6 @@ $as_echo "$ac_res" >&6; }
   eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
 
 } # ac_fn_c_check_header_compile
-
-# ac_fn_c_check_func LINENO FUNC VAR
-# ----------------------------------
-# Tests whether FUNC exists, setting the cache variable VAR accordingly
-ac_fn_c_check_func ()
-{
-  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $2" >&5
-$as_echo_n "checking for $2... " >&6; }
-if eval \${$3+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-/* Define $2 to an innocuous variant, in case <limits.h> declares $2.
-   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
-#define $2 innocuous_$2
-
-/* System header to define __stub macros and hopefully few prototypes,
-    which can conflict with char $2 (); below.
-    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
-    <limits.h> exists even on freestanding compilers.  */
-
-#ifdef __STDC__
-# include <limits.h>
-#else
-# include <assert.h>
-#endif
-
-#undef $2
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char $2 ();
-/* The GNU C library defines this for functions which it implements
-    to always fail with ENOSYS.  Some functions are actually named
-    something starting with __ and the normal name is an alias.  */
-#if defined __stub_$2 || defined __stub___$2
-choke me
-#endif
-
-int
-main ()
-{
-return $2 ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  eval "$3=yes"
-else
-  eval "$3=no"
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-fi
-eval ac_res=\$$3
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-  eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
-
-} # ac_fn_c_check_func
 
 # ac_fn_c_check_decl LINENO SYMBOL VAR INCLUDES
 # ---------------------------------------------
@@ -3558,170 +3558,12 @@ cf_have_libssl=no
 cf_have_libcrypto=no
 cf_have_libz=no
 
-cf_have_ptsname_r=no
-cf_have_setresuid=no
-cf_have_clearenv=no
-
 cf_use_simd=no
 cf_use_sendfile=no
 cf_use_xattr=no
 
+cf_use_hashopenssl=auto
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ptsname_r in -lc" >&5
-$as_echo_n "checking for ptsname_r in -lc... " >&6; }
-if ${ac_cv_lib_c_ptsname_r+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lc  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char ptsname_r ();
-int
-main ()
-{
-return ptsname_r ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_c_ptsname_r=yes
-else
-  ac_cv_lib_c_ptsname_r=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_c_ptsname_r" >&5
-$as_echo "$ac_cv_lib_c_ptsname_r" >&6; }
-if test "x$ac_cv_lib_c_ptsname_r" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBC 1
-_ACEOF
-
-  LIBS="-lc $LIBS"
-
-fi
-
-cf_have_ptsname_r=$ac_cv_lib_c_ptsname_r
-if test "$cf_have_ptsname_r" = "yes"
-then
-$as_echo "#define HAVE_PTSNAME_R 1" >>confdefs.h
-
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for clearenv in -lc" >&5
-$as_echo_n "checking for clearenv in -lc... " >&6; }
-if ${ac_cv_lib_c_clearenv+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lc  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char clearenv ();
-int
-main ()
-{
-return clearenv ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_c_clearenv=yes
-else
-  ac_cv_lib_c_clearenv=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_c_clearenv" >&5
-$as_echo "$ac_cv_lib_c_clearenv" >&6; }
-if test "x$ac_cv_lib_c_clearenv" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBC 1
-_ACEOF
-
-  LIBS="-lc $LIBS"
-
-fi
-
-cf_have_clearenv=$ac_cv_lib_c_clearenv
-if test "$cf_have_clearenv" = "yes"
-then
-$as_echo "#define HAVE_CLEARENV 1" >>confdefs.h
-
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for setresuid in -lc" >&5
-$as_echo_n "checking for setresuid in -lc... " >&6; }
-if ${ac_cv_lib_c_setresuid+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lc  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char setresuid ();
-int
-main ()
-{
-return setresuid ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_c_setresuid=yes
-else
-  ac_cv_lib_c_setresuid=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_c_setresuid" >&5
-$as_echo "$ac_cv_lib_c_setresuid" >&6; }
-if test "x$ac_cv_lib_c_setresuid" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBC 1
-_ACEOF
-
-  LIBS="-lc $LIBS"
-
-fi
-
-cf_have_setresuid=$ac_cv_lib_c_setresuid
-if test "$cf_have_setresuid" = "yes"
-then
-$as_echo "#define HAVE_SETRESUID 1" >>confdefs.h
-
-fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for get_current_dir_name in -lc" >&5
 $as_echo_n "checking for get_current_dir_name in -lc... " >&6; }
@@ -3776,325 +3618,25 @@ $as_echo "#define HAVE_GET_CURR_DIR 1" >>confdefs.h
 fi
 
 
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for umount2 in -lc" >&5
-$as_echo_n "checking for umount2 in -lc... " >&6; }
-if ${ac_cv_lib_c_umount2+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lc  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char umount2 ();
-int
-main ()
-{
-return umount2 ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_c_umount2=yes
-else
-  ac_cv_lib_c_umount2=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_c_umount2" >&5
-$as_echo "$ac_cv_lib_c_umount2" >&6; }
-if test "x$ac_cv_lib_c_umount2" = xyes; then :
+for ac_func in ptsname_r clearenv setresuid initgroups poll mlock mlockall munlockall madvise htonll ntohll mkostemp mount umount umount2 getentropy
+do :
+  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
+ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
+if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
   cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBC 1
+#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
 _ACEOF
 
-  LIBS="-lc $LIBS"
-
 fi
-
-cf_have_umount2=$ac_cv_lib_c_umount2
-if test "$cf_have_umount2" = "yes"
-then
-$as_echo "#define HAVE_UMOUNT2 1" >>confdefs.h
-
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for umount in -lc" >&5
-$as_echo_n "checking for umount in -lc... " >&6; }
-if ${ac_cv_lib_c_umount+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lc  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char umount ();
-int
-main ()
-{
-return umount ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_c_umount=yes
-else
-  ac_cv_lib_c_umount=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_c_umount" >&5
-$as_echo "$ac_cv_lib_c_umount" >&6; }
-if test "x$ac_cv_lib_c_umount" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBC 1
-_ACEOF
-
-  LIBS="-lc $LIBS"
-
-fi
-
-cf_have_umount=$ac_cv_lib_c_umount
-if test "$cf_have_umount" = "yes"
-then
-$as_echo "#define HAVE_UMOUNT 1" >>confdefs.h
-
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for mkostemp in -lc" >&5
-$as_echo_n "checking for mkostemp in -lc... " >&6; }
-if ${ac_cv_lib_c_mkostemp+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lc  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char mkostemp ();
-int
-main ()
-{
-return mkostemp ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_c_mkostemp=yes
-else
-  ac_cv_lib_c_mkostemp=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_c_mkostemp" >&5
-$as_echo "$ac_cv_lib_c_mkostemp" >&6; }
-if test "x$ac_cv_lib_c_mkostemp" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBC 1
-_ACEOF
-
-  LIBS="-lc $LIBS"
-
-fi
-
-cf_have_mkostemp=$ac_cv_lib_c_mkostemp
-if test "$cf_have_mkostemp" = "yes"
-then
-$as_echo "#define HAVE_MKOSTEMP 1" >>confdefs.h
-
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for poll in -lc" >&5
-$as_echo_n "checking for poll in -lc... " >&6; }
-if ${ac_cv_lib_c_poll+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lc  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char poll ();
-int
-main ()
-{
-return poll ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_c_poll=yes
-else
-  ac_cv_lib_c_poll=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_c_poll" >&5
-$as_echo "$ac_cv_lib_c_poll" >&6; }
-if test "x$ac_cv_lib_c_poll" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBC 1
-_ACEOF
-
-  LIBS="-lc $LIBS"
-
-fi
-
-cf_have_poll=$ac_cv_lib_c_poll
-if test "$cf_have_poll" = "yes"
-then
-$as_echo "#define HAVE_POLL 1" >>confdefs.h
-
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for htonll in -lc" >&5
-$as_echo_n "checking for htonll in -lc... " >&6; }
-if ${ac_cv_lib_c_htonll+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lc  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char htonll ();
-int
-main ()
-{
-return htonll ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_c_htonll=yes
-else
-  ac_cv_lib_c_htonll=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_c_htonll" >&5
-$as_echo "$ac_cv_lib_c_htonll" >&6; }
-if test "x$ac_cv_lib_c_htonll" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBC 1
-_ACEOF
-
-  LIBS="-lc $LIBS"
-
-fi
-
-cf_have_htonll=$ac_cv_lib_c_htonll
-if test "$cf_have_htonll" = "yes"
-then
-$as_echo "#define HAVE_HTONLL 1" >>confdefs.h
-
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ntohll in -lc" >&5
-$as_echo_n "checking for ntohll in -lc... " >&6; }
-if ${ac_cv_lib_c_ntohll+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lc  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char ntohll ();
-int
-main ()
-{
-return ntohll ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_c_ntohll=yes
-else
-  ac_cv_lib_c_ntohll=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_c_ntohll" >&5
-$as_echo "$ac_cv_lib_c_ntohll" >&6; }
-if test "x$ac_cv_lib_c_ntohll" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBC 1
-_ACEOF
-
-  LIBS="-lc $LIBS"
-
-fi
-
-cf_have_ntohll=$ac_cv_lib_c_ntohll
-if test "$cf_have_ntohll" = "yes"
-then
-$as_echo "#define HAVE_NTOHLL 1" >>confdefs.h
-
-fi
+done
 
 
 
 # Check whether --enable-sendfile was given.
 if test "${enable_sendfile+set}" = set; then :
   enableval=$enable_sendfile; cf_use_sendfile=$enableval
+else
+  cf_use_sendfile=auto
 fi
 
 
@@ -4125,11 +3667,15 @@ else
 fi
 
 
+if test "$cf_use_sendfile" != "no"
+then
+ac_fn_c_check_func "$LINENO" "sendfile" "ac_cv_func_sendfile"
+if test "x$ac_cv_func_sendfile" = xyes; then :
+  $as_echo "#define HAVE_SENDFILE 1" >>confdefs.h
+
 fi
 
-if test "$cf_use_sendfile" = "yes"
-then
-$as_echo "#define USE_SENDFILE 1" >>confdefs.h
+fi
 
 fi
 
@@ -4138,10 +3684,12 @@ fi
 # Check whether --enable-ip6 was given.
 if test "${enable_ip6+set}" = set; then :
   enableval=$enable_ip6; cf_use_ip6=$enableval
+else
+  cf_use_ip6=yes
 fi
 
 
-if test "$cf_use_ip6" = "yes"
+if test "$cf_use_ip6" != "yes"
 then
 $as_echo "#define USE_INET6 1" >>confdefs.h
 
@@ -4151,6 +3699,8 @@ fi
 # Check whether --enable-xattr was given.
 if test "${enable_xattr+set}" = set; then :
   enableval=$enable_xattr; cf_use_xattr=$enableval
+else
+  cf_use_xattr=yes
 fi
 
 
@@ -4213,12 +3763,14 @@ fi
 # Check whether --enable-namespaces was given.
 if test "${enable_namespaces+set}" = set; then :
   enableval=$enable_namespaces; cf_use_namespaces=$enableval
+else
+  cf_use_namespaces=yes
 fi
 
 
 if test "$cf_use_namespaces" = "yes"
 then
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for unshare in -lc" >&5
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for unshare in -lc" >&5
 $as_echo_n "checking for unshare in -lc... " >&6; }
 if ${ac_cv_lib_c_unshare+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -4263,14 +3815,14 @@ _ACEOF
 
 fi
 
-	cf_have_unshare=$ac_cv_lib_c_unshare
-	if test "$cf_have_unshare" = "yes"
-	then
-		$as_echo "#define HAVE_UNSHARE 1" >>confdefs.h
+        cf_have_unshare=$ac_cv_lib_c_unshare
+        if test "$cf_have_unshare" = "yes"
+        then
+                $as_echo "#define HAVE_UNSHARE 1" >>confdefs.h
 
-	fi
+        fi
 
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for setns in -lc" >&5
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for setns in -lc" >&5
 $as_echo_n "checking for setns in -lc... " >&6; }
 if ${ac_cv_lib_c_setns+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -4315,18 +3867,20 @@ _ACEOF
 
 fi
 
-	cf_have_setns=$ac_cv_lib_c_setns
-	if test "$cf_have_setns" = "yes"
-	then
-		$as_echo "#define HAVE_SETNS 1" >>confdefs.h
+        cf_have_setns=$ac_cv_lib_c_setns
+        if test "$cf_have_setns" = "yes"
+        then
+                $as_echo "#define HAVE_SETNS 1" >>confdefs.h
 
-	fi
+        fi
 fi
 
 
 # Check whether --enable-zlib was given.
 if test "${enable_zlib+set}" = set; then :
   enableval=$enable_zlib; cf_use_zlib=$enableval
+else
+  cf_use_zlib=yes
 fi
 
 
@@ -4384,6 +3938,8 @@ fi
 # Check whether --enable-ssl was given.
 if test "${enable_ssl+set}" = set; then :
   enableval=$enable_ssl; cf_use_ssl=$enableval
+else
+  cf_use_ssl=yes
 fi
 
 
@@ -4607,7 +4163,12 @@ fi
 fi
 
 
-for ac_func in OpenSSL_add_all_algorithms EVP_bf_cbc EVP_rc2_cbc EVP_rc4 EVP_rc5_32_12_16_cbc EVP_des_cbc EVP_desx_cbc EVP_cast5_cbc EVP_idea_cbc EVP_aes_128_cbc EVP_aes_256_cbc X509_check_host SSL_set_tlsext_host_name SSL_set_min_proto_version
+
+if test "$cf_have_libssl" = "yes"
+then
+cf_use_zlib=yes
+
+for ac_func in OpenSSL_add_all_algorithms EVP_MD_CTX_create EVP_MD_CTX_new EVP_MD_CTX_destroy EVP_MD_CTX_free EVP_bf_cbc EVP_rc2_cbc EVP_rc4 EVP_rc5_32_12_16_cbc EVP_des_cbc EVP_desx_cbc EVP_cast5_cbc EVP_idea_cbc EVP_aes_128_cbc EVP_aes_256_cbc X509_check_host SSL_set_tlsext_host_name SSL_set_min_proto_version
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
@@ -4678,11 +4239,13 @@ $as_echo "no" >&6; }
 fi
 rm -f conftest*
 
+
+
+
+
 fi
 
-if test "$cf_have_libssl" = "yes"
-then
-cf_use_zlib=yes
+
 fi
 
 
@@ -4707,6 +4270,8 @@ cf_have_capabilities=no
 # Check whether --enable-capabilities was given.
 if test "${enable_capabilities+set}" = set; then :
   enableval=$enable_capabilities; cf_use_capabilities=$enableval
+else
+  cf_use_capabilities=yes
 fi
 
 
@@ -5954,7 +5519,7 @@ echo "Filesystem attribues (xattr) NOT enabled"
 fi
 
 
-if test "$cf_use_sendfile" = "yes"
+if test "$ac_cv_func_sendfile" = "yes"
 then
 echo "Linux sendfile syscall enabled"
 else

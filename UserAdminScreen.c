@@ -1,5 +1,6 @@
 #include "Authenticate.h"
 #include "ChrootHelper.h"
+#include "server.h"
 
 extern STREAM *ParentProcessPipe;
 
@@ -289,7 +290,7 @@ void UserAdminScreenDisplay(STREAM *S, HTTPSession *Session)
     Html=DrawUsersTable(Html, Session);
 
     Html=CatStr(Html, "</form></body></html>\n");
-    HTTPServerSendResponse(S, Session, "200 OK","text/html",Html);
+    AlayaServerSendResponse(S, Session, "200 OK","text/html",Html);
 
     Destroy(Tempstr);
     Destroy(Config);

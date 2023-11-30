@@ -35,17 +35,17 @@ STREAM *SSHConnect(const char *Host, int Port, const char *User, const char *Pas
     ptr=GetToken(Command, "\\S", &Token, 0);
     while (ptr)
     {
-        if (strcmp(Token,"none")==0) Tempstr=CatStr(Tempstr, "-N ");
+        if (CompareStr(Token,"none")==0) Tempstr=CatStr(Tempstr, "-N ");
         else if (strncmp(Token, "stdin:",6)==0) Tempstr=MCatStr(Tempstr,"-W ", Token+6, NULL);
         else if (strncmp(Token, "jump:",5)==0) Tempstr=MCatStr(Tempstr,"-J ", Token+5, NULL);
         else if (strncmp(Token, "tunnel:",7)==0)
         {
-            Tempstr=MCatStr(Tempstr,"-oExitOnForwardFailure=yes -N -L ", Token+7, NULL);
+            Tempstr=MCatStr(Tempstr,"-oExitOnForwardFailure=yes -L ", Token+7, NULL);
             IsTunnel=TRUE;
         }
         else if (strncmp(Token, "proxy:",6)==0)
         {
-            Tempstr=MCatStr(Tempstr,"-oExitOnForwardFailure=yes -N -D ", Token+6, NULL);
+            Tempstr=MCatStr(Tempstr,"-oExitOnForwardFailure=yes -D ", Token+6, NULL);
             IsTunnel=TRUE;
         }
         else RemoteCmd=MCatStr(RemoteCmd, Token, " ", NULL);
@@ -69,7 +69,7 @@ STREAM *SSHConnect(const char *Host, int Port, const char *User, const char *Pas
     //pty settings, so we can use the 'cntrl-d' control character
     if (Flags & SSH_CANON_PTY) TTYConfigs=CatStr(TTYConfigs, " canon");
 
-    TTYConfigs=CatStr(TTYConfigs, " noshell");
+    TTYConfigs=CatStr(TTYConfigs, " noshell setsid");
 
     S=STREAMSpawnCommand(Tempstr, TTYConfigs);
     if (S)

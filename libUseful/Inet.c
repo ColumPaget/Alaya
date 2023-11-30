@@ -1,4 +1,4 @@
-#include "inet.h"
+#include "Inet.h"
 #include "Http.h"
 #include "GeneralFunctions.h"
 #include "Markup.h"
@@ -60,14 +60,15 @@ char *GetExternalIP(char *RetStr)
     //count items in array. avoid sizeof as it's not consistent c/c++
     for (max=0; Services[max] !=NULL; max++);
 
+    //pick a random start position, and to through all servers from that start
     start=(time(NULL) + rand()) % max;
-    for (i=start; (i < max) && (! StrValid(RetStr)); i++)
+    for (i=start; (i < max) && (! IsIPAddress(RetStr)); i++)
     {
         ptr=GetToken(Services[i], ",", &Token, 0);
         RetStr=ExtractFromWebpage(RetStr, Token, ptr, 4);
     }
 
-    for (i=0; (i < start) && (! StrValid(RetStr)); i++)
+    for (i=0; (i < start) && (! IsIPAddress(RetStr)); i++)
     {
         ptr=GetToken(Services[i], ",", &Token, 0);
         RetStr=ExtractFromWebpage(RetStr, Token, ptr, 4);

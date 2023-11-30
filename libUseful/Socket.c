@@ -106,13 +106,12 @@ int SocketParseConfig(const char *Config, TSockSettings *Settings)
         else if (strcasecmp(Name, "permissions")==0) Settings->Perms=FileSystemParsePermissions(Value);
         else if (strcasecmp(Name,"keepalive")==0)
         {
-            if (StrLen(Value) && (strncasecmp(Value, "n",1)==0)) Settings->Flags |= SOCK_NOKEEPALIVE;
+            if (StrValid(Value) && (strncasecmp(Value, "n",1)==0)) Settings->Flags |= SOCK_NOKEEPALIVE;
         }
         else if (strcasecmp(Name,"timeout")==0)
         {
             Settings->Timeout=atoi(Value);
         }
-        //else STREAMSetValue(S, Name, Value);
 
         ptr=GetNameValuePair(ptr, "\\S", "=", &Name, &Value);
     }
@@ -233,42 +232,27 @@ void SockSetOptions(int sock, int SetFlags, int UnsetFlags)
 int IP6SockAddrCreate(struct sockaddr **ret_sa, const char *Addr, int Port)
 {
     struct sockaddr_in6 *sa6;
-    char *Token=NULL, *wptr;
+    char *Token=NULL;
     const char *ptr;
     socklen_t salen;
 
 
     sa6=(struct sockaddr_in6 *) calloc(1,sizeof(struct sockaddr_in6));
+
     if (StrValid(Addr))
     {
-        if (IsIP4Address(Addr))
-        {
-            Token=MCopyStr(Token,"::ffff:",Addr,NULL);
-            ptr=Token;
-        }
-        else
-        {
-            ptr=GetToken(Addr, "%",&Token,0);
-            if (StrValid(ptr)) sa6->sin6_scope_id=if_nametoindex(ptr);
-
-            ptr=Token;
-            if (*ptr == '[')
-            {
-                ptr++;
-                wptr=strchr(ptr,']');
-                if (wptr) *wptr='\0';
-            }
-        }
-
-        inet_pton(AF_INET6, ptr, &(sa6->sin6_addr));
+        ptr=GetToken(Addr, "%",&Token,0);
+        if (StrValid(ptr)) sa6->sin6_scope_id=if_nametoindex(ptr);
+        StrtoIP6(Token, &(sa6->sin6_addr));
     }
     else sa6->sin6_addr=in6addr_any;
+
+    Token=IP6toStr(Token, &(sa6->sin6_addr));
     sa6->sin6_port=htons(Port);
     sa6->sin6_family=AF_INET6;
 
     *ret_sa=(struct sockaddr *) sa6;
     salen=sizeof(struct sockaddr_in6);
-
 
     DestroyString(Token);
 
@@ -367,6 +351,7 @@ int GetHostARP(const char *IP, char **Device, char **MAC)
     FILE *F;
 
     Tempstr=SetStrLen(Tempstr, 255);
+//TODO: why use fopen?
     F=fopen("/proc/net/arp","r");
     if (F)
     {
@@ -932,16 +917,25 @@ int STREAMNetConnect(STREAM *S, const char *Proto, const char *Host, int Port, c
 {
     int result=FALSE;
     TSockSettings Settings;
+    char *Name=NULL, *Value=NULL;
+    const char *ptr;
 
     memset(&Settings, 0, sizeof(TSockSettings));
     SocketParseConfig(Config, &Settings);
 
+    ptr=GetToken(Config, "\\S", &Value, 0); //throw away flags that will already have been parsed by SocketParseConfig
+    ptr=GetNameValuePair(ptr, "\\S", "=", &Name, &Value);
+    while (ptr)
+    {
+        STREAMSetValue(S, Name, Value);
+        ptr=GetNameValuePair(ptr, "\\S", "=", &Name, &Value);
+    }
 
     if (StrValid(Host))
     {
         //Flags are handled in this function
         S->in_fd=NetConnectWithSettings(Proto, STREAMGetValue(S, "LocalAddress"), Host, Port, &Settings);
-        S->Timeout=Settings.Timeout;
+        if (Settings.Timeout > 0) S->Timeout=Settings.Timeout;
         S->out_fd=S->in_fd;
         if (S->in_fd > -1) result=TRUE;
     }
@@ -966,6 +960,9 @@ int STREAMNetConnect(STREAM *S, const char *Proto, const char *Host, int Port, c
 
         if (STREAMWaitConnect(S)) result=STREAMDoPostConnect(S, S->Flags);
     }
+
+    Destroy(Name);
+    Destroy(Value);
 
     return(result);
 }

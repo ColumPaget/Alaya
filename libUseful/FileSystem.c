@@ -1,5 +1,6 @@
 #include "FileSystem.h"
 #include "Errors.h"
+#include "Users.h"
 #include <glob.h>
 //#include <sys/ioctl.h>
 //#include <sys/resource.h>
@@ -256,6 +257,17 @@ int FileChGroup(const char *FileName, const char *Group)
 }
 
 
+int FileChMod(const char *Path, const char *Mode)
+{
+    int perms;
+
+    perms=FileSystemParsePermissions(Mode);
+    if (chmod(Path, perms) ==0) return(TRUE);
+    return(FALSE);
+}
+
+
+
 int FileTouch(const char *Path)
 {
     struct utimbuf times;
@@ -273,6 +285,7 @@ unsigned long FileCopyWithProgress(const char *SrcPath, const char *DestPath, DA
 {
     STREAM *Src;
     unsigned long result;
+    struct stat FStat;
 
     Src=STREAMOpen(SrcPath,"r");
     if (! Src) return(0);
@@ -280,6 +293,8 @@ unsigned long FileCopyWithProgress(const char *SrcPath, const char *DestPath, DA
     if (Callback) STREAMAddProgressCallback(Src,Callback);
     result=STREAMCopy(Src, DestPath);
     STREAMClose(Src);
+    if (stat(SrcPath, &FStat)==0) chmod(DestPath, FStat.st_mode);
+
     return(result);
 }
 
@@ -557,7 +572,7 @@ int FileSystemCopyDir(const char *Src, const char *Dest)
     const char *ptr;
     struct stat Stat;
     char *Tempstr=NULL, *Path=NULL;
-    int i, RetVal=FALSE;
+    int i, result, RetVal=FALSE;
 
     Tempstr=MCopyStr(Tempstr, Dest, "/", NULL);
     MakeDirPath(Tempstr, 0777);
@@ -579,8 +594,9 @@ int FileSystemCopyDir(const char *Src, const char *Dest)
                 if (S_ISLNK(Stat.st_mode))
                 {
                     Tempstr=SetStrLen(Tempstr, PATH_MAX);
-                    readlink(ptr, Tempstr, PATH_MAX);
-                    symlink(Path, Tempstr);
+                    result=readlink(ptr, Tempstr, PATH_MAX);
+                    StrTrunc(Tempstr, result);
+                    result=symlink(Path, Tempstr);
                 }
                 else if (S_ISDIR(Stat.st_mode))
                 {
@@ -611,6 +627,8 @@ static int FileSystemParsePermissionsTri(const char **ptr, int ReadPerm, int Wri
 {
     int Perms=0;
 
+    if (**ptr=='+') ptr++;
+    if (**ptr=='=') ptr++;
     if (**ptr=='r') Perms |= ReadPerm;
     if (ptr_incr(ptr, 1) ==0) return(Perms);
     if (**ptr=='w') Perms |= WritePerm;

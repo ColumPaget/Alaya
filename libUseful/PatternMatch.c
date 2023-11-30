@@ -333,7 +333,7 @@ static int pmatch_char(const char **P_PtrPtr, const char **S_PtrPtr, int *Flags)
     int result=MATCH_FAIL;
 
     P_Start=*P_PtrPtr;
-    if (*Flags & PMATCH_NOCASE)
+    if ((*Flags) & PMATCH_NOCASE)
     {
         P_Char=tolower(**P_PtrPtr);
         S_Char=tolower(**S_PtrPtr);

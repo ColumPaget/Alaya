@@ -22,6 +22,19 @@ void **ArrayAdd(void **Array, void *Item)
 }
 
 
+void *ArrayGetItem(void *array[], int pos)
+{
+    int i;
+    for (i=0; i <= pos; i++)
+    {
+        if (array[i]==NULL) return(NULL);
+        if (i==pos) return(array[i]);
+    }
+    return(NULL);
+}
+
+
+
 void ArrayDestroy(void **Array, ARRAY_ITEM_DESTROY_FUNC DestroyFunc)
 {
     void **ptr;

@@ -14,6 +14,10 @@ Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
 extern "C" {
 #endif
 
+
+
+int UnixSocketBindPath(int sock, const char *Path);
+
 //create a unix (filesystem not network) socket. 'Type' can be 'SOCK_STREAM' or 'SOCK_DGRAM'.
 //return value is file descriptor of socket, or -1 on error
 int UnixServerInit(int Type, const char *Path);

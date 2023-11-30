@@ -44,8 +44,9 @@ const char *ParseHostDetails(const char *Data, char **Host,char **Port,char **Us
     if (*ptr == '[')
     {
         tptr=ptr+1;
-        while ((*ptr !=']') && (*ptr !='\0')) ptr++;
-        if (Host) *Host=CopyStrLen(*Host, tptr, ptr-tptr);
+        ptr=GetToken(ptr+1, "]", &Token, 0);
+        if (Host) *Host=CopyStr(*Host, Token);
+        if (*ptr == ':') ptr++;
     }
     else
     {
@@ -125,13 +126,13 @@ void ParseURL(const char *URL, char **Proto, char **Host, char **Port, char **Us
 
     if (Port && (! StrValid(*Port)) && StrValid(tProto))
     {
-        if (strcmp(tProto,"http")==0) *Port=CopyStr(*Port,"80");
-        else if (strcmp(tProto,"https")==0) *Port=CopyStr(*Port,"443");
-        else if (strcmp(tProto,"ssh")==0) *Port=CopyStr(*Port,"22");
-        else if (strcmp(tProto,"ftp")==0) *Port=CopyStr(*Port,"21");
-        else if (strcmp(tProto,"telnet")==0) *Port=CopyStr(*Port,"23");
-        else if (strcmp(tProto,"smtp")==0) *Port=CopyStr(*Port,"25");
-        else if (strcmp(tProto,"mailto")==0) *Port=CopyStr(*Port,"25");
+        if (CompareStr(tProto,"http")==0) *Port=CopyStr(*Port,"80");
+        else if (CompareStr(tProto,"https")==0) *Port=CopyStr(*Port,"443");
+        else if (CompareStr(tProto,"ssh")==0) *Port=CopyStr(*Port,"22");
+        else if (CompareStr(tProto,"ftp")==0) *Port=CopyStr(*Port,"21");
+        else if (CompareStr(tProto,"telnet")==0) *Port=CopyStr(*Port,"23");
+        else if (CompareStr(tProto,"smtp")==0) *Port=CopyStr(*Port,"25");
+        else if (CompareStr(tProto,"mailto")==0) *Port=CopyStr(*Port,"25");
 
     }
 
@@ -154,8 +155,8 @@ void ParseConnectDetails(const char *Str, char **Type, char **Host, char **Port,
 
     while (ptr)
     {
-        if (strcmp(Token,"-password")==0) ptr=GetToken(ptr," ",Pass,0);
-        else if (strcmp(Token,"-keyfile")==0)
+        if (CompareStr(Token,"-password")==0) ptr=GetToken(ptr," ",Pass,0);
+        else if (CompareStr(Token,"-keyfile")==0)
         {
             ptr=GetToken(ptr," ",&Token,0);
             *Pass=MCopyStr(*Pass,"keyfile:",Token,NULL);

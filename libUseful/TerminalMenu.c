@@ -3,34 +3,15 @@
 
 TERMMENU *TerminalMenuCreate(STREAM *Term, int x, int y, int wid, int high)
 {
-    TERMMENU *Item;
-
-    Item=(TERMMENU *) calloc(1,sizeof(TERMMENU));
-    Item->Term=Term;
-    Item->x=x;
-    Item->y=y;
-    Item->wid=wid;
-    Item->high=high;
-    Item->Options=ListCreate();
-    Item->MenuAttribs=CopyStr(Item->MenuAttribs, "~C~n");
-    Item->MenuCursorLeft=CopyStr(Item->MenuCursorLeft, "~W~n");
-
-    return(Item);
+    return(TerminalWidgetNew(Term, x, y, wid, high, "attribs= cursor_attribs=~e selected_attribs=~e cursor=>"));
 }
 
 
 
-
-
-void TerminalMenuDraw(TERMMENU *Menu)
+static ListNode *MenuGetTop(TERMMENU *Menu)
 {
     ListNode *Curr, *Prev;
-    char *Contents=NULL, *Tempstr=NULL, *Output=NULL;
-    char *p_Attribs, *p_Cursor, *p_Color=NULL;
-    int y, yend, count;
-
-    y=Menu->y;
-    yend=y+Menu->high;
+    int count;
 
     if (Menu->Options->Side)
     {
@@ -39,68 +20,147 @@ void TerminalMenuDraw(TERMMENU *Menu)
         count=0;
         while (Prev)
         {
-            Curr=Prev;
             count++;
             if (count >= Menu->high) break;
+            Curr=Prev;
             Prev=ListGetPrev(Curr);
         }
     }
     else Curr=ListGetNext(Menu->Options);
 
-    while (Curr)
+    return(Curr);
+}
+
+
+static void TerminalGetLineAttributes(TERMMENU *Menu, ListNode *Curr, char **p_Attribs, char **LineStart, char **LineEnd)
+{
+    //start with default attribs
+    *p_Attribs=Menu->Attribs;
+    *LineEnd=CopyPadStr(*LineEnd, "", ' ', TerminalStrLen(Menu->CursorRight));
+
+    if (Menu->Options->Side == Curr)
+    {
+        *p_Attribs=Menu->CursorAttribs;
+        *LineStart=MCopyStr(*LineStart, Menu->Attribs, Menu->CursorAttribs, Menu->CursorLeft, NULL);
+        *LineEnd=MCopyStr(*LineEnd, Menu->CursorAttribs, Menu->CursorRight, NULL);
+    }
+    else *LineStart=CopyPadStr(*LineStart, Menu->Attribs, ' ', TerminalStrLen(Menu->CursorLeft));
+
+    if (Curr->Flags & TERMMENU_SELECTED)
+    {
+        *p_Attribs=Menu->SelectedAttribs;
+        *LineStart=MCatStr(*LineStart, Menu->SelectedAttribs, "*", NULL);
+    }
+    else *LineStart=CatStr(*LineStart, " ");
+}
+
+
+
+static char *TerminalMenuFormatItem(char *Output, TERMMENU *Menu, ListNode *Curr)
+{
+    int count, margins;
+    char *LineStart=NULL, *LineEnd=NULL, *Contents=NULL, *Tempstr=NULL;
+    char *SingleLineCR=NULL;
+    char *p_Attribs;
+
+    margins=TerminalStrLen(Menu->CursorLeft) + TerminalStrLen(Menu->CursorRight) + 1;
+    TerminalGetLineAttributes(Menu, Curr, &p_Attribs, &LineStart, &LineEnd);
+
+    //single line mode uses a carriage return to return to the start of the line,
+    //rather than a full scale menu with cursor positioning
+    if (Menu->y == -1) SingleLineCR=CopyStr(SingleLineCR, "\r");
+    else SingleLineCR=CopyStr(SingleLineCR, "");
+
+    if (StrValid(p_Attribs)) Contents=ReplaceStr(Contents, Curr->Tag, "~0", p_Attribs);
+    else Contents=CopyStr(Contents, Curr->Tag);
+
+    Contents=TerminalStrTrunc(Contents, Menu->wid - margins);
+    count=TerminalStrLen(Contents);
+    while (count < (Menu->wid - margins))
+    {
+        Contents=CatStr(Contents, " ");
+        count++;
+    }
+
+
+    Tempstr=MCopyStr(Tempstr, SingleLineCR, LineStart, Contents, LineEnd, NULL);
+
+    Output=CopyStr(Output, "");
+    TerminalFormatSubStr(Tempstr, &Output, Menu->Term);
+
+    Destroy(SingleLineCR);
+    Destroy(LineStart);
+    Destroy(LineEnd);
+    Destroy(Contents);
+    Destroy(Tempstr);
+
+    return(Output);
+}
+
+
+//If a menu has fewer items in it than can fill it's full size,
+//then we need to pad it with extra lines to it's full size.
+void TerminalMenuPadToEnd(TERMMENU *Menu, int start, int end)
+{
+    int y;
+    char *Output=NULL;
+
+    y=start;
+    Output=PadStrTo(Output, ' ', Menu->wid);
+    while (y <= end)
     {
         TerminalCursorMove(Menu->Term, Menu->x, y);
-        if (Menu->Options->Side==Curr)
-        {
-            p_Attribs=Menu->MenuCursorLeft;
-            p_Cursor="> ";
-        }
-        else if (Curr->Flags & TERMMENU_SELECTED)
-        {
-            p_Attribs=Menu->MenuAttribs;
-            p_Cursor=" X";
-        }
-        else
-        {
-            p_Attribs=Menu->MenuAttribs;
-            p_Cursor="  ";
-        }
+        STREAMWriteString(Output, Menu->Term);
+        y++;
+    }
 
-        Contents=ReplaceStr(Contents, Curr->Tag, "~0", p_Attribs);
-        Contents=TerminalStrTrunc(Contents, Menu->wid-4);
-        Tempstr=MCopyStr(Tempstr, p_Attribs, p_Cursor, Contents, NULL);
+    Destroy(Output);
+}
 
-        Output=CopyStr(Output, "");
-        TerminalFormatSubStr(Tempstr, &Output, Menu->Term);
+
+void TerminalMenuDraw(TERMMENU *Menu)
+{
+    ListNode *Curr;
+    char *Output=NULL;
+    int y, yend, count;
+    //single line mode is a special case
+    //that doesn't use 'cursor move' to build
+    //a menu at a specific screen position,
+    //but instead creates a simplified single-line menu
+    //at the current cursor position
+    int singleline=FALSE;
+
+    if (Menu->y==-1)
+    {
+        y=0;
+        singleline=TRUE;
+        yend=1;
+    }
+    else
+    {
+        y=Menu->y;
+        yend=y+Menu->high;
+    }
+
+    Curr=MenuGetTop(Menu);
+    while (Curr)
+    {
+        if (! singleline) TerminalCursorMove(Menu->Term, Menu->x, y);
+        Output=TerminalMenuFormatItem(Output, Menu, Curr);
 
         //length has two added for the leading space for the cursor
 
-        count=TerminalStrLen(Contents);
-        while (count < Menu->wid-2)
-        {
-            Output=CatStr(Output, " ");
-            count++;
-        }
         STREAMWriteString(Output, Menu->Term);
         STREAMWriteString(ANSI_NORM, Menu->Term);
         y++;
-        if (y > yend) break;
+        if (y >= yend) break;
         Curr=ListGetNext(Curr);
     }
 
-    Tempstr=CopyStr(Tempstr, "");
-    Tempstr=PadStrTo(Tempstr, ' ', Menu->wid);
-    while (y <= yend)
-    {
-        TerminalCursorMove(Menu->Term, Menu->x, y);
-        STREAMWriteString(Tempstr, Menu->Term);
-        y++;
-    }
 
+    if (! singleline) TerminalMenuPadToEnd(Menu, y, yend);
     STREAMFlush(Menu->Term);
 
-    Destroy(Contents);
-    Destroy(Tempstr);
     Destroy(Output);
 }
 

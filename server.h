@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-//Only used by 'HTTPServerSendHeaders'
+//Only used by 'AlayaServerSendHeaders'
 #define HEADERS_CGI 1
 #define HEADERS_AUTH 2
 #define HEADERS_USECACHE 4
@@ -19,12 +19,13 @@ typedef enum {METHOD_HEAD, METHOD_GET,METHOD_POST,METHOD_PUT,METHOD_DELETE,METHO
 HTTPSession *HTTPSessionCreate();
 void HTTPServerHandleConnection(HTTPSession *Session);
 void HTTPServerHandlePost(STREAM *S, HTTPSession *Session);
-void HTTPServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags);
-void HTTPServerSendHTML(STREAM *S, HTTPSession *Session, const char *Title, const char *Body);
-void HTTPServerSendResponse(STREAM *S, HTTPSession *Heads, const char *ResponseLine, const char *ContentType, const char *Body);
-void HTTPServerSendFile(STREAM *S, HTTPSession *Session, const char *Path, ListNode *Vars, int SendData);
+int HTTPServerActivateSSL(HTTPSession *Session,ListNode *Keys);
+void AlayaServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags);
+void AlayaServerSendHTML(STREAM *S, HTTPSession *Session, const char *Title, const char *Body);
+void AlayaServerSendResponse(STREAM *S, HTTPSession *Heads, const char *ResponseLine, const char *ContentType, const char *Body);
+void AlayaServerSendFile(STREAM *S, HTTPSession *Session, const char *Path, ListNode *Vars, int SendData);
 int HTTPServerExecCGI(STREAM *ClientCon, HTTPSession *Session, const char *ScriptPath);
-void HTTPServerSendDocument(STREAM *S, HTTPSession *Session, const char *Path, int Flags);
+void AlayaServerSendDocument(STREAM *S, HTTPSession *Session, const char *Path, int Flags);
 int HTTPServerDecideToCompress(HTTPSession *Session, const char *Path);
 int HTTPServerReadBody(HTTPSession *Session, char **Data);
 void HTTPServerHandleStream(STREAM *Output, HTTPSession *Session, const char *SearchPath, int SendData);

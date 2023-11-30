@@ -37,6 +37,8 @@ int TTYReset(int tty);
 //shutdown TTY (hangup line if phone)
 int TTYHangUp(int tty);
 
+//in situations where the application is displaying a terminal, or in some other sense
+//knows the size of a window, tell the pty system what size that window is
 void PTYSetGeometry(int pty, int wid, int high);
 
 //open a tty device (like /dev/ttyS0). Flags are as 'TTYFLAG_' #defines above
