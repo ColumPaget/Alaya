@@ -1,0 +1,142 @@
+v4.6 (2025-03-10)
+  * bundled libUseful dir now named libUseful-bundled to prevent confusion with any installed libUseful
+  * Upgrade to libUseful-5, this should fix issues with rotating logfiles
+
+v4.5 (2022-04-04)
+  * Use locale timezone. 
+  * Added -pfs and PerfectForwardSecrecy options to command-line and config file
+  * add  Settings.Timezone
+  * fix XML returned on PROPFIND 404
+
+v4.4 (2020-11-30)
+  * Fix for uninitialized pidfile path error
+  * Add -P command-line option and PidFile= config file option
+  * Fix for bug introduced by 'unshare' feature that disables 'ChHome' feature
+
+v4.1 (2020-10-09)
+  * fastopen now only enabled in https by default. added TCPFastOpen and ListenQueue config options
+
+v4.0 (2020-10-09)
+  * added REUSEPORT and namespaces
+  * added namespaces support
+  * handle chroot better when server not running as root
+  * Fix for pipes being held open by other processes that shouldn't even have them
+
+v3.2 (2020-04-24)
+  * fix for vpath directory traversals
+
+v3.1 (2020-04-23)
+  * Handle being used through a proxy or frontend that is encrypting for us. 
+  * Added 'Upload' events support.
+  * Don't display 'move selected' and 'delete selected' if interactive mode not enabled.
+
+v3.0 (2020-04-12)
+  * Support HTTPS/HTTP on same port. 
+  * Added SOCKS service support.  
+  * Fix CGI bug for slow .cgi scripts. 
+  * Add proxy allow/deny config.
+
+v2.3 (2019-10-29)
+  * Fix for silly 'missing return' issue that leaves directory listing broken on some systems, while miraculously working on others
+
+v2.2 (2019-10-18)
+  * fix for autoconf check for xattr. Only use this feature if asked
+  * Fix for SIGPIPE issues. 
+  * Added 'local' vpath type (for use with let's encrypt).
+
+v2.1 (2016-04-06)
+  * Fixed slow cgi scripts. 
+  * Fixed 'UTC only' in cgi scripts
+  * bugfix: fix crash when permission denied on reading a media file into an m3u listing
+
+v2.0 (2016-03-25)
+  * Added -sslv command-line option. 
+  * Fixing some problems with KeepAlive/Session Reuse
+  * Added 'password' option to VPaths
+  * bugfixes for PROXY VPaths
+  * multiple bugfixes, including one relating to authentication
+  * fix for cookie-header problem. 
+  * Fixes for POST to cgi programs
+  * Session Cookie Authentication added. 
+  * Connection: Keep-Alive is now on by default
+  * Bigger default memory resources due to experience with php. 
+  * VPaths can now take 'user=' and 'group=' arguments to specify which user to switch to when accessing a vpath
+  * read resolution of image files. So far only works for BMP!
+  * cache-age can now be set against a VPath. Better handling of child processes and the sockets they talk on. The 'send directory as tar' option can now support a selection of files, and user-defined package types using external programs like tar, rar or zip.
+  * pam-account checking added
+  * Initial Websockets work
+  * added REMOTE_MAC support
+  * log to file (event logfile) now works
+  * Better handling of POST requests
+  * upgraded libUseful. Fixed handling of form data containing HTTP entites.
+  * MkDir now works with folders that have a spaces within the name.
+  * Access tokens can now be generated on a file's Edit/Details page. General fixes for compiler warnings.
+  * Only supply access tokens in .m3u files if access token authentication is enabled
+  * Authentication cleanups, Fix for 'deny' mode not working if pam not enabled
+  * Fix for paths containing single-quotes
+  * MaxLogSize setting can now take k,M,G suffixes
+  * Fixed stray \r bug for cgi scripts (added 'StripTrailingWhitespace'), 
+  * Added Resource Limits
+  * Events framework extended to work with response codes, even from within chroot. 
+  * Changes to ensure exit if SSL negotation fails
+  * Anti-shellshock changes with the 'SetEnvironmentVariable' function that cleans occurances of '()' out of CGI envornment variables. 
+  * changes to prevent 'endless loop' when reading ID3 tags
+  * More changes to access tokens to allow their use in less trusted environments, and removal of insistance on HTTP Method, so an access token now grants permission to HEAD, GET, OPTIONS, but never PUT or POST
+  * Added X-Media headers
+  * added timezone setting
+  * File properties stored in .prop file or xattr. 
+  * Added secret key for access token authentication
+  * Safari has issues with http keep-alive, so that feature can now be turned on or off as required
+  * Run Event scripts as a non-root user
+
+v1.3 
+  * Support for client certificates. 
+  * Support for Perfect Forward Secrecy. 
+
+v1.2 
+  * IPv6 support added. 
+  * Capabilities support added: most capabilities dropped at startup. 
+
+v1.1 
+  * Proxy support working again. 
+  * 'UserAgentSettings' added. 
+  * Digest Authentication added (READ THE 'README'!). 
+  * Ability to log out of HTTP session by going to a fake url. 
+
+v1.0.4 
+  * Support for custom headers to be added from config-file.  
+  * Added 'LookupClientHost' option to allow turning client hostname lookups on/off.
+
+v1.0.1
+  *  Anti-cross-site-scripting system added.
+
+v1.0.0
+  * Numerous minor bugfixes, 
+
+v0.0.11 
+  * Added security hash for cgi scripts. 
+  * Added specifiable interpreters for scripting languages. 
+  * Added support for 'chained' certificates bundled in a .pem format file.
+
+v0.0.10 
+  * webdav 'COPY' implemented
+
+v0.0.9 
+  * enhanced directory listings added.
+
+v0.0.8
+  * proxy POST added. 
+
+v0.0.7
+  * Gzip compression added for downloads. 
+
+v0.0.6
+  * Authentication 'realm' now set to hostname and overridable via commandline/config file options. 
+
+v0.0.5
+  * Rudimentary proxy server support added ('CONNECT' method and proxy 'GET' method). 
+
+v0.0.4
+  * Fixes to PROPFIND to work with cyberduck
+  * -allowed and -denied switches added to command-line-args
+
