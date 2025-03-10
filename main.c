@@ -48,6 +48,28 @@ void SigHandler(int sig)
 }
 
 
+void SetGMT()
+{
+    time_t Now;
+
+    setenv("TZ","GMT",TRUE);
+    time(&Now);
+    localtime(&Now);
+}
+
+
+void ReopenLogFile(const char *Msg, int Force)
+{
+    if (Force) LogFileClose(Settings.LogPath);
+    //we don't want any child processes doing 'log rotate' so max log size and max log rotate are set to zero here
+    //we will rotate whenever we AcceptConnection
+    //Check if log file has gotten big and rotate if needs be
+    LogToFile(Settings.LogPath, "%s",Msg);
+    LogFileFlushAll(TRUE);
+    LogFileFindSetValues(Settings.LogPath, LOGFILE_LOGPID|LOGFILE_LOCK|LOGFILE_TIMESTAMP|LOGFILE_MILLISECS, Settings.MaxLogSize, Settings.MaxLogRotate, 10);
+    LogFileCheckRotate(Settings.LogPath);
+}
+
 
 
 int ChildFunc(void *Data, int Flags)
@@ -81,7 +103,6 @@ int ChildFunc(void *Data, int Flags)
     HTTPSessionDestroy(Session);
 
     STREAMClose(ParentProcessPipe);
-    //LogFileFlushAll(TRUE);
     _exit(0);
 }
 
@@ -93,12 +114,13 @@ void AcceptConnection(STREAM *Serv)
     STREAM *S;
     pid_t pid;
 
-    //Check if log file has gotten big and rotate if needs be
-    LogFileCheckRotate(Settings.LogPath);
+
 
     Session=HTTPSessionCreate();
     Session->S=STREAMServerAccept(Serv);
     STREAMSetFlushType(Session->S, FLUSH_FULL,0,0);
+
+    ReopenLogFile("New Connection", FALSE);
 
     pid=PipeSpawnFunction(&infd,&outfd,NULL, ChildFunc, Session, "");
     Tempstr=FormatStr(Tempstr,"%d",pid);
@@ -172,23 +194,6 @@ void CollectChildProcesses()
 }
 
 
-
-void SetGMT()
-{
-    time_t Now;
-
-    setenv("TZ","GMT",TRUE);
-    time(&Now);
-    localtime(&Now);
-}
-
-
-void ReopenLogFile(char *Msg)
-{
-    LogFileClose(Settings.LogPath);
-    LogFileFindSetValues(Settings.LogPath, LOGFILE_LOGPID|LOGFILE_LOCK|LOGFILE_TIMESTAMP|LOGFILE_MILLISECS, Settings.MaxLogSize, Settings.MaxLogRotate, 10);
-    LogToFile(Settings.LogPath, "%s",Msg);
-}
 
 
 
@@ -360,9 +365,6 @@ int main(int argc, char *argv[])
 
     SetResourceLimits();
 
-    Tempstr=FormatStr(Tempstr, "Alaya Version %s Starting up on %s:%d",Version,Settings.BindAddress,Settings.Port);
-    ReopenLogFile(Tempstr);
-
 
 //Not only handles signals, but registers itself too, so we
 //run it to set up signal handling
@@ -378,6 +380,11 @@ int main(int argc, char *argv[])
 
 //Do this before any logging!
     if (! (Settings.Flags & FLAG_NODEMON)) demonize();
+
+//Now reopen logfile
+    Tempstr=FormatStr(Tempstr, "Alaya Version %s Starting up on %s:%d",Version,Settings.BindAddress,Settings.Port);
+    ReopenLogFile(Tempstr, TRUE);
+
 
 // must do this AFTER demonize
     if (StrValid(Settings.PidFilePath)) WritePidFile(Settings.PidFilePath);
@@ -420,7 +427,7 @@ int main(int argc, char *argv[])
 
         if (Settings.Flags & FLAG_SIGHUP_RECV)
         {
-            ReopenLogFile("Reopening Log File");
+            ReopenLogFile("Reopening Log File", TRUE);
             Settings.Flags &= ~FLAG_SIGHUP_RECV;
         }
         CollectChildProcesses();

@@ -810,7 +810,7 @@ void InitSettings()
     uname(&UnameData);
     memset(&Settings,0,sizeof(TSettings));
     Settings.ListenQueueLen=10;
-    Settings.MaxLogSize=999999;
+    Settings.MaxLogSize=9999999;
     Settings.MaxLogRotate=5;
     Settings.LogPath=CopyStr(Settings.LogPath,"SYSLOG");
     Settings.PidFilePath=CopyStr(Settings.PidFilePath,"/var/run/alaya.pid");

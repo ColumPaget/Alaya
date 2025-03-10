@@ -1,8 +1,7 @@
-#include "libUseful/libUseful.h"
-
 #ifndef ALAYA_SETTINGS_H
 #define ALAYA_SETTINGS_H
 
+#include "common.h"
 
 //Flag values for Settings->Flags
 #define FLAG_NODEMON 1

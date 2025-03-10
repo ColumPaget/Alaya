@@ -1,21 +1,21 @@
 CC = gcc
 CFLAGS = -g -O2
 CPPFLAGS = 
-LIBS =  -lcrypt -lcrypto -lssl -lpam -lcap -lc -lc -lz  libUseful/libUseful.a
-INSTALL=/bin/install -c
+LIBS =  -lssl -lcrypto -lcrypt -lz  libUseful-bundled/libUseful.a
+INSTALL=/usr/bin/install -c
 prefix=/usr/local
 exec_prefix=${prefix}
 bindir=${exec_prefix}/sbin
 sysconfdir=${prefix}/etc
-FLAGS=$(CFLAGS) $(CPPFLAGS) -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DSTDC_HEADERS=1 -D_FILE_OFFSET_BITS=64 -DHAVE_LIBZ=1 -DHAVE_LIBC=1 -DHAVE_LIBC=1 -DUSE_UNSHARE=1 -DUSE_PRCTL=1 -DHAVE_LIBCAP=1 -DUSE_LINUX_CAPABILITIES=1 -DHAVE_LIBPAM=1 -DHAVE_LIBSSL=1 -DHAVE_LIBCRYPTO=1 -DHAVE_LIBCRYPT=1 -DHAVE_SHADOW_H=1 
-OBJ=auth_access_token.o Authenticate.o auth_client_certificate.o auth_alaya_native.o auth_unix.o auth_pam.o MimeType.o DavProps.o Settings.o common.o server.o cgi.o FileProperties.o tar.o directory_listing.o FileDetailsPage.o VPath.o ChrootHelper.o UserAdminScreen.o Events.o ID3.o upload.o proxy.o websocket.o icecast.o xssi.o libUseful/libUseful.a
+FLAGS=$(CFLAGS) $(CPPFLAGS) -DPACKAGE_NAME=\"\" -DPACKAGE_TARNAME=\"\" -DPACKAGE_VERSION=\"\" -DPACKAGE_STRING=\"\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DHAVE_LIBZ=1 -DUSE_LINUX_CAPABILITIES=1 -DHAVE_LIBCRYPT=1 -DHAVE_LIBCRYPTO=1 -DHAVE_LIBSSL=1 -DHAVE_SHADOW_H=1 -DUSE_LIBUSEFUL_BUNDLED=1 
+OBJ=auth_access_token.o Authenticate.o auth_client_certificate.o auth_alaya_native.o auth_unix.o auth_pam.o MimeType.o DavProps.o Settings.o common.o server.o cgi.o FileProperties.o tar.o directory_listing.o FileDetailsPage.o VPath.o ChrootHelper.o UserAdminScreen.o Events.o ID3.o upload.o proxy.o websocket.o icecast.o xssi.o libUseful-bundled/libUseful.a
 EXE=alaya
 
 all: $(OBJ)
 	$(CC) $(FLAGS) -o $(EXE) $(OBJ) main.c $(LIBS) 
 
-libUseful/libUseful.a: 
-	@cd libUseful; $(MAKE)
+libUseful-bundled/libUseful.a: 
+	$(MAKE) -C libUseful-bundled
 
 auth_access_token.o: auth_access_token.c auth_access_token.h
 	$(CC) $(FLAGS) -c auth_access_token.c

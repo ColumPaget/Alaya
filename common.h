@@ -1,7 +1,12 @@
 #ifndef ALAYA_COMMON_H
 #define ALAYA_COMMON_H
 
-#include "libUseful/libUseful.h"
+#ifdef USE_LIBUSEFUL_BUNDLED
+#include "libUseful-bundled/libUseful.h"
+#else
+#include "libUseful-5/libUseful.h"
+#endif
+
 #include "Settings.h"
 #include <glob.h>
 #include <sys/wait.h>

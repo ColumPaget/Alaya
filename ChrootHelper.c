@@ -327,7 +327,7 @@ pid_t HandleWebsocketExecRequest(STREAM *ClientCon, const char *Data)
 
     //We will never read from this stream again. Any further data will be read
     //by the process we spawn off
-    ClientCon->State |= SS_EMBARGOED;
+    ClientCon->State |= LU_SS_EMBARGOED;
     Response=ParseSessionInfo(Data);
     CleanStr(Response->Path);
     CleanStr(Response->SearchPath);
@@ -426,7 +426,7 @@ pid_t HandleCGIExecRequest(STREAM *ClientCon, const char *Data)
 
     //We will never read from this stream again. Any further data will be read
     //by the process we spawn off
-    ClientCon->State |= SS_EMBARGOED;
+    ClientCon->State |= LU_SS_EMBARGOED;
     Response=ParseSessionInfo(Data);
     CleanStr(Response->Path);
     CleanStr(Response->SearchPath);
@@ -569,7 +569,7 @@ pid_t HandlePostFileRequest(STREAM *ClientCon, const char *Data)
         if (Response->Flags & SESSION_KEEPALIVE) _exit(1);
         _exit(0);
     }
-    else ClientCon->State |= SS_EMBARGOED;
+    else ClientCon->State |= LU_SS_EMBARGOED;
 
     Destroy(Tempstr);
 
@@ -675,7 +675,7 @@ pid_t HandleProxyRequest(STREAM *ClientCon, const char *Data)
         STREAMFlush(ClientCon);
         _exit(0);
     }
-    else ClientCon->State |= SS_EMBARGOED;
+    else ClientCon->State |= LU_SS_EMBARGOED;
 
     Destroy(Tempstr);
 

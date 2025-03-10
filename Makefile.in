@@ -14,8 +14,8 @@ EXE=alaya
 all: $(OBJ)
 	$(CC) $(FLAGS) -o $(EXE) $(OBJ) main.c $(LIBS) 
 
-libUseful/libUseful.a: 
-	@cd libUseful; $(MAKE)
+libUseful-bundled/libUseful.a: 
+	$(MAKE) -C libUseful-bundled
 
 auth_access_token.o: auth_access_token.c auth_access_token.h
 	$(CC) $(FLAGS) -c auth_access_token.c

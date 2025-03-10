@@ -1,12 +1,11 @@
-
-
-AC_INIT([main.c])
+AC_INIT
+AC_CONFIG_SRCDIR([main.c])
 
 AC_PROG_CC 
-AC_LANG_C 
+AC_LANG([C]) 
 AC_PROG_MAKE_SET 
 AC_PROG_INSTALL 
-AC_HEADER_STDC 
+ 
 AC_SYS_LARGEFILE
 
 AC_CHECK_LIB(z,deflate,,)
@@ -77,16 +76,31 @@ fi
 AC_ARG_ENABLE(ssl, [  --enable-ssl		use Secure Sockets Layer (default=no)], cf_use_ssl=$enableval )
 if test "$cf_use_ssl" = "yes" 
 then
-AC_CHECK_LIB(ssl,SSL_library_init,,)
-cf_have_libssl=$ac_cv_lib_ssl_SSL_library_init
+  AC_CHECK_LIB(crypt, crypt,,)
+  cf_have_libcrypt=$ac_cv_lib_crypt_crypt
 
-AC_CHECK_LIB(crypto,EVP_CIPHER_CTX_init,,)
-cf_have_libcrypto=$ac_cv_lib_crypto_EVP_CIPHER_CTX_init
+  AC_CHECK_LIB(crypto,EVP_CIPHER_CTX_init,,)
+  cf_have_libcrypto=$ac_cv_lib_crypto_EVP_CIPHER_CTX_init
+
+  dnl New versions of openssl seem to lack EVP_CIPHER_CTX_init, so let's look for another function. I've no idea what's going on with openssl, this is why I use libressl instead.
+  if test "$cf_have_libcrypto" != "yes"
+  then
+        AC_CHECK_LIB(crypto,EVP_CIPHER_CTX_new,,)
+        cf_have_libcrypto=$ac_cv_lib_crypto_EVP_CIPHER_CTX_new
+  fi
+
+
+  AC_CHECK_LIB(ssl,SSL_library_init,,)
+  cf_have_libssl=$ac_cv_lib_ssl_SSL_library_init
+
+  dnl New versions of openssl seem to lack SSL_library_init, so let's look for another function. I've no idea what's going on with openssl, this is why I use libressl instead.
+  if test "$cf_have_libssl" != "yes"
+  then
+        AC_CHECK_LIB(ssl,OPENSSL_init_ssl,,)
+        cf_have_libssl=$ac_cv_lib_ssl_OPENSSL_init_ssl
+  fi
 fi
 
-
-AC_CHECK_LIB(crypt, crypt,,)
-cf_have_libcrypt=$ac_cv_lib_crypt_crypt
 
 AC_CHECK_HEADER(shadow.h,AC_DEFINE(HAVE_SHADOW_H, 1))
 
@@ -105,15 +119,17 @@ AC_CHECK_LIB(Useful,GetToken)
 LUSEFUL="system"
 else
 LUSEFUL="bundled"
-STATIC_LIBS="libUseful/libUseful.a"
+AC_DEFINE(USE_LIBUSEFUL_BUNDLED)
+STATIC_LIBS="libUseful-bundled/libUseful.a"
 AC_SUBST(STATIC_LIBS)
-AC_CONFIG_SUBDIRS([libUseful])
+AC_CONFIG_SUBDIRS([libUseful-bundled])
 fi
 
 
 
 dnl read Makefile.in and write Makefile 
-AC_OUTPUT(Makefile)
+AC_CONFIG_FILES([Makefile])
+AC_OUTPUT
 
 echo
 echo "********** Alaya Compile Settings *********"
