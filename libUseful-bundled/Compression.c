@@ -1,4 +1,215 @@
+#include "Compression.h"
 #include "DataProcessing.h"
+
+/*
+This module mostly contains functions for compressing/decompressing using zlib.
+zlib is the compression method used by gzip and zip/pkzip. This allows libUseful
+to unzip compressed http pages and files compressed with gzip.
+
+This module also contains functions for auto-detecting type of compression used on
+a file, if it is one of gzip, bzip2 or lzip
+*/
+
+
+//auto-detect compression type from first bytes in the stream
+//this function assumes it is passed an open stream that is
+//positioned at the start of file or stream
+const char *STREAMDetectCompression(STREAM *S)
+{
+    char *Buffer=NULL;
+    const char *Comp="";
+    int result;
+
+    if (S->Type==STREAM_TYPE_FILE)
+    {
+        Buffer=SetStrLen(Buffer, 20);
+        //using PeekBytes is useless here, because Peek still reads from the file
+        //at the time that the compression Processor isn't loaded into the stream.
+        //This means bytes will be read into the stream buffer, and sit there, which
+        //haven't been decompressed. Thus we have to SEEK back, and flush out the stream
+        //after we have examined the leading bytes.
+        result=STREAMReadBytes(S, Buffer, 10);
+        STREAMSeek(S, 0, SEEK_SET);
+
+
+        if ((result > 2) && (strncmp(Buffer, "BZh", 3)==0)) Comp="bzip2";
+        else if ((result > 3) && (strncmp(Buffer, "LZIP", 4)==0)) Comp="lzip";
+        else if ((result > 1) && (strncmp(Buffer, "\x1F\x8B", 2)==0)) Comp="gzip";
+        else if ((result > 5) && (strncmp(Buffer, "\xFD\x37\x7A\x58\x5A\x00", 6)==0)) Comp="xz";
+    }
+
+    Destroy(Buffer);
+
+    return(Comp);
+}
+
+
+
+// Rather than writing a compressed stream, compress a bunch of bytes in a buffer
+int CompressBytes(char **Out, const char *Alg, const char *In, unsigned long Len, int Level)
+{
+    TProcessingModule *Mod=NULL;
+    char *Tempstr=NULL;
+    unsigned long val;
+    int result;
+
+    Tempstr=FormatStr(Tempstr,"CompressionLevel=%d",Level);
+    Mod=StandardDataProcessorCreate("compress",Alg,Tempstr, NULL, NULL);
+    if (! Mod) return(-1);
+
+    val=Len *2;
+    *Out=(char *) realloc(*Out,val);
+    result=Mod->Write(Mod,In,Len,Out,&val,TRUE);
+
+    DestroyString(Tempstr);
+    DataProcessorDestroy(Mod);
+
+    return(result);
+}
+
+
+//rather than reading a compressed stream, decompress a bunch of bytes in a buffer
+int DeCompressBytes(char **Out, const char *Alg, const char *In, unsigned long Len)
+{
+    TProcessingModule *Mod=NULL;
+    int result;
+    unsigned long val;
+
+    Mod=StandardDataProcessorCreate("decompress",Alg,"",NULL, NULL);
+    if (! Mod) return(-1);
+
+    val=Len *2;
+    *Out=(char *) realloc(*Out,val);
+    result=Mod->Read(Mod,In,Len,Out,&val,TRUE);
+
+    DataProcessorDestroy(Mod);
+
+    return(result);
+}
+
+
+
+
+// create a compression module, this will be a Data Processing Module that either
+// uses libraries (currently just zlib) to compress and decompress or
+// uses compression commands like gzip, bzip2 and xz via a pipe
+TProcessingModule *LU_CompressionModuleCreate(const char *Name, const char *Args)
+{
+    TProcessingModule *Mod=NULL;
+
+    if (
+        (strcasecmp(Name,"zlib")==0)  ||
+        (strcasecmp(Name,"deflate")==0)
+    )
+    {
+#ifdef HAVE_LIBZ
+        Mod=DataProcessorCreate(Name, Args);
+        Mod->Init=zlibProcessorInit;
+        Mod->Flags |= DPM_COMPRESS;
+#endif
+    }
+    else if (
+        (strcasecmp(Name,"gzip")==0) ||
+        (strcasecmp(Name,"gz")==0)
+    )
+    {
+#ifdef HAVE_LIBZ
+        Mod=DataProcessorCreate(Name, Args);
+        Mod->Init=zlibProcessorInit;
+        Mod->Args=MCopyStr(Mod->Args,"Alg=gzip ", Args, NULL);
+        Mod->Flags |= DPM_COMPRESS;
+
+#else
+        Mod=PipeCommandProcessorCreate(Name, Args);
+        Mod->Args=MCopyStr(Mod->Args,"Command='gzip --stdout -' ", Args, NULL);
+        Mod->Flags |= DPM_COMPRESS;
+#endif
+    }
+    else if (
+        (strcasecmp(Name,"bzip2")==0) ||
+        (strcasecmp(Name,"bz2")==0)
+    )
+    {
+        Mod=PipeCommandProcessorCreate(Name, Args);
+        Mod->Args=MCopyStr(Mod->Args,"Command='bzip2 --stdout -' ", Args, NULL);
+        Mod->Flags |= DPM_COMPRESS;
+    }
+    else if (strcasecmp(Name,"xz")==0)
+    {
+        Mod=PipeCommandProcessorCreate(Name, Args);
+        Mod->Args=MCopyStr(Mod->Args,"Command='xz -z --stdout -' ", Args, NULL);
+        Mod->Flags |= DPM_COMPRESS;
+    }
+    else if (strcasecmp(Name,"lzip")==0)
+    {
+        Mod=PipeCommandProcessorCreate(Name, Args);
+        Mod->Args=MCopyStr(Mod->Args,"Command='lzip --stdout -' ", Args, NULL);
+        Mod->Flags |= DPM_COMPRESS;
+    }
+
+
+
+    return(Mod);
+}
+
+
+// create a decompression module, this will be a Data Processing Module that either
+// uses libraries (currently just zlib) to compress and decompress or
+// uses compression commands like gzip, bzip2 and xz via a pipe
+TProcessingModule *LU_DeCompressionModuleCreate(const char *Name, const char *Args)
+{
+    TProcessingModule *Mod=NULL;
+
+    if (strcasecmp(Name,"zlib")==0)
+    {
+#ifdef HAVE_LIBZ
+        Mod=DataProcessorCreate(Name, Args);
+        Mod->Init=zlibProcessorInit;
+        Mod->Flags |= DPM_COMPRESS;
+#endif
+    }
+    else if (strcasecmp(Name,"gzip")==0)
+    {
+#ifdef HAVE_LIBZ
+        Mod=DataProcessorCreate(Name, Args);
+        Mod->Init=zlibProcessorInit;
+        Mod->Args=MCopyStr(Mod->Args,"Alg=gzip ", Args, NULL);
+        Mod->Flags |= DPM_COMPRESS;
+
+#else
+        Mod=PipeCommandProcessorCreate(Name, Args);
+        Mod->Args=MCopyStr(Mod->Args,"Command='bzip2 -d --stdout -' ", Args, NULL);
+        Mod->Flags |= DPM_COMPRESS;
+#endif
+    }
+    else if (strcasecmp(Name,"bzip2")==0)
+    {
+        Mod=PipeCommandProcessorCreate(Name, Args);
+        Mod->Args=MCopyStr(Mod->Args,"Command='bzip2 -d --stdout -' ", Args, NULL);
+        Mod->Flags |= DPM_COMPRESS;
+    }
+    else if (strcasecmp(Name,"xz")==0)
+    {
+        Mod=PipeCommandProcessorCreate(Name, Args);
+        Mod->Args=MCopyStr(Mod->Args,"Command='xz -d --stdout -' ", Args, NULL);
+        Mod->Flags |= DPM_COMPRESS;
+    }
+    else if (strcasecmp(Name,"lzip")==0)
+    {
+        Mod=PipeCommandProcessorCreate(Name, Args);
+        Mod->Args=MCopyStr(Mod->Args,"Command='lzip -d --stdout -' ", Args, NULL);
+        Mod->Flags |= DPM_COMPRESS;
+    }
+
+
+
+    return(Mod);
+}
+
+
+
+
+/* From here on down is all zlib data processor */
 
 
 #ifdef HAVE_LIBZ
@@ -84,9 +295,8 @@ int zlibProcessorRead(TProcessingModule *ProcMod, const char *InData, unsigned l
     {
         return(STREAM_CLOSED);
     }
+
     ZData=(zlibData *) ProcMod->Data;
-
-
     ZData->z_in.avail_in=InLen;
     ZData->z_in.next_in=(Bytef *) InData;
     ZData->z_in.avail_out=*OutLen;
@@ -105,9 +315,11 @@ int zlibProcessorRead(TProcessingModule *ProcMod, const char *InData, unsigned l
         case Z_DATA_ERROR:
             inflateSync(&ZData->z_in);
             break;
+
         case Z_ERRNO:
             if (Flush) ProcMod->Flags |= DPM_READ_FINAL;
             break;
+
         case Z_STREAM_ERROR:
         case Z_STREAM_END:
             ProcMod->Flags |= DPM_READ_FINAL;
@@ -115,6 +327,7 @@ int zlibProcessorRead(TProcessingModule *ProcMod, const char *InData, unsigned l
         }
 
         if ((ZData->z_in.avail_in==0) && (ProcMod->Flags & DPM_READ_FINAL)) break;
+
         if ((ZData->z_in.avail_in > 0) || Flush)
         {
             (*OutLen)+=BUFSIZ;
@@ -122,7 +335,6 @@ int zlibProcessorRead(TProcessingModule *ProcMod, const char *InData, unsigned l
             ZData->z_in.next_out=(Bytef *) (*OutData) + bytes_read;
             ZData->z_in.avail_out=(*OutLen) - bytes_read;
         }
-
     }
 #endif
 
@@ -186,8 +398,11 @@ int zlibProcessorInit(TProcessingModule *ProcMod, const char *Args, unsigned cha
     ZData=(zlibData *) calloc(1,sizeof(zlibData));
     ZData->z_in.avail_in=0;
     ZData->z_in.avail_out=0;
-    if (Type==COMP_GZIP) result=inflateInit2(&ZData->z_in,47);
+
+    if (Type==COMP_GZIP) result=inflateInit2(&ZData->z_in, 47);
     else result=inflateInit(&ZData->z_in);
+
+    if (result != Z_OK) RaiseError(0, "zlib init failed: %s", ZData->z_in.msg);
 
     ZData->z_out.avail_in=0;
     ZData->z_out.avail_out=0;
@@ -210,44 +425,4 @@ int zlibProcessorInit(TProcessingModule *ProcMod, const char *Args, unsigned cha
 
 
 
-
-int CompressBytes(char **Out, const char *Alg, const char *In, unsigned long Len, int Level)
-{
-    TProcessingModule *Mod=NULL;
-    char *Tempstr=NULL;
-    unsigned long val;
-    int result;
-
-    Tempstr=FormatStr(Tempstr,"CompressionLevel=%d",Level);
-    Mod=StandardDataProcessorCreate("compress",Alg,Tempstr, NULL, NULL);
-    if (! Mod) return(-1);
-
-    val=Len *2;
-    *Out=(char *) realloc(*Out,val);
-    result=Mod->Write(Mod,In,Len,Out,&val,TRUE);
-
-    DestroyString(Tempstr);
-    DataProcessorDestroy(Mod);
-
-    return(result);
-}
-
-
-int DeCompressBytes(char **Out, const char *Alg, const char *In, unsigned long Len)
-{
-    TProcessingModule *Mod=NULL;
-    int result;
-    unsigned long val;
-
-    Mod=StandardDataProcessorCreate("decompress",Alg,"",NULL, NULL);
-    if (! Mod) return(-1);
-
-    val=Len *2;
-    *Out=(char *) realloc(*Out,val);
-    result=Mod->Read(Mod,In,Len,Out,&val,TRUE);
-
-    DataProcessorDestroy(Mod);
-
-    return(result);
-}
 

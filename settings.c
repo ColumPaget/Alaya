@@ -164,10 +164,10 @@ void ParseConfigItem(const char *ConfigLine)
 {
     const char *ConfTokens[]= {"include","Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","PidFilePath","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","Path","FileType","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","WebsocketHandler","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings",
                                "SSLKey","SSLCert","SSLCiphers","SSLDHParams","SSLClientCertificate","SSLVerifyPath", "SSLVersion",
-                               "Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats","Admin","AllowProxy", "DenyProxy", "UseNamespaces", "ReusePort", "TCPFastOpen","ListenQueue","PFS","PerfectForwardSecrecy",
+                               "Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","UrlTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats","Admin","AllowProxy", "DenyProxy", "UseNamespaces", "ReusePort", "TCPFastOpen","ListenQueue","PFS","PerfectForwardSecrecy","AllowSU", "URLShortener","URLShort",
                                NULL
                               };
-    typedef enum {CT_INCLUDE,CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE, CT_PIDFILE, CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_PATH, CT_FILETYPE, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_SSL_VERSION, CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS, CT_ADMIN, CT_ALLOWPROXY, CT_DENYPROXY, CT_USE_NAMESPACES, CT_REUSE_PORT, CT_FAST_OPEN, CT_LISTEN_QUEUE, CT_SSL_PFS, CT_SSL_PERFECT_FORWARD_SECRECY} TConfigTokens;
+    typedef enum {CT_INCLUDE,CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE, CT_PIDFILE, CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_PATH, CT_FILETYPE, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_SSL_VERSION, CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_URL_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS, CT_ADMIN, CT_ALLOWPROXY, CT_DENYPROXY, CT_USE_NAMESPACES, CT_REUSE_PORT, CT_FAST_OPEN, CT_LISTEN_QUEUE, CT_SSL_PFS, CT_SSL_PERFECT_FORWARD_SECRECY, CT_ALLOW_SU, CT_URL_SHORT, CT_URL_SHORT2} TConfigTokens;
 
     char *Token=NULL;
     const char *ptr;
@@ -401,6 +401,10 @@ void ParseConfigItem(const char *ConfigLine)
         Settings.AccessTokenKey=CopyStr(Settings.AccessTokenKey,ptr);
         break;
 
+    case CT_URL_TOKEN_KEY:
+        Settings.URLTokenKey=CopyStr(Settings.URLTokenKey,ptr);
+        break;
+
     case CT_TIMEZONE:
         Settings.Timezone=CopyStr(Settings.Timezone,ptr);
         break;
@@ -453,6 +457,14 @@ void ParseConfigItem(const char *ConfigLine)
         else Settings.Flags &= ~(FLAG_USE_FASTOPEN | FLAG_USE_HTTPS_FASTOPEN);
         break;
 
+    case CT_ALLOW_SU:
+        Settings.Flags |= FLAG_ALLOW_SU;
+        break;
+
+    case CT_URL_SHORT:
+    case CT_URL_SHORT2:
+        Settings.URLShortner=CopyStr(Settings.URLShortner, ptr);
+        break;
     }
 
     Destroy(Token);
@@ -561,51 +573,55 @@ void PrintUsage()
     fprintf(stdout,"Credits: Thanks to Gregor Heuer, Helmut Schmid, and Maurice R Volaski for bug reports.\n");
     fprintf(stdout,"\n");
 
-    fprintf(stdout,"Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-key <path>] [-cert <path>] [-client-cert <level>] [-verify-path <path>] [-ciphers <cipher list>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>] [-tz <timezone>]\n\n");
-    fprintf(stdout,"	-v:		Verbose logging.\n");
-    fprintf(stdout,"	-v -v:		Even more verbose logging.\n");
-    fprintf(stdout,"	-a:		Specify the authentication file for 'built in' authentication.\n");
-    fprintf(stdout,"	-A:		Authentication methods. Comma separated list of pam,passwd,shadow,native,accesstoken. For 'Alaya native only' just use 'native' on its own\n");
-    fprintf(stdout,"	-d:		No daemon, don't background process.\n");
-    fprintf(stdout,"	-f:		Path to config file, defaults to /etc/alaya.conf, but alaya can be configured by command-line args only.\n");
-    fprintf(stdout,"	-O:		Open, don't require authentication.\n");
-    fprintf(stdout,"	-h:		'ChHome mode', switch to users home dir and chroot.\n");
-    fprintf(stdout,"	-i:		Set interface listen on, allows running separate servers on the same port on different interfaces/network cards.\n");
-    fprintf(stdout,"	-l:		Path to log file, default is to use 'syslog' instead.\n");
-    fprintf(stdout,"	-m:		HTTP Methods (GET, PUT, DELETE, PROPFIND) that are allowed.\nComma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for readonly DAV.\n'BASE' will set GET,POST,HEAD. 'DAV' will set everything needed for WebDAV. 'RGET' will allow proxy-server gets. 'PROXY' will enable CONNECT and RGET. 'DAV,PROXY' enables everything.\n");
-    fprintf(stdout,"	-p:		Set port to listen on.\n");
-    fprintf(stdout,"	-P:		Set path to pidfile.\n");
-    fprintf(stdout,"	-tz:		Set server's timezone.\n");
-    fprintf(stdout,"	-r:		'ChRoot mode', chroot into directory and offer services from it\n");
-    fprintf(stdout,"	-key:		Keyfile for SSL (HTTPS)\n");
-    fprintf(stdout,"	-cert:		Certificate for SSL (HTTPS). This can be a certificate chain bundled in .pem format.\n");
-    fprintf(stdout,"	-ciphers:	List of SSL ciphers to use.\n");
-    fprintf(stdout,"	-dhparams:	Path to a file containing Diffie Helmann parameters for Perfect Forward Secrecy.\n");
-    fprintf(stdout,"	-dhgenerate:	Generate Diffie Helmann parameters for Perfect Forward Secrecy at startup (will take a long time). Will not generate if a dhparams file ahs been supplied with -dhparams\n");
-    fprintf(stdout,"	-pfs:		Use Perfect Forward Secrecy. Will not generate Diffie Helmann parameters unless -dhgenerate is supplied too\n");
-    fprintf(stdout,"	-client-cert:	Settings for SSL client certificate authentication. Three levels are available: 'required' means a client MUST supply a certificate, but that it may still be required to log in through normal authentication. 'sufficient' means that a client CAN supply a certificate, and that the certificate is all the authentication that's needed. 'required+sufficient' means that a client MUST provide a certificate, and that this certificate is sufficient for authentication. 'ask' is used at the global level, when 'required' or 'sufficient' is present in the authentication file for a specific user.\n");
-    fprintf(stdout,"	-verify-path:		Path to a file, or a directory, containing Authority certificates for verifying client certificates.\n");
-    fprintf(stdout,"	-cgi:		Directory containing cgi programs. These programs will be accessible even though they are outside of a 'chroot'\n");
-    fprintf(stdout,"	-hashfile:	File containing cryptographic hashes of cgi-scripts. This file contains the output of the md5sum, shasum, sha256sum or sha512sum utilities.\n");
-    fprintf(stdout,"	-ep:		'External path' containing files that will be accessible even outside a chroot.\n");
-    fprintf(stdout,"	-u:		User to run cgi-programmes and default 'real user' for any 'native users' that don't have one specified.\n");
-    fprintf(stdout,"	-g:		Group to run server in (this will be the default group for users)\n");
-    fprintf(stdout,"	-allowed:		Comma separated list of users allowed to login (default without this switch is 'all users can login'\n");
-    fprintf(stdout,"	-denied:		Comma separated list of users DENIED login\n");
-    fprintf(stdout,"	-realm:		Realm for HTTP Authentication\n");
-    fprintf(stdout,"	-compress:		Compress documents and responses. This can have three values, 'yes', 'no' or 'partial'. 'Partial' means alaya will compress directory listings and other internally genrated pages, but not file downloads.\n");
-    fprintf(stdout,"	-cache:		Takes an argument in seconds which is the max-age recommended for browser caching. Setting this to zero will turn off caching in the browser. Default is 10 secs.\n");
+    fprintf(stdout,"Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-key <path>] [-cert <path>] [-client-cert <level>] [-verify-path <path>] [-ciphers <cipher list>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>] [-tz <timezone>] [-accesstokenkey <string>] [-urltokenkey <string>]\n\n");
+    fprintf(stdout,"  %-15s %s", "-v","Verbose logging.\n");
+    fprintf(stdout,"  %-15s %s", "-v -v", "Even more verbose logging.\n");
+    fprintf(stdout,"  %-15s %s", "-a", "Specify the authentication file for 'built in' authentication.\n");
+    fprintf(stdout,"  %-15s %s", "-A", "Authentication methods. Comma separated list of pam,passwd,shadow,native,accesstoken,urltoken. For 'Alaya native only' just use 'native' on its own\n");
+    fprintf(stdout,"  %-15s %s", "-d", "No daemon, don't background process.\n");
+    fprintf(stdout,"  %-15s %s","-f", "Path to config file, defaults to /etc/alaya.conf, but alaya can be configured by command-line args only.\n");
+    fprintf(stdout,"  %-15s %s","-O", "Open, don't require authentication.\n");
+    fprintf(stdout,"  %-15s %s","-h", "'ChHome mode', switch to users home dir and chroot.\n");
+    fprintf(stdout,"  %-15s %s","-i", "Set interface listen on, allows running separate servers on the same port on different interfaces/network cards.\n");
+    fprintf(stdout,"  %-15s %s","-l", "Path to log file, default is to use 'syslog' instead.\n");
+    fprintf(stdout,"  %-15s %s","-m", "HTTP Methods (GET, PUT, DELETE, PROPFIND) that are allowed.\nComma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for readonly DAV.\n'BASE' will set GET,POST,HEAD. 'DAV' will set everything needed for WebDAV. 'RGET' will allow proxy-server gets. 'PROXY' will enable CONNECT and RGET. 'DAV,PROXY' enables everything.\n");
+    fprintf(stdout,"  %-15s %s","-p", "Set port to listen on.\n");
+    fprintf(stdout,"  %-15s %s","-P", "Set path to pidfile.\n");
+    fprintf(stdout,"  %-15s %s","-tz", "Set server's timezone.\n");
+    fprintf(stdout,"  %-15s %s","-r", "'ChRoot mode', chroot into directory and offer services from it\n");
+    fprintf(stdout,"  %-15s %s","-key", "Keyfile for SSL (HTTPS)\n");
+    fprintf(stdout,"  %-15s %s","-cert", "Certificate for SSL (HTTPS). This can be a certificate chain bundled in .pem format.\n");
+    fprintf(stdout,"  %-15s %s","-ciphers", "List of SSL ciphers to use.\n");
+    fprintf(stdout,"  %-15s %s","-dhparams", "Path to a file containing Diffie Helmann parameters for Perfect Forward Secrecy.\n");
+    fprintf(stdout,"  %-15s %s","-dhgenerate", "Generate Diffie Helmann parameters for Perfect Forward Secrecy at startup (will take a long time). Will not generate if a dhparams file ahs been supplied with -dhparams\n");
+    fprintf(stdout,"  %-15s %s","-pfs", "Use Perfect Forward Secrecy. Will not generate Diffie Helmann parameters unless -dhgenerate is supplied too\n");
+    fprintf(stdout,"  %-15s %s","-client-cert", "Settings for SSL client certificate authentication. Three levels are available: 'required' means a client MUST supply a certificate, but that it may still be required to log in through normal authentication. 'sufficient' means that a client CAN supply a certificate, and that the certificate is all the authentication that's needed. 'required+sufficient' means that a client MUST provide a certificate, and that this certificate is sufficient for authentication. 'ask' is used at the global level, when 'required' or 'sufficient' is present in the authentication file for a specific user.\n");
+    fprintf(stdout,"  %-15s %s","-verify-path", "Path to a file, or a directory, containing Authority certificates for verifying client certificates.\n");
+    fprintf(stdout,"  %-15s %s","-cgi", "Directory containing cgi programs. These programs will be accessible even though they are outside of a 'chroot'\n");
+    fprintf(stdout,"  %-15s %s","-hashfile", "File containing cryptographic hashes of cgi-scripts. This file contains the output of the md5sum, shasum, sha256sum or sha512sum utilities.\n");
+    fprintf(stdout,"  %-15s %s","-ep", "'External path' containing files that will be accessible even outside a chroot.\n");
+    fprintf(stdout,"  %-15s %s","-u", "User to run cgi-programmes and default 'real user' for any 'native users' that don't have one specified.\n");
+    fprintf(stdout,"  %-15s %s","-g", "Group to run server in (this will be the default group for users)\n");
+    fprintf(stdout,"  %-15s %s","-allowed", "Comma separated list of users allowed to login (default without this switch is 'all users can login'\n");
+    fprintf(stdout,"  %-15s %s","-denied", "Comma separated list of users DENIED login\n");
+    fprintf(stdout,"  %-15s %s","-realm", "Realm for HTTP Authentication\n");
+    fprintf(stdout,"  %-15s %s","-compress", "Compress documents and responses. This can have three values, 'yes', 'no' or 'partial'. 'Partial' means alaya will compress directory listings and other internally genrated pages, but not file downloads.\n");
+    fprintf(stdout,"  %-15s %s","-cache", "Takes an argument in seconds which is the max-age recommended for browser caching. Setting this to zero will turn off caching in the browser. Default is 10 secs.\n");
+    fprintf(stdout,"  %-15s %s","-accesstokenkey", "Secret key to use with access-tokens.\n");
+    fprintf(stdout,"  %-15s %s","-urltokenkey", "Secret key to use with url-tokens.\n");
+    fprintf(stdout,"  %-15s %s","-su", "Allow switching to root user if cgi programs are configured suid. NOT RECOMENDED.\n");
     fprintf(stdout,"\n\nUser Setup for Alaya Authentication\n");
-    fprintf(stdout,"	Alaya can use PAM, /etc/shadow or /etc/passwd to authenticate, but has its own password file that offers extra features, or is useful to create users who can only use Alaya. Users in the Alaya password file are mapped to a 'real' user on the system (usually 'guest' or 'nobody'). The Alaya password file can be setup through the alaya commandline.\n\n");
-    fprintf(stdout," Add User: alaya -user add [-a <auth path>] [-e <password encryption type>]  [-h <user home directory>] <Username> <Password> <Setting> <Setting> <Setting>\n\n");
-    fprintf(stdout,"	-a:		Specify the authentication file for 'built in' authentication.\n");
-    fprintf(stdout,"	-h:		Specify home directory of new user.\n");
-    fprintf(stdout,"	-u:		Specify 'real user' that this user maps to.\n");
-    fprintf(stdout,"	-e:		Specify password encryption type (sha1, sha512, sha256, md5, plain or null).\n");
-    fprintf(stdout,"				Config file type settings (like 'ChHome' or 'ChRoot=/var/shared' or 'HttpMethods=GET,PUT,PROPFIND' or 'CgiPath=/usr/share/cgi' can be added so that these settings are specific to a user\n\n");
+    fprintf(stdout,"	Alaya can use PAM, /etc/shadow or /etc/passwd to authenticate, but has its own password file that offers extra features, or is useful to create users who can only use Alaya. Users in the Alaya password file are mapped to a 'real' user on the system (usually 'guest' or 'nobody'). The Alaya password file can be setup through the alaya commandline.\n");
+    fprintf(stdout,"\nAdd User:\n   alaya -user add [-a <auth path>] [-e <password encryption type>]  [-h <user home directory>] <Username> <Password> <Setting> <Setting> <Setting>\n\n");
+    fprintf(stdout,"   %-15s %s","-a", "Specify the authentication file for 'built in' authentication.\n");
+    fprintf(stdout,"   %-15s %s","-h", "Specify home directory of new user.\n");
+    fprintf(stdout,"   %-15s %s","-u", "Specify 'real user' that this user maps to.\n");
+    fprintf(stdout,"   %-15s %s","-e", "Specify password encryption type (sha1, sha512, sha256, md5, plain or null).\n");
+    fprintf(stdout,"\nConfig file type settings (like 'ChHome' or 'ChRoot=/var/shared' or 'HttpMethods=GET,PUT,PROPFIND' or 'CgiPath=/usr/share/cgi') can be added so that these settings are specific to a user\n\n");
+    fprintf(stdout,"   alaya -user add bill billspassword ChHome HttpMethods=GET\n");
 
-    fprintf(stdout," Delete User: alaya -user del [-a <auth path>] <Username>\n\n");
-    fprintf(stdout," List Users : alaya -user list\n\n");
+    fprintf(stdout,"\nDelete User:\n  alaya -user del [-a <auth path>] <Username>\n\n");
+    fprintf(stdout,"List Users:\n  alaya -user list\n\n");
 
 }
 
@@ -751,6 +767,16 @@ void SettingsParseCommandLine(int argc, char *argv[], TSettings *Settings)
             Token=MCopyStr(Token,"ScriptHashFile=",argv[++i],NULL);
             ParseConfigItem(Token);
         }
+        else if (strcmp(argv[i],"-accesstokenkey")==0)
+        {
+            Token=MCopyStr(Token,"AccessTokenKey=",argv[++i],NULL);
+            ParseConfigItem(Token);
+        }
+        else if (strcmp(argv[i],"-urltokenkey")==0)
+        {
+            Token=MCopyStr(Token,"URLTokenKey=",argv[++i],NULL);
+            ParseConfigItem(Token);
+        }
         else if (strcmp(argv[i],"-cache")==0) Settings->DocumentCacheTime=strtol(argv[++i],NULL,10);
         else if (strcmp(argv[i],"-clientnames")==0) Settings->Flags |= FLAG_LOOKUP_CLIENT;
         else if (strcmp(argv[i],"-tz")==0)
@@ -765,7 +791,43 @@ void SettingsParseCommandLine(int argc, char *argv[], TSettings *Settings)
         {
             fprintf(stdout,"version: %s\n",Version);
             fprintf(stdout,"\nBuilt: %s %s\n",__DATE__,__TIME__);
+
+#ifdef USE_IP6
+            fprintf(stdout, "   IPv6 support enabled\n");
+#endif
+
+#ifdef HAVE_LIBPAM
+            fprintf(stdout, "   Pluggable Authentication Modules (PAM) enabled\n");
+#endif
+
+#ifdef USE_MDWE
+            fprintf(stdout, "   MDWE memory hardening enabled\n");
+#endif
+
+#ifdef USE_NOSU
+            fprintf(stdout, "   PR_NO_NEW_PRIVS 'nosu' deny privesc enabled\n");
+#endif
+
+#ifdef USE_LINUX_CAPABILITIES
+            fprintf(stdout, "   Linux Capabilites enabled\n");
+#endif
+
+#ifdef USE_UNSHARE
+            fprintf(stdout, "   process containment using unshare enabled (allows chroot as normal user)\n");
+#endif
+
+#ifdef USE_SOCKS
+            fprintf(stdout, "   SOCKS proxy features enabled\n");
+#endif
+
+#ifdef USE_SENDFILE
+            fprintf(stdout, "   use linux sendfile for zero-copy send of data in unencrypted HTTP mode\n");
+#endif
+
+
+
             fprintf(stdout,"libUseful: Version %s BuildTime: %s\n",LibUsefulGetValue("LibUsefulVersion"), LibUsefulGetValue("LibUsefulBuildTime"));
+
             if (SSLAvailable()) fprintf(stdout,"SSL Library: %s\n",LibUsefulGetValue("SSL:Library"));
             else fprintf(stdout,"%s\n","SSL Library: None, not compiled with --enable-ssl");
 
@@ -812,11 +874,11 @@ void InitSettings()
     Settings.ListenQueueLen=10;
     Settings.MaxLogSize=9999999;
     Settings.MaxLogRotate=5;
-    Settings.LogPath=CopyStr(Settings.LogPath,"SYSLOG");
-    Settings.PidFilePath=CopyStr(Settings.PidFilePath,"/var/run/alaya.pid");
-    Settings.ConfigPath=CopyStr(Settings.ConfigPath,"/etc/alaya.conf");
-    Settings.DefaultDir=CopyStr(Settings.DefaultDir,"./");
-    Settings.BindAddress=CopyStr(Settings.BindAddress,"");
+    Settings.LogPath=CopyStr(Settings.LogPath, "SYSLOG");
+    Settings.PidFilePath=CopyStr(Settings.PidFilePath, "/var/run/alaya.pid");
+    Settings.ConfigPath=CopyStr(Settings.ConfigPath, "/etc/alaya.conf");
+    Settings.DefaultDir=CopyStr(Settings.DefaultDir, "./");
+    Settings.BindAddress=CopyStr(Settings.BindAddress, "");
     Settings.Flags |= FLAG_KEEPALIVES | FLAG_USE_REUSEPORT | FLAG_USE_UNSHARE | FLAG_USE_HTTPS_FASTOPEN;
     Settings.DirListFlags=DIR_SHOWFILES | DIR_FANCY;
     Settings.AuthFlags=FLAG_AUTH_REQUIRED | FLAG_AUTH_COOKIE;

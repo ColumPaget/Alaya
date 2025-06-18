@@ -19,14 +19,23 @@ void LibUsefulInitSettings()
 {
     char *Tempstr=NULL;
 
-    LibUsefulSettings=ListCreate();
-    SetVar(LibUsefulSettings,"LibUseful:Version",__LIBUSEFUL_VERSION__);
-    Tempstr=MCopyStr(Tempstr,__LIBUSEFUL_BUILD_DATE__," ",__LIBUSEFUL_BUILD_TIME__,NULL);
-    SetVar(LibUsefulSettings,"LibUseful:BuildTime",Tempstr);
-    Tempstr=FormatStr(Tempstr, "%d", 4096 * 10000);
-    SetVar(LibUsefulSettings,"MaxDocumentSize", Tempstr);
-    Tempstr=FormatStr(Tempstr, "%d", 4096 * 10000);
-    SetVar(LibUsefulSettings,"WEBSOCKET:MaxFrameSize", Tempstr);
+    LibUsefulSettings=ListCreate(LIST_FLAG_CACHE);
+    SetVar(LibUsefulSettings, "LibUseful:Version", __LIBUSEFUL_VERSION__);
+
+    Tempstr=MCopyStr(Tempstr, __LIBUSEFUL_BUILD_DATE__, " ", __LIBUSEFUL_BUILD_TIME__, NULL);
+    SetVar(LibUsefulSettings, "LibUseful:BuildTime", Tempstr);
+
+#ifdef USE_LGPL
+    SetVar(LibUsefulSettings, "LibUseful:License", "LGPLv3");
+#else
+    SetVar(LibUsefulSettings, "LibUseful:License", "GPLv3");
+#endif
+
+    Tempstr=FormatStr(Tempstr,  "%d",  4096 * 10000);
+    SetVar(LibUsefulSettings, "MaxDocumentSize",  Tempstr);
+
+    Tempstr=FormatStr(Tempstr,  "%d",  4096 * 10000);
+    SetVar(LibUsefulSettings, "WEBSOCKET:MaxFrameSize",  Tempstr);
 
     DestroyString(Tempstr);
 }

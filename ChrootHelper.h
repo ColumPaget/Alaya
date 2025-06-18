@@ -2,6 +2,7 @@
 #define ALAYA_CHROOT_HELPERS_H
 
 #include "common.h"
+#include "http_session.h"
 
 //These functions relate to requests for data from outside of the current
 //path and possibly outside of chroot. These scripts/documents are served

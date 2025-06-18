@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2025 Colum Paget <colums.projects@googlemail.com>
-* SPDX-License-Identifier: GPL-3.0
+* SPDX-License-Identifier: LGPL-3.0-or-later
 */
 
 
@@ -51,6 +51,11 @@ You can swap in externally managed histories with 'LineEditSwapHistory', which r
 #include "List.h"
 
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define LINE_EDIT_ENTER  -1
 #define LINE_EDIT_CANCEL -2
 
@@ -81,5 +86,11 @@ void LineEditAddToHistory(TLineEdit *LE, const char *Text);
 
 //swap history list for another, return the old one
 ListNode *LineEditSwapHistory(TLineEdit *LE, ListNode *NewHist);
+
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif

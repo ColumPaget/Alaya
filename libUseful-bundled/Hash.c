@@ -155,6 +155,7 @@ int HashBytes(char **Return, const char *Type, const char *text, int len, int En
     if (! Hash) return(0);
     Hash->Update(Hash, text, len);
     result=HashFinish(Hash, Encoding, Return);
+    HashDestroy(Hash);
 
     return(result);
 }
@@ -227,6 +228,7 @@ int HashSTREAM(char **Return, const char *Type, STREAM *S, int Encoding)
     DestroyString(Tempstr);
 
     result=HashFinish(Hash, Encoding, Return);
+    HashDestroy(Hash);
 
     return(result);
 }

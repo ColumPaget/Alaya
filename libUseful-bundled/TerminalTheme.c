@@ -32,7 +32,7 @@ ListNode *TerminalThemeInit()
     SetVar(TermTheme, "Calendar:TitleAttribs", "~B~w");
     SetVar(TermTheme, "Calendar:TitleMonthAttribs", "~y");
     SetVar(TermTheme, "Calendar:OutsideMonthAttribs", "~b");
-    SetVar(TermTheme, "Calendar:TodayAttribs", "~e");
+    SetVar(TermTheme, "Calendar:TodayAttribs", "~r~e");
 
 
 

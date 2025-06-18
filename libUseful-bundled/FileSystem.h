@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
-* SPDX-License-Identifier: GPL-3.0
+* SPDX-License-Identifier: LGPL-3.0-or-later
 */
 
 #ifndef LIBUSEFUL_FILEPATH_H
@@ -47,7 +47,10 @@ char *SlashTerminateDirectoryPath(char *DirPath);
 char *StripDirectorySlash(char *DirPath);
 
 //clearer than '(access(File, F_OK)==0)'. returns TRUE if file exists, FALSE otherwise
-int FileExists(const char *);
+int FileExists(const char *Path);
+
+//return Size of file at Path
+size_t FileSize(const char *Path);
 
 //Make an entire directory path. This is similar to the command-line 'mkdir -p'.
 //Note, that this function will only make directories up to the last '/'. Thus you can pass it a
@@ -62,10 +65,28 @@ int MakeDirPath(const char *Path, int DirMask);
 //The function returns the first matching file it finds.
 char *FindFileInPath(char *InBuff, const char *File, const char *Path);
 
+//searches a ':' separated path (as in the PATH environment variable) for a file IN A SUBDIRECTORY.
+//If found, the full file path is copied into InBuff and returned. InBuff might be resized, so it 
+//should be a libUseful style string (see String.h). If the file cannot be found an empty string will be returned.
+char *FindFileInPathSubDirectory(char *RetStr, const char *File, const char *SubDirectory, const char *Path);
+
 //Like 'FindFileInPath' except that the string in 'File' can be a glob/fnmatch/shell style pattern, so
 //that more than one file may be matched. These file paths are returned as items in a libUseful style
 //list (See List.h). The list should be destroyed with ListDestroy(Files, DestroyString);
+//return value is number of files found
 int FindFilesInPath(const char *File, const char *Path, ListNode *Files);
+
+//find files matching a glob pattern IN A SUBDIRECTORY of any directories in 'Path' 
+//return all found files in the list 'Files',
+//return value is number of files found
+int FindFilesInPathSubDirectory(const char *File, const char *Path, const char *SubDirectory, ListNode *Files);
+
+
+//Take a ':' seperated list of paths (as per the $PATH environment variable) and clip the last directory off each
+//one in order to get a 'prefix' (so for instance if /usr/bin/ is in your path, it will be clipped to '/usr/'
+//then append a subdirectory to this 'prefix'. Then search for 'File' in the resulting directories.
+//The first file found is returned.
+char *FindFileInPrefixSubDirectory(char *RetStr, const char *File, const char *SubDirectory, const char *Path);
 
 //If a file ends with an extension like .tmp or .exe, then change it to NewExt. If it doesn't have
 //an extension then add NewExt
@@ -143,6 +164,7 @@ int FileSetXAttr(const char *Path, const char *Name, const char *Value);
 int FileSystemCopyDir(const char *Src, const char *Dest);
 
 
+//recursive remove directory and everything in it
 int FileSystemRmDir(const char *Dir);
 
 
@@ -159,6 +181,9 @@ int FileSetFlags(const char *Path, int Set, int Unset);
 //a file append-only or immutable
 int FileSystemSetSTREAMFlags(int fd, int Set, int Unset);
 int FileSetSTREAMFlags(const char *Path, int Set, int Unset);
+
+
+int FileWrite(const char *Path, const char *Data);
 
 #ifdef __cplusplus
 }

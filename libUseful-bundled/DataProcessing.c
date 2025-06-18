@@ -15,6 +15,20 @@
 extern int STREAMReadThroughProcessors(STREAM *S, char *Bytes, int InLen);
 
 
+
+TProcessingModule *DataProcessorCreate(const char *Name, const char *Args)
+{
+    TProcessingModule *Mod;
+
+    Mod=(TProcessingModule *) calloc(1,sizeof(TProcessingModule));
+    Mod->Args=CopyStr(Mod->Args,Args);
+    Mod->Name=CopyStr(Mod->Name,Name);
+
+    return(Mod);
+}
+
+
+
 void DataProcessorDestroy(void *In)
 {
     TProcessingModule *Mod;
@@ -22,6 +36,7 @@ void DataProcessorDestroy(void *In)
     Mod=(TProcessingModule *) In;
     if (! Mod) return;
     if (Mod->Close) Mod->Close(Mod);
+
     DestroyString(Mod->Name);
     DestroyString(Mod->Args);
     DestroyString(Mod->ReadBuff);
@@ -29,6 +44,92 @@ void DataProcessorDestroy(void *In)
     free(Mod);
 }
 
+
+static int PipeCommandProcessorInit(TProcessingModule *ProcMod, const char *Args, unsigned char **Header, int *HeadLen)
+{
+    int result=FALSE;
+    char *Tempstr=NULL;
+    char *Name=NULL, *Value=NULL, *Cmd=NULL;
+    const char *ptr;
+    STREAM *S;
+
+    ptr=GetNameValuePair(Args,"\\S","=",&Name,&Value);
+    while (ptr)
+    {
+        if (strcasecmp(Name,"Command")==0) Tempstr=CopyStr(Tempstr,Value);
+
+        ptr=GetNameValuePair(ptr,"\\S","=",&Name,&Value);
+    }
+
+    if (StrValid(Tempstr) )
+    {
+        ptr=GetToken(Tempstr,"\\S",&Name,0);
+        Value=FindFileInPath(Value,Name,getenv("PATH"));
+        Cmd=MCopyStr(Cmd, Value, " ", ptr, NULL);
+
+//by pipe
+        if (StrValid(Cmd) )
+        {
+            S=STREAMSpawnCommand(Cmd, "");
+            STREAMSetTimeout(S, 0);
+            ProcMod->Data=(void *) S;
+            result=TRUE;
+        }
+    }
+
+    DestroyString(Cmd);
+    DestroyString(Name);
+    DestroyString(Value);
+    DestroyString(Tempstr);
+
+    return(result);
+}
+
+
+static int PipeCommandProcessorTransact(TProcessingModule *ProcMod, const char *InData, unsigned long InLen, char **OutData, unsigned long *OutLen, int Flush)
+{
+    STREAM *S;
+
+    S=(STREAM *) ProcMod->Data;
+    if (InLen > 0)
+    {
+        STREAMWriteBytes(S,InData,InLen);
+        STREAMFlush(S);
+    }
+
+    if (Flush)
+    {
+        if (S->out_fd > -1) close(S->out_fd);
+        S->out_fd=-1;
+    }
+    else if (! STREAMCheckForBytes(S)) return(0);
+    return(STREAMReadBytes(S,*OutData,*OutLen));
+}
+
+
+static int PipeCommandProcessorClose(TProcessingModule *ProcMod)
+{
+    STREAMClose((STREAM *) ProcMod->Data);
+    ProcMod->Data=NULL;
+
+    return(TRUE);
+}
+
+
+
+TProcessingModule *PipeCommandProcessorCreate(const char *Name, const char *Args)
+{
+    TProcessingModule *Mod;
+
+    Mod=DataProcessorCreate(Name, Args);
+
+    Mod->Init=PipeCommandProcessorInit;
+    Mod->Read=PipeCommandProcessorTransact;
+    Mod->Write=PipeCommandProcessorTransact;
+    Mod->Close=PipeCommandProcessorClose;
+
+    return(Mod);
+}
 
 
 char *DataProcessorGetValue(TProcessingModule *M, const char *Name)
@@ -54,209 +155,21 @@ void DataProcessorSetValue(TProcessingModule *M, const char *Name, const char *V
 
 
 
-void DataProcessorUpdateBuffer(char **Buffer, int *Used, int *Size, const char *Data, int DataLen)
+
+
+TProcessingModule *StandardDataProcessorCreate(const char *Class, const char *Name, const char *Args, unsigned char **Header, int *HeadLen)
 {
-    int len;
-
-    if (DataLen < 1) return;
-
-    len=*Used+DataLen;
-
-
-    if (len > *Size)
-    {
-        *Buffer=(char *) realloc(*Buffer,len);
-        *Size=len;
-    }
-
-//if we've been supplied actual data to put in the buffer, then do so
-//otherwise just expand it if needed
-    if (Data)
-    {
-        memcpy((*Buffer) + (*Used),Data,DataLen);
-        *Used=len;
-    }
-}
-
-
-int PipeCommandProcessorInit(TProcessingModule *ProcMod, const char *Args, unsigned char **Header, int *HeadLen)
-{
-    int result=FALSE;
-    char *Tempstr=NULL;
-    char *Name=NULL, *Value=NULL;
-    const char *ptr;
-    STREAM *S;
-
-    ptr=GetNameValuePair(Args,"\\S","=",&Name,&Value);
-    while (ptr)
-    {
-        if (strcasecmp(Name,"Command")==0) Tempstr=CopyStr(Tempstr,Value);
-
-        ptr=GetNameValuePair(ptr,"\\S","=",&Name,&Value);
-    }
-
-    if (StrValid(Tempstr) )
-    {
-        GetToken(Tempstr,"\\S",&Name,0);
-        Value=FindFileInPath(Value,Name,getenv("PATH"));
-
-//by pipe
-        if (StrValid(Value) )
-        {
-            S=STREAMSpawnCommand(Value, "");
-            ProcMod->Data=(void *) S;
-            result=TRUE;
-        }
-    }
-
-    DestroyString(Name);
-    DestroyString(Value);
-    DestroyString(Tempstr);
-
-    return(result);
-}
-
-
-int PipeCommandProcessorWrite(TProcessingModule *ProcMod, const char *InData, unsigned long InLen, char **OutData, unsigned long *OutLen, int Flush)
-{
-    STREAM *S;
-
-    S=(STREAM *) ProcMod->Data;
-    if (InLen > 0)
-    {
-        STREAMWriteBytes(S,InData,InLen);
-        STREAMFlush(S);
-    }
-
-    if (Flush)
-    {
-        if (S->out_fd > -1) close(S->out_fd);
-        S->out_fd=-1;
-    }
-    else if (! STREAMCheckForBytes(S)) return(0);
-    return(STREAMReadBytes(S,*OutData,*OutLen));
-}
-
-
-int PipeCommandProcessorClose(TProcessingModule *ProcMod)
-{
-    STREAMClose((STREAM *) ProcMod->Data);
-    ProcMod->Data=NULL;
-
-    return(TRUE);
-}
-
-
-
-
-TProcessingModule *StandardDataProcessorCreate(const char *Class, const char *Name, const char *iArgs, unsigned char **Header, int *HeadLen)
-{
-    char *Args=NULL;
     TProcessingModule *Mod=NULL;
 
-    Args=CopyStr(Args,iArgs);
-
     if (strcasecmp(Class,"crypto")==0) Mod=libCryptoProcessorCreate();
-
-
-    if (strcasecmp(Class,"compress")==0)
-    {
-        Mod=(TProcessingModule *) calloc(1,sizeof(TProcessingModule));
-        Mod->Args=CopyStr(Mod->Args,Args);
-        Mod->Name=CopyStr(Mod->Name,Name);
-
-        if (
-            (strcasecmp(Name,"zlib")==0)  ||
-            (strcasecmp(Name,"deflate")==0)
-        )
-        {
-#ifdef HAVE_LIBZ
-            Mod->Init=zlibProcessorInit;
-            Mod->Flags |= DPM_COMPRESS;
-#endif
-        }
-        else if (
-            (strcasecmp(Name,"gzip")==0) ||
-            (strcasecmp(Name,"gz")==0)
-        )
-        {
-#ifdef HAVE_LIBZ
-            Mod->Init=zlibProcessorInit;
-            Args=MCopyStr(Args,"Alg=gzip ",iArgs,NULL);
-            Mod->Flags |= DPM_COMPRESS;
-#endif
-        }
-        else if (
-            (strcasecmp(Name,"bzip2")==0) ||
-            (strcasecmp(Name,"bz2")==0)
-        )
-        {
-            Args=MCopyStr(Args,"Command='bzip2 --stdout -' ",iArgs,NULL);
-            Mod->Init=PipeCommandProcessorInit;
-            Mod->Write=PipeCommandProcessorWrite;
-            Mod->Close=PipeCommandProcessorClose;
-            Mod->Flags |= DPM_COMPRESS;
-        }
-        else if (strcasecmp(Name,"xz")==0)
-        {
-            Args=MCopyStr(Args,"Command='xz --stdout -' ",iArgs,NULL);
-            Mod->Init=PipeCommandProcessorInit;
-            Mod->Write=PipeCommandProcessorWrite;
-            Mod->Close=PipeCommandProcessorClose;
-            Mod->Flags |= DPM_COMPRESS;
-        }
-
-    }
-
+    if (strcasecmp(Class,"compress")==0) Mod=LU_CompressionModuleCreate(Name, Args);
 
     if (
         (strcasecmp(Class,"uncompress")==0) ||
         (strcasecmp(Class,"decompress")==0)
-    )
-    {
-        Mod=(TProcessingModule *) calloc(1,sizeof(TProcessingModule));
-        Mod->Args=CopyStr(Mod->Args,Args);
-        Mod->Name=CopyStr(Mod->Name,Name);
+    ) Mod=LU_DeCompressionModuleCreate(Name, Args);
 
-        if (strcasecmp(Name,"zlib")==0)
-        {
-#ifdef HAVE_LIBZ
-            Mod->Init=zlibProcessorInit;
-            Mod->Flags |= DPM_COMPRESS;
-#endif
-        }
-        else if (strcasecmp(Name,"gzip")==0)
-        {
-#ifdef HAVE_LIBZ
-            Mod->Init=zlibProcessorInit;
-            Args=MCopyStr(Args,"Alg=gzip ",iArgs,NULL);
-            Mod->Flags |= DPM_COMPRESS;
-#endif
-        }
-        else if (strcasecmp(Name,"bzip2")==0)
-        {
-            Args=MCopyStr(Args,"Command='bzip2 -d --stdout -' ",iArgs,NULL);
-            Mod->Init=PipeCommandProcessorInit;
-            Mod->Read=PipeCommandProcessorWrite;
-            Mod->Close=PipeCommandProcessorClose;
-            Mod->Flags |= DPM_COMPRESS;
-        }
-        else if (strcasecmp(Name,"xz")==0)
-        {
-            Args=MCopyStr(Args,"Command='xz -d --stdout -' ",iArgs,NULL);
-            Mod->Init=PipeCommandProcessorInit;
-            Mod->Read=PipeCommandProcessorWrite;
-            Mod->Close=PipeCommandProcessorClose;
-            Mod->Flags |= DPM_COMPRESS;
-        }
-
-    }
-
-
-
-    if (Mod && Mod->Init && Mod->Init(Mod, Args, Header, HeadLen)) return(Mod);
-
-    DestroyString(Args);
+    if (Mod && Mod->Init && Mod->Init(Mod, Mod->Args, Header, HeadLen)) return(Mod);
 
     DataProcessorDestroy(Mod);
     return(NULL);
@@ -342,14 +255,15 @@ int DataProcessorAvailable(const char *Class, const char *Name)
 }
 
 
-int STREAMAddStandardDataProcessor(STREAM *S, const char *Class, const char *Name, const char *iArgs)
+int STREAMAddStandardDataProcessor(STREAM *S, const char *Class, const char *iName, const char *iArgs)
 {
     TProcessingModule *Mod=NULL;
-    char *Args=NULL, *Tempstr=NULL;
+    char *Args=NULL, *Name=NULL, *Tempstr=NULL;
     unsigned char *Header=NULL;
     int HeadLen=0, RetVal=FALSE, ReadOffset=0;
 
     Args=CopyStr(Args, iArgs);
+    Name=CopyStr(Name, iName);
     if ( (S->Flags & SF_RDONLY) && (strcasecmp(Class, "crypto")==0) )
     {
         if (S->Flags & SF_WRONLY)
@@ -371,6 +285,20 @@ int STREAMAddStandardDataProcessor(STREAM *S, const char *Class, const char *Nam
         STREAMSeek(S, ReadOffset, SEEK_SET);
     }
 
+
+    if ( (S->Flags & SF_RDONLY) &&
+            ( (strcasecmp(Class, "uncompress")==0) || (strcasecmp(Class, "decompress")==0) )
+       )
+    {
+        if (strcasecmp(Name, "auto")==0)
+        {
+            Name=CopyStr(Name, STREAMDetectCompression(S));
+            //if we can't detect compression, assume that this file is
+            //uncompressed, and so return TRUE to indicate setup went okay
+            if (! StrValid(Name)) RetVal=TRUE;
+        }
+    }
+
     Mod=StandardDataProcessorCreate(Class,Name,Args,&Header,&HeadLen);
     if (Mod)
     {
@@ -386,6 +314,7 @@ int STREAMAddStandardDataProcessor(STREAM *S, const char *Class, const char *Nam
 
     Destroy(Tempstr);
     Destroy(Header);
+    Destroy(Name);
     Destroy(Args);
 
     return(RetVal);

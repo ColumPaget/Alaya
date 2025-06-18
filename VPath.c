@@ -166,8 +166,7 @@ static char *VPathSubstituteArgs(char *RetStr, const char *Template, HTTPSession
 
 static int VPathHandleFilePath(STREAM *S, HTTPSession *Session, TPathItem *VPath, int SendData)
 {
-    char *Tempstr=NULL;
-    char *LocalPath=NULL, *ExternalPath=NULL, *DocName=NULL;
+    char *Tempstr=NULL, *LocalPath=NULL, *ExternalPath=NULL, *DocName=NULL;
     const char *ptr;
     int result=FALSE, Flags=0;
 
@@ -271,7 +270,7 @@ int VPathProcess(STREAM *S, HTTPSession *Session, int Flags)
 
 
 //		if (Flags & HEADERS_POST) HTTPServerHandlePost(S,Session,PI->Type);
-    LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s] %d",PI->Type,Session->Path,PI->Path,VPathSession->Flags & SESSION_ALLOW_UPLOAD);
+    LogToFile(Settings.LogPath,"APPLYING VPATH: %d [%s] -> [%s] %d",PI->Type, Session->Path, PI->Path, VPathSession->Flags & SESSION_ALLOW_UPLOAD);
     switch (PI->Type)
     {
     case PATHTYPE_CGI:
@@ -290,10 +289,10 @@ int VPathProcess(STREAM *S, HTTPSession *Session, int Flags)
         break;
 
     case PATHTYPE_LOGOUT:
-        VPathSession->Path=FormatStr(VPathSession->Path,"%d-%d-%d",getpid(),time(NULL),rand());
+        VPathSession->Path=FormatStr(VPathSession->Path, "%d-%d-%d", getpid(), time(NULL), rand());
         HTTPServerHandleRegister(VPathSession, LOGIN_CHANGE);
-        Path=FormatURL(Path, VPathSession, "/");
-        Path=MCatStr(Path,"?Logout=",VPathSession->Path,NULL);
+        Path=HTTPSessionFormatURL(Path, VPathSession, "/");
+        Path=MCatStr(Path, "?Logout=", VPathSession->Path, NULL);
         VPathSession->Flags &= ~SESSION_KEEPALIVE;
         AlayaServerSendResponse(S, VPathSession, "302", "", Path);
         break;
@@ -312,11 +311,11 @@ int VPathProcess(STREAM *S, HTTPSession *Session, int Flags)
             //We don't normally copy Password into VPATH, so we need to get it from 'Session'
             if (StrValid(PI->Password)) VPathSession->Password=CopyStr(VPathSession->Password, Session->Password);
             else VPathSession->Password=CopyStr(VPathSession->Password, Session->Password);
-            Path=MCopyStr(Path,VPathSession->UserName,":",VPathSession->Password,NULL);
+            Path=MCopyStr(Path, VPathSession->UserName, ":", VPathSession->Password, NULL);
             Tempstr=EncodeBytes(Tempstr, Path, StrLen(Path), ENCODE_BASE64);
-            VPathSession->RemoteAuthenticate=MCopyStr(VPathSession->RemoteAuthenticate,"Basic ",Tempstr,NULL);
+            VPathSession->RemoteAuthenticate=MCopyStr(VPathSession->RemoteAuthenticate, "Basic ", Tempstr, NULL);
         }
-        Path=MCopyStr(Path,PI->Path,VPathSession->Path+StrLen(PI->URL),NULL);
+        Path=MCopyStr(Path,PI->Path, VPathSession->Path + StrLen(PI->URL), NULL);
         ChrootProcessRequest(S, VPathSession, "PROXY", Path, "");
         break;
 
@@ -335,8 +334,7 @@ int VPathProcess(STREAM *S, HTTPSession *Session, int Flags)
         break;
     }
 
-//		HTTPSessionDestroy(VPathSession);
-
+    HTTPSessionDestroy(VPathSession);
 
     Destroy(Tempstr);
     Destroy(Path);

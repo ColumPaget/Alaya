@@ -31,6 +31,7 @@ all:
 	gcc -oHttpServer.exe HttpServer.c $(LIBS)
 	gcc -oPasswordFile.exe PasswordFile.c $(LIBS)
 	gcc -obase32.exe base32.c $(LIBS)
+	gcc -obase64.exe base64.c $(LIBS)
 	gcc -ouudecode.exe uudecode.c $(LIBS)
 	gcc -ononewprivs.exe nonewprivs.c $(LIBS)
 	gcc -ochroot.exe chroot.c $(LIBS)
@@ -41,6 +42,8 @@ all:
 	gcc -ofmtduration.exe fmtduration.c $(LIBS)
 	gcc -ocalendar.exe calendar.c $(LIBS)
 	gcc -oLineEdit.exe LineEdit.c $(LIBS)
+	gcc -ocontainer.exe container.c $(LIBS)
+	gcc -oListLimits.exe ListLimits.c $(LIBS)
 
 seccomp.exe: seccomp.c
 	gcc -oseccomp.exe seccomp.c $(LIBS)

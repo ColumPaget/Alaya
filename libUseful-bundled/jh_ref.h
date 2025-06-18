@@ -79,8 +79,15 @@ hongjun
 */
 
 
+#ifdef USE_JH
+
 #ifndef JH_HASH_H
 #define JH_HASH_H
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 
 typedef unsigned long long DataLength;
@@ -103,4 +110,9 @@ HashReturn JHUpdate(hashState *state, const unsigned char *data, DataLength data
 unsigned int JHFinal(hashState *state, unsigned char *hashval);
 
 
+#ifdef __cplusplus
+}
+#endif
+
+#endif
 #endif

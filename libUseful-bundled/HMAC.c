@@ -4,18 +4,18 @@ int HMACBlockSize(const char *Type)
 {
     const char *ptr;
 
-		if (StrValid(Type))
-		{
-    if (strncasecmp(Type, "hmac-",5)==0) ptr=Type+5;
-    else ptr=Type;
+    if (StrValid(Type))
+    {
+        if (strncasecmp(Type, "hmac-",5)==0) ptr=Type+5;
+        else ptr=Type;
 
-    if (strcasecmp(ptr, "md4")==0) return(64);
-    if (strcasecmp(ptr, "md5")==0) return(64);
-    if (strcasecmp(ptr, "sha")==0) return(64);
-    if (strcasecmp(ptr, "sha1")==0) return(64);
-    if (strcasecmp(ptr, "sha224")==0) return(64);
-    if (strcasecmp(ptr, "sha256")==0) return(64);
-		}
+        if (strcasecmp(ptr, "md4")==0) return(64);
+        if (strcasecmp(ptr, "md5")==0) return(64);
+        if (strcasecmp(ptr, "sha")==0) return(64);
+        if (strcasecmp(ptr, "sha1")==0) return(64);
+        if (strcasecmp(ptr, "sha224")==0) return(64);
+        if (strcasecmp(ptr, "sha256")==0) return(64);
+    }
 
     return(128);
 }

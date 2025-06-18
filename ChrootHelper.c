@@ -3,6 +3,7 @@
 #include "proxy.h"
 #include "cgi.h"
 #include "Authenticate.h"
+#include "linux.h"
 
 //These functions relate to requests for data from outside of the current
 //path and possibly outside of chroot. These scripts/documents are served
@@ -44,16 +45,16 @@ void CleanStr(char *Data)
 
 
 //Sanitize is more than 'Clean', it clears out any HTML string
-char *SanitizeStr(char *Buffer, char *Data)
+char *SanitizeStr(char *RetStr, const char *Data)
 {
     char *TagNamespace=NULL, *TagType=NULL, *TagData=NULL;
-    char *RetStr=NULL, *Tempstr=NULL;
+    char *Tempstr=NULL;
     const char *ptr;
 
     ptr=XMLGetTag(Data, &TagNamespace, &TagType, &TagData);
     while (ptr)
     {
-        if (! StrValid(TagType)) Tempstr=CatStr(Tempstr,TagData);
+        if (! StrValid(TagType)) Tempstr=CatStr(Tempstr, TagData);
         else
         {
             if (
@@ -61,10 +62,10 @@ char *SanitizeStr(char *Buffer, char *Data)
                 ((*TagType=='/') && ListFindNamedItem(Settings.SanitizeArgumentsAllowedTags,TagType+1))
             )
             {
-                if (StrValid(TagNamespace)) Tempstr=MCatStr(Tempstr,"<",TagNamespace,":",TagType,NULL);
-                else Tempstr=MCatStr(Tempstr,"<",TagType,NULL);
-                if (StrValid(TagData)) Tempstr=MCatStr(Tempstr," ",TagData,NULL);
-                Tempstr=CatStr(Tempstr,">");
+                if (StrValid(TagNamespace)) Tempstr=MCatStr(Tempstr, "<", TagNamespace, ":", TagType, NULL);
+                else Tempstr=MCatStr(Tempstr, "<", TagType, NULL);
+                if (StrValid(TagData)) Tempstr=MCatStr(Tempstr, " ", TagData, NULL);
+                Tempstr=CatStr(Tempstr, ">");
             }
         }
 
@@ -72,7 +73,7 @@ char *SanitizeStr(char *Buffer, char *Data)
         ptr=XMLGetTag(ptr, &TagNamespace, &TagType, &TagData);
     }
 
-    RetStr=HTTPQuote(Buffer,Tempstr);
+    RetStr=HTTPQuote(RetStr, Tempstr);
 
     Destroy(TagNamespace);
     Destroy(Tempstr);
@@ -84,26 +85,24 @@ char *SanitizeStr(char *Buffer, char *Data)
 }
 
 
-char *SanitizeQueryString(char *Buffer, char *Data)
+char *SanitizeQueryString(char *RetStr, const char *Data)
 {
     char *Name=NULL, *Value=NULL, *Token=NULL;
     const char *ptr;
-    char *RetStr=NULL;
 
-    RetStr=CopyStr(Buffer,"");
-    ptr=GetNameValuePair(Data,"&","=",&Name,&Value);
+    RetStr=CopyStr(RetStr, "");
+    ptr=GetNameValuePair(Data, "&", "=", &Name, &Value);
     while (ptr)
     {
         Token=HTTPUnQuote(Token, Value);
         StripTrailingWhitespace(Token);
-        Value=SanitizeStr(Value,Token);
+        Value=SanitizeStr(Value, Token);
 
-        if (RetStr && (*RetStr != '\0')) RetStr=MCatStr(RetStr,"&",Name,"=",Value,NULL);
-        else RetStr=MCatStr(RetStr,Name,"=",Value,NULL);
-        ptr=GetNameValuePair(ptr,"&","=",&Name,&Value);
+        if (RetStr && (*RetStr != '\0')) RetStr=MCatStr(RetStr, "&", Name, "=", Value, NULL);
+        else RetStr=MCatStr(RetStr,  Name, "=", Value, NULL);
+
+        ptr=GetNameValuePair(ptr, "&", "=", &Name, &Value);
     }
-
-
 
     Destroy(Name);
     Destroy(Value);
@@ -351,6 +350,9 @@ pid_t HandleWebsocketExecRequest(STREAM *ClientCon, const char *Data)
         STREAMFlush(ClientCon);
 
         //Launch a process that will run the requested program
+        //we cannot use LinuxSetNoWriteExec in this forked process,
+        //as if we do the requested program will not be able to run
+        //as it won't be able to map it's code as executable
         result=fork();
         if (result==0)
         {
@@ -416,7 +418,6 @@ pid_t HandleWebsocketExecRequest(STREAM *ClientCon, const char *Data)
 }
 
 
-
 pid_t HandleCGIExecRequest(STREAM *ClientCon, const char *Data)
 {
     char *Tempstr=NULL, *Name=NULL, *Value=NULL;
@@ -424,9 +425,6 @@ pid_t HandleCGIExecRequest(STREAM *ClientCon, const char *Data)
     int result, i;
     HTTPSession *Response;
 
-    //We will never read from this stream again. Any further data will be read
-    //by the process we spawn off
-    ClientCon->State |= LU_SS_EMBARGOED;
     Response=ParseSessionInfo(Data);
     CleanStr(Response->Path);
     CleanStr(Response->SearchPath);
@@ -435,6 +433,7 @@ pid_t HandleCGIExecRequest(STREAM *ClientCon, const char *Data)
 
     if (access(ScriptPath,F_OK) !=0)
     {
+        STREAMWriteLine("FAIL\n", ClientCon);
         AlayaServerSendHTML(ClientCon, Response, "404 Not Found","Couldn't find that script.");
         LogToFile(Settings.LogPath,"No such script: %s in path %s = %s",Response->Path,Response->SearchPath,ScriptPath);
     }
@@ -443,16 +442,24 @@ pid_t HandleCGIExecRequest(STREAM *ClientCon, const char *Data)
         (! CheckScriptIntegrity(ScriptPath))
     )
     {
+        STREAMWriteLine("FAIL\n", ClientCon);
         AlayaServerSendHTML(ClientCon, Response, "403 Forbidden","You don't have permission for that.");
         LogToFile(Settings.LogPath,"Cannot execute script: %s",ScriptPath);
     }
     else
     {
+        //We will never read from this stream again. Any further data will be read
+        //by the process we spawn off
+        ClientCon->State |= LU_SS_EMBARGOED;
+
         if (StrValid(Response->StartDir)) chdir(Response->StartDir);
         STREAMFlush(ClientCon);
         LogFileFlushAll(TRUE);
 
         //Launch a process that will run the requested program
+        //we cannot use LinuxSetNoWriteExec in this forked process,
+        //as if we do the requested program will not be able to run
+        //as it won't be able to map its code as executable
         result=fork();
         if (result==0)
         {
@@ -500,6 +507,9 @@ pid_t HandleGetFileRequest(STREAM *ClientCon, const char *Data)
     pid=fork();
     if (pid==0)
     {
+        //this process does not launch program, so it shouldn't need to make memory executable
+        LinuxSetNoWriteExec(TRUE);
+
         Response=ParseSessionInfo(Data);
         Tempstr=FindFileInPath(Tempstr,Response->Path,Response->SearchPath);
         if (! SwitchGroup(Response->Group))
@@ -541,6 +551,9 @@ pid_t HandlePostFileRequest(STREAM *ClientCon, const char *Data)
     pid=fork();
     if (pid==0)
     {
+        //this process does not launch program, so it shouldn't need to make memory executable
+        LinuxSetNoWriteExec(TRUE);
+
         Response=ParseSessionInfo(Data);
         Tempstr=FindFileInPath(Tempstr,Response->Path,Response->SearchPath);
         Response->Path=CopyStr(Response->Path, Tempstr);
@@ -592,6 +605,10 @@ pid_t HandleIconRequest(STREAM *ClientCon, const char *Data)
     pid=fork();
     if (pid==0)
     {
+        //this process does not launch program, so it shouldn't need to make memory executable
+        LinuxSetNoWriteExec(TRUE);
+
+
         Response=ParseSessionInfo(Data);
         Vars=ListCreate();
         ptr=GetNameValuePair(Response->Arguments,"&","=",&Name,&Tempstr);
@@ -659,6 +676,10 @@ pid_t HandleProxyRequest(STREAM *ClientCon, const char *Data)
     pid=fork();
     if (pid==0)
     {
+        //this process does not launch program, so it shouldn't need to make memory executable
+        LinuxSetNoWriteExec(TRUE);
+
+
         Response=ParseSessionInfo(Data);
         Response->S=ClientCon;
         STREAMWriteLine("READY\n",ClientCon);
@@ -812,6 +833,12 @@ void HandleDelUserRequest(const char *Data)
 
 
 
+/* Read a request from a child process and carry it out.
+   This is the core fuction of alaya's 'container' functionality
+   where processes that talk to HTTP clients, which may be chrooted,
+   ask the parent process to do things for them.
+*/
+
 pid_t HandleChildProcessRequest(STREAM *S)
 {
     char *Tempstr=NULL, *Token=NULL;
@@ -932,10 +959,14 @@ STREAM *ChrootSendPathRequest(HTTPSession *Session, const char *Type, const char
     Tempstr=MCatStr(Tempstr, " SearchPath='",Quoted,"'",NULL);
 
     S=ChrootSendRequest(Session, Type, Tempstr);
+
+
     DestroyString(Tempstr);
+    DestroyString(Quoted);
 
     return(S);
 }
+
 
 int ChrootProcessRequest(STREAM *S, HTTPSession *Session, const char *Type, const char *Path, const char *SearchPath)
 {
@@ -951,7 +982,8 @@ int ChrootProcessRequest(STREAM *S, HTTPSession *Session, const char *Type, cons
 //Wait till process outside of chroot responds to our request,
     while (STREAMCheckForBytes(ParentProcessPipe)==0) usleep(10000);
 
-//Read 'OKAY' line
+//Read 1st line from helper that is carrying out processing for us
+//this should be 'READY' or 'OKAY'
     Tempstr=STREAMReadLine(Tempstr, ParentProcessPipe);
 
 //if closed or timed out, then give up

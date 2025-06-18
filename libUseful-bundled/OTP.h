@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
-* SPDX-License-Identifier: GPL-3.0
+* SPDX-License-Identifier: LGPL-3.0-or-later
 */
 
 
@@ -19,6 +19,11 @@ SecretEncoding=ENCODE_BASE32
 This function does not parse totp urls, you will have to extract the secret from those yourself.
 */
 
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 
 //Calculate TOTP at a given time, returns number of seconds the code is valid from that time
@@ -40,5 +45,11 @@ char *GoogleTOTP(char *RetStr, const char *EncodedSecret);
 
 //Google authenticator compatible TOTP
 char *GoogleTOTP(char *RetStr, const char *EncodedSecret);
+
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif

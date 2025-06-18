@@ -10,8 +10,10 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
-
+#include <stdlib.h>
+#include <unistd.h>
 #include <locale.h>
+
 
 char *OSSysInfoInterfaces(char *RetStr)
 {
@@ -169,7 +171,10 @@ const char *OSSysInfoString(int Info)
 //lua that have an 'os' object that returns information
 size_t OSSysInfoLong(int Info)
 {
-#ifdef linux
+    int result;
+    double loadavg[3];
+
+#ifdef HAVE_SYSINFO
     struct sysinfo SysInfo;
 
     sysinfo(&SysInfo);
@@ -217,5 +222,53 @@ size_t OSSysInfoLong(int Info)
     }
 
 #endif
+
+
+    switch (Info)
+    {
+#ifdef HAVE_GETLOADAVG
+
+    case OSINFO_LOAD1MIN:
+        result=getloadavg(loadavg, 3);
+        if (result > -1) return((size_t) loadavg[0]);
+        break;
+
+    case OSINFO_LOAD5MIN:
+        result=getloadavg(loadavg, 3);
+        if (result > -1) return((size_t) loadavg[1]);
+        break;
+
+    case OSINFO_LOAD15MIN:
+        result=getloadavg(loadavg, 3);
+        if (result > -1) return((size_t) loadavg[2]);
+        break;
+
+#endif
+
+    case OSINFO_PAGESIZE:
+#ifdef HAVE_GETPAGESIZE
+        return((size_t) getpagesize());
+#endif
+
+#ifdef HAVE_SYSCONF
+        return((size_t) sysconf(_SC_PAGESIZE));
+#endif
+
+#ifdef PAGE_SIZE
+        return((size_t) PAGE_SIZE);
+#endif
+        break;
+
+#ifdef HAVE_SYSCONF
+    case OSINFO_OPENMAX:
+        return((size_t) sysconf(_SC_OPEN_MAX));
+        break;
+    case OSINFO_CLOCKTICK:
+        return((size_t) sysconf(_SC_CLK_TCK));
+        break;
+#endif
+    }
+
+
     return(0);
 }

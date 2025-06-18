@@ -333,7 +333,7 @@ char *HTTPServerPropFindItemXML(char *InBuff, HTTPSession *Heads, char *ItemPath
     char *RetStr=NULL, *URL=NULL;
 
 
-    URL=FormatURL(URL,Heads,ItemPath);
+    URL=HTTPSessionFormatURL(URL,Heads,ItemPath);
 //if (S_ISDIR(FileStat.st_mode)) URL=SlashTerminateDirectoryPath(URL);
     RetStr=MCatStr(InBuff,"<response>\n<href>",URL,"</href>\n<propstat>\n<prop>\n",NULL);
 
@@ -383,7 +383,7 @@ char *HTTPServerPropFindXML(char *InBuff, HTTPSession *Heads, ListNode *PropList
     else
     {
 
-        Tempstr=FormatURL(Tempstr,Heads,Heads->Path);
+        Tempstr=HTTPSessionFormatURL(Tempstr,Heads,Heads->Path);
         RetStr=MCatStr(RetStr,"<response><href>",Tempstr,"</href>\n<propstat>\n<prop>\n",NULL);
         RetStr=CatStr(RetStr,"</prop>\n<status>HTTP/1.1 404 Not Found</status>\n</propstat>\n</response>\n");
 
@@ -450,7 +450,7 @@ void HTTPServerPropPatch(STREAM *S,HTTPSession *Heads)
     }
 
     XML=CopyStr(XML, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<multistatus xmlns=\"DAV:\">\n");
-    Tempstr=FormatURL(Tempstr,Heads,Heads->Path);
+    Tempstr=HTTPSessionFormatURL(Tempstr,Heads,Heads->Path);
     XML=MCatStr(XML,"<response>\n<href>",Tempstr,"</href>\n",NULL);
 
     Curr=ListGetNext(PropList);

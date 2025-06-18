@@ -2,6 +2,8 @@
 #define ALAYA_CLIENT_CERTS_H
 
 #include "common.h"
+#include "http_session.h"
+
 
 //Will only return false if FLAG_SSL_CERT_REQUIRED is set
 int AuthClientCertificate(HTTPSession *Session, STREAM *S);

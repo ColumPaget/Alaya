@@ -1,9 +1,10 @@
 /*
 Copyright (C) 2000-2001, 2003, 2005-2006, 2008-2011 Free Software Foundation, Inc.
-* SPDX-License-Identifier: GPL-3.0
+* SPDX-License-Identifier: GPL-2.0-or-later
 */
 
-/* Declarations of functions and data types used for SHA1 sum
+/*
+   Declarations of functions and data types used for SHA1 sum
    library functions.
    Copyright (C) 2000-2001, 2003, 2005-2006, 2008-2011 Free Software Foundation, Inc.
 
@@ -19,7 +20,12 @@ Copyright (C) 2000-2001, 2003, 2005-2006, 2008-2011 Free Software Foundation, In
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
-   Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.  */
+   Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.  
+*/
+
+
+#ifdef USE_SHA1
+
 
 #ifndef SHA1_H
 # define SHA1_H 1
@@ -81,5 +87,7 @@ extern void *sha1_read_ctx (const struct sha1_ctx *ctx, void *resbuf);
 # ifdef __cplusplus
 }
 # endif
+
+#endif
 
 #endif

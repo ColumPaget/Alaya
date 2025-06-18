@@ -189,10 +189,10 @@ static int NativeFileCheckPassword(char *Name, const char *PassType, const char 
         if (StrValid(Digest) && (strcmp(Password,Digest)==0)) result=TRUE;
     }
 
-    Destroy(Tempstr);
-    Destroy(Password);
     Destroy(Salt);
+    Destroy(Password);
     Destroy(Digest);
+    Destroy(Tempstr);
 
     return(result);
 }

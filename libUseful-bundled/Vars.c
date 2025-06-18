@@ -6,10 +6,11 @@
 
 ListNode *SetDetailVar(ListNode *Vars, const char *Name, const char *Data, int ItemType, time_t Time)
 {
-    ListNode *Node;
+    ListNode *Node=NULL;
 
     if (! Vars) return(NULL);
-    Node=ListFindTypedItem(Vars,ItemType,Name);
+    if (! (Vars->Flags & LIST_FLAG_UNIQ)) Node=ListFindTypedItem(Vars,ItemType,Name);
+
     if (Node) Node->Item=(void *) CopyStr((char *) Node->Item,Data);
     else Node=ListAddTypedItem(Vars,ItemType,Name,CopyStr(NULL,Data));
 

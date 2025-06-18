@@ -7,7 +7,7 @@ char *Tempstr=NULL, *Types=NULL, *Type=NULL;
 const char *ptr;
 
 Types=HashAvailableTypes(Types);
-printf("HashTypes: %s\n", Types);
+printf("HashTypes: %s\n\n", Types);
 
 ptr=GetToken(Types, ",", &Type, 0);
 while (ptr)

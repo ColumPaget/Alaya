@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
-* SPDX-License-Identifier: GPL-3.0
+* SPDX-License-Identifier: LGPL-3.0-or-later
 */
 
 /* 
@@ -76,7 +76,11 @@ This of course means that the final displayed string might be a different length
 
 Can be used to get the length of the string that will actually be displayed (with all formatting characters removed)
 
-Unicode characters can be referred to by name like so:
+
+To use unicode characters you must call the function `TerminalSetUTF8(level)` to tell libuseful your system supports unicode, and what level of unicode is supported.
+
+ 
+Unicode characters can be output by code using ~Uxxxx, but this only supports characters up to FFFF. However characters can be referred to by name using `~:<name>:` like so:
 
 TerminalPutStr("duration: 80~:micro:s", StdOut);
 
@@ -95,7 +99,7 @@ beamed8note 266B
 beamed16note 266C
 
 
-The default path for this file is /etc/unicode-names.conf, but it can be overriden either by setting the environment variable 'UNICODE_NAMES_FILE' or by setting the libuseful variable 'Unicode:NamesFile'
+The default path for this file is /etc/unicode-names.conf, but it can be overriden either by setting the environment variable 'UNICODE_NAMES_FILE' or by setting the libuseful variable 'Unicode:NamesFile'. Nerdfonts are also supported, see 'Unicode.h' for more details on howto setup unicode and nerdfonts name mappings.
 */
 
 

@@ -2,6 +2,8 @@
 #define ALAYA_VPATH_H
 
 #include "common.h"
+#include "http_session.h"
+
 
 void VPathParse(ListNode *List, const char *PathType, const char *Data);
 TPathItem *VPathFind(int Type, const char *Match);

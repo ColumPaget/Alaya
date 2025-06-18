@@ -22,6 +22,9 @@
       Robert Klep <robert@ilse.nl>  -- Expansion function fix
 */
 
+
+#ifdef USE_SHA1
+
 //#include <config.h>
 
 #include "sha1.h"
@@ -329,3 +332,5 @@ sha1_process_block (const void *buffer, size_t len, struct sha1_ctx *ctx)
         e = ctx->E += e;
     }
 }
+
+#endif

@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
-* SPDX-License-Identifier: GPL-3.0
+* SPDX-License-Identifier: LGPL-3.0-or-later
 */
 
 #ifndef LIBUSEFUL_SOCKET_H
@@ -52,20 +52,32 @@ extern "C" {
 #endif
 
 
-#ifndef HAVE_HTONLL
-#if __BIG_ENDIAN__
-# define htonll(x) (x)
-#else
-# define htonll(x) ( ( (uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32) )
+#ifdef __APPLE__
+#include <libkern/OSByteOrder.h>
 #endif
+
+#ifndef HAVE_HTONLL
+  #ifdef __APPLE__
+    # define htonll(x) OSSwapHostToBigInt64(x)
+  #else
+    #if __BIG_ENDIAN__
+      # define htonll(x) (x)
+    #else
+      # define htonll(x) ( ( (uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32) )
+    #endif
+  #endif
 #endif
 
 #ifndef HAVE_NTOHLL
-#if __BIG_ENDIAN__
-# define ntohll(x) (x)
-#else
-# define ntohll(x) ( ( (uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32) )
-#endif
+  #ifdef __APPLE__
+    # define ntohll(x) OSSwapBigToHostInt64(x)
+  #else
+    #if __BIG_ENDIAN__
+      # define ntohll(x) (x)
+    #else
+      # define ntohll(x) ( ( (uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32) )
+    #endif
+  #endif
 #endif
 
 

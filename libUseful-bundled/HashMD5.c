@@ -1,5 +1,6 @@
 #include "HashMD5.h"
 
+#ifdef USE_MD5
 #include "md5.h"
 #define MD5LEN 16
 
@@ -41,10 +42,12 @@ int HashFinishMD5(HASH *Hash, char **HashStr)
 
     return(len);
 }
+#endif
 
 
 int HashInitMD5(HASH *Hash, const char *Name, int Len)
 {
+#ifdef USE_MD5
     Hash->Ctx=(void *) calloc(1,sizeof(MD5_CTX));
     MD5Init((MD5_CTX *) Hash->Ctx);
     Hash->Update=HashUpdateMD5;
@@ -52,10 +55,15 @@ int HashInitMD5(HASH *Hash, const char *Name, int Len)
     Hash->Clone=HashCloneMD5;
 
     return(TRUE);
+#else
+    return(FALSE);
+#endif
 }
 
 
 void HashRegisterMD5()
 {
+#ifdef USE_MD5
     HashRegister("md5", 0, HashInitMD5);
+#endif
 }

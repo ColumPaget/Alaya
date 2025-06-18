@@ -17,12 +17,15 @@
 #include "VPath.h"
 #include "xssi.h"
 #include "icecast.h"
+#include "linux.h"
+#include "url_short.h"
 #include <netinet/tcp.h>
 
 #ifdef USE_UNSHARE
 #define _GNU_SOURCE
 #include <sched.h>
 #endif
+
 
 const char *HTTPMethods[]= {"HEAD","GET","POST","PUT","DELETE","MKCOL","PROPFIND","PROPPATCH","MOVE","COPY","OPTIONS","CONNECT","LOCK","UNLOCK","MKCALENDAR", "REPORT", NULL};
 
@@ -80,7 +83,7 @@ int HTTPServerDecideToCompress(HTTPSession *Session, const char *Path)
     return(FALSE);
 }
 
-int HTTPServerActivateSSL(HTTPSession *Session,ListNode *Keys)
+int HTTPServerActivateSSL(HTTPSession *Session, ListNode *Keys)
 {
     ListNode *Curr;
     int Flags=0;
@@ -88,7 +91,7 @@ int HTTPServerActivateSSL(HTTPSession *Session,ListNode *Keys)
     Curr=ListGetNext(Keys);
     while (Curr)
     {
-        STREAMSetValue(Session->S,Curr->Tag,(char *) Curr->Item);
+        STREAMSetValue(Session->S, Curr->Tag, (char *) Curr->Item);
         Curr=ListGetNext(Curr);
     }
 
@@ -418,7 +421,7 @@ int HTTPServerReadHeaders(HTTPSession *Session)
         case HEAD_UPGRADE:
             if ((strcasecmp(ptr,"Upgrade")==0) && SSLAvailable())
             {
-                if (! HTTPServerActivateSSL(Session,Settings.SSLKeys)) return(FALSE);
+                if (! HTTPServerActivateSSL(Session, Settings.SSLKeys)) return(FALSE);
             }
             else if (strcasecmp(ptr,"websocket")==0) Session->MethodID = METHOD_WEBSOCKET;
             break;
@@ -454,7 +457,10 @@ int HTTPServerReadHeaders(HTTPSession *Session)
     }
 
 
+    //if these tokens are supplied in the request either via url arguments or POST
+    //then we declare that some authentication is 'present' in the request
     if (strstr(Session->Arguments,"AccessToken")) Session->AuthFlags |= FLAG_AUTH_PRESENT | FLAG_AUTH_ACCESS_TOKEN;
+    if (strstr(Session->Arguments,"URLToken")) Session->AuthFlags |= FLAG_AUTH_PRESENT | FLAG_AUTH_URL_TOKEN;
 
 
     Session->URL=HTTPUnQuote(Session->URL, Session->OriginalURL);
@@ -491,7 +497,7 @@ void AlayaServerSendHeaders(STREAM *S, HTTPSession *Session, int Flags)
     STREAMWriteLine(Tempstr,S);
     if (Settings.Flags & FLAG_LOG_VERBOSE) LogToFile(Settings.LogPath,">> %s",Tempstr);
 
-    AlayaServerSendHeader(S,"Date",GetDateStr("%a, %d %b %Y %H:%M:%S %Z",NULL));
+    AlayaServerSendHeader(S, "Date", GetDateStr("%a, %d %b %Y %H:%M:%S %Z",NULL));
 
     if (Session->LastModified > 0) AlayaServerSendHeader(S,"Last-Modified",GetDateStrFromSecs("%a, %d %b %Y %H:%M:%S %Z", Session->LastModified,Settings.Timezone));
 
@@ -748,6 +754,9 @@ void AlayaServerSendFile(STREAM *S, HTTPSession *Session, const char *Path, List
     STREAM *Doc;
     HTTPSession *Response;
     char *Buffer=NULL, *Tempstr=NULL;
+    int SendfileFlags=SENDFILE_LOOP;
+
+    LogToFile(Settings.LogPath,"AlayaSendFile: %s %d", Path, Flags);
 
     Doc=STREAMFileOpen(Path, SF_RDONLY);
     if (! Doc) AlayaServerSendHTML(S, Session, "403 Forbidden","You don't have permission for that.");
@@ -773,14 +782,20 @@ void AlayaServerSendFile(STREAM *S, HTTPSession *Session, const char *Path, List
         AlayaServerSendHeaders(S, Response, Flags);
 
         if (Response->Flags & SESSION_ENCODE_GZIP) STREAMAddStandardDataProcessor(S,"compression","gzip","CompressionLevel=1");
+
         if (Flags & HEADERS_SENDFILE)
         {
 //      LogToFile(Settings.LogPath,"SF: %d %s", Response->ContentSize, Buffer);
 //			if (Session->Flags & SESSION_ICECAST) IcecastSendData(Doc, S);
             //else if (Flags & HEADERS_XSSI) STREAMWriteLine(Buffer, S);
             //else
-            //
-            STREAMSendFile(Doc, S, 0, SENDFILE_KERNEL | SENDFILE_LOOP);
+
+            //older versions of libUseful might allow using the sendfile syscall with TLS/SSL
+            //which doesn't work. Recent libUseful shouldn't have this issue, but we play safe here
+            //and don't add SENDFILE_KERNEL flag if output is SSL
+            SendfileFlags = SENDFILE_LOOP;
+            if (! (S->State & LU_SS_SSL)) SendfileFlags |= SENDFILE_KERNEL;
+            STREAMSendFile(Doc, S, 0, SendfileFlags);
         }
 
 
@@ -1010,7 +1025,7 @@ static void HTTPServerCopy(STREAM *S,HTTPSession *Heads)
 
     LogToFile(Settings.LogPath,"HTTP COPY: [%s] [%s]",Heads->URL,Heads->Destination);
 
-    result=CopyURL(Heads, Heads->URL, Heads->Destination);
+    result=HTTPSessionCopyURL(Heads, Heads->URL, Heads->Destination);
 
     switch (result)
     {
@@ -1273,10 +1288,7 @@ static int HTTPServerSetUserContext(HTTPSession *Session)
 //you must do this on linux in some situations after switching users,
 //otherwise many files in /proc will continue to be owned by root
 //which will cause trouble with unshare
-#ifdef USE_PRCTL
-#include <sys/prctl.h>
-        prctl(PR_SET_DUMPABLE,1);
-#endif
+        LinuxSetDumpable();
     }
 
 
@@ -1291,6 +1303,11 @@ static int HTTPServerSetUserContext(HTTPSession *Session)
 //even as a non-root user)
     DropCapabilities(CAPS_LEVEL_SESSION);
 
+
+//by now we have done everything, chroot, switch user, etc
+//so as a last step is to do a PR_SET_NO_NEW_PRIVS to prevent this
+//process from ever switching back to the root user
+    if (! (Settings.Flags & FLAG_ALLOW_SU)) LinuxSetNoSU();
 
     return(TRUE);
 }
@@ -1351,7 +1368,7 @@ static int HTTPServerAuthenticate(HTTPSession *Session)
     if (VPath && (VPath->Flags & PATHITEM_NOAUTH)) Session->Flags |= SESSION_AUTHENTICATED;
 
     //Consider AccessToken Authentication for this URL!
-    if ((! (Session->Flags & SESSION_AUTHENTICATED)) && (Session->AuthFlags & FLAG_AUTH_ACCESS_TOKEN)) ParseAccessToken(Session);
+    if ((! (Session->Flags & SESSION_AUTHENTICATED)) && (Session->AuthFlags & (FLAG_AUTH_ACCESS_TOKEN | FLAG_AUTH_URL_TOKEN))) ParseAccessToken(Session);
 
     if (Session->AuthFlags & FLAG_AUTH_PRESENT)
     {
@@ -1658,6 +1675,9 @@ void HTTPServerFindAndSendDocument(STREAM *S, HTTPSession *Session, int Flags)
 //THIS IS WHERE WE MAP VPATHS!! If a document is a VPATH, it's handled in VPathProcess
     if (! VPathProcess(S, Session, Flags))
     {
+        LogToFile(Settings.LogPath,"NOT A VPATH %s", Session->URL);
+
+
         ptr=Session->StartDir;
         if (*ptr=='.') ptr++;
         if (strcmp(ptr,"/")==0) Path=CopyStr(Path, Session->Path);
@@ -1680,6 +1700,7 @@ void HTTPServerHandleHTTPConnection(HTTPSession *Session)
 {
     char *Tempstr=NULL, *Method=NULL, *URL=NULL;
     int AuthOkay=TRUE, result, val;
+    int ShortenerLookup=SHORT_ACT_NONE;
 
     while (1)
     {
@@ -1692,10 +1713,16 @@ void HTTPServerHandleHTTPConnection(HTTPSession *Session)
         {
             AuthOkay=FALSE;
 
-            if (HTTPServerAuthenticate(Session))
+#ifdef USE_URL_SHORTENER
+            ShortenerLookup=URLShortHandle(Session);
+            if (ShortenerLookup ==  SHORT_ACT_QUERY) AuthOkay=TRUE;
+#endif
+
+            if (HTTPServerAuthenticate(Session)) AuthOkay=TRUE;
+
+            if (AuthOkay == TRUE)
             {
                 LogToFile(Settings.LogPath,"AUTHENTICATED: %s@%s for '%s %s' against %s %s\n", Session->UserName, Session->ClientIP, Session->Method, Session->Path,Settings.AuthPath,Settings.AuthMethods);
-                AuthOkay=TRUE;
             }
             else
             {
@@ -1737,8 +1764,11 @@ void HTTPServerHandleHTTPConnection(HTTPSession *Session)
                 break;
 
             case METHOD_GET:
-                result=HTTPServerProcessActions(Session->S, Session);
-                if (! result) HTTPServerFindAndSendDocument(Session->S, Session, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
+                if (ShortenerLookup != SHORT_ACT_STORE)
+                {
+                    result=HTTPServerProcessActions(Session->S, Session);
+                    if (! result) HTTPServerFindAndSendDocument(Session->S, Session, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
+                }
                 break;
 
             case METHOD_RGET:
@@ -1875,8 +1905,10 @@ void HTTPServerHandleConnection(HTTPSession *Session)
     GetHostARP(Session->ClientIP, &Token, &Session->ClientMAC);
     if ((Settings.Flags & FLAG_LOOKUP_CLIENT) && StrValid(Session->ClientIP)) Session->ClientHost=CopyStr(Session->ClientHost,IPStrToHostName(Session->ClientIP));
 
-
     Type=HTTPServerConnectType(Session);
+
+
+    LogToFile(Settings.LogPath, "HandleConnection: %s %d %d %d\n", Session->ClientIP, Type, CONNECTION_HTTP, CONNECTION_HTTPS);
     switch (Type)
     {
     case CONNECTION_HTTP:
@@ -1886,6 +1918,7 @@ void HTTPServerHandleConnection(HTTPSession *Session)
     case CONNECTION_HTTPS:
         if (! HTTPServerActivateSSL(Session,Settings.SSLKeys))
         {
+            LogToFile(Settings.LogPath, "ERROR: failed to enable SSL %s %s.", Session->ClientHost, Session->ClientIP);
             return;
         }
         HTTPServerHandleHTTPConnection(Session);

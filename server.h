@@ -2,6 +2,8 @@
 #define WEBSERV_SERVER_H
 
 #include "common.h"
+#include "http_session.h"
+
 
 //Only used by 'AlayaServerSendHeaders'
 #define HEADERS_CGI 1

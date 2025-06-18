@@ -94,11 +94,13 @@ static int TCPServerNew(const char *Host, int Port, int Flags, TSockSettings *Se
     int fd;
 
     fd=IPServerNew(SOCK_STREAM, Host, Port, Flags);
-    if (Settings->QueueLen > 0)
+
+    if (fd > -1)
     {
         listen(fd, Settings->QueueLen);
+
 #ifdef TCP_FASTOPEN
-        if (Flags & SOCK_TCP_FASTOPEN) SockSetOpt(fd, TCP_FASTOPEN, "TCP_FASTOPEN", Settings->QueueLen);
+        if (Flags & SOCK_TCP_FASTOPEN) SockSetOpt(fd, TCP_FASTOPEN, "TCP_FASTOPEN", 1);
 #endif
     }
 

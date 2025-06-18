@@ -16,6 +16,8 @@
 #include <asm/ioctl.h>
 #include <stddef.h>  //for offsetof macro
 
+#include "StringList.h"
+
 static int InstructionCount=0;
 
 
@@ -94,6 +96,9 @@ int SysCallGetID(const char *Name)
 #ifdef __NR_socket
     if (strcmp(Name, "socket")==0) return(__NR_socket);
 #endif
+#ifdef __NR_socketpair
+    if (strcmp(Name, "socketpair")==0) return(__NR_socketpair);
+#endif
 #ifdef __NR_connect
     if (strcmp(Name, "connect")==0) return(__NR_connect);
 #endif
@@ -144,9 +149,42 @@ int SysCallGetID(const char *Name)
     if (strcmp(Name, "open_by_handle_at")==0) return(__NR_open_by_handle_at);
 #endif
 
+#ifdef __NR_link
+    if (strcmp(Name, "link")==0) return(__NR_link);
+#endif
+
+#ifdef __NR_linkat
+    if (strcmp(Name, "linkat")==0) return(__NR_linkat);
+#endif
+
+#ifdef __NR_symlink
+    if (strcmp(Name, "symlink")==0) return(__NR_symlink);
+#endif
+
+#ifdef __NR_symlinkat
+    if (strcmp(Name, "symlinkat")==0) return(__NR_symlinkat);
+#endif
+
 #ifdef __NR_unlink
     if (strcmp(Name, "unlink")==0) return(__NR_unlink);
 #endif
+
+#ifdef __NR_unlinkat
+    if (strcmp(Name, "unlinkat")==0) return(__NR_unlinkat);
+#endif
+
+#ifdef __NR_rename
+    if (strcmp(Name, "rename")==0) return(__NR_rename);
+#endif
+
+#ifdef __NR_renameat
+    if (strcmp(Name, "renameat")==0) return(__NR_renameat);
+#endif
+
+#ifdef __NR_renameat2
+    if (strcmp(Name, "renameat2")==0) return(__NR_renameat2);
+#endif
+
 
 #ifdef __NR_rmdir
     if (strcmp(Name, "rmdir")==0) return(__NR_rmdir);
@@ -200,7 +238,15 @@ int SysCallGetID(const char *Name)
 
 
 #ifdef __NR_truncate
+    if (strcmp(Name, "truncate")==0) return(__NR_truncate);
+#endif
+
+#ifdef __NR_ftruncate
     if (strcmp(Name, "ftruncate")==0) return(__NR_ftruncate);
+#endif
+
+#ifdef __NR_truncate64
+    if (strcmp(Name, "truncate64")==0) return(__NR_truncate64);
 #endif
 
 #ifdef __NR_ftruncate64
@@ -226,6 +272,31 @@ int SysCallGetID(const char *Name)
 #endif
 #ifdef __NR_shmctl
     if (strcmp(Name, "shmctl")==0) return(__NR_shmctl);
+#endif
+
+//semaphore syscalls, again usually benign
+#ifdef __NR_semop
+    if (strcmp(Name, "semop")==0) return(__NR_semop);
+#endif
+#ifdef __NR_semget
+    if (strcmp(Name, "semget")==0) return(__NR_semget);
+#endif
+#ifdef __NR_semctl
+    if (strcmp(Name, "semctl")==0) return(__NR_semctl);
+#endif
+
+//message queue syscalls, again usually benign
+#ifdef __NR_msgrcv
+    if (strcmp(Name, "msgrcv")==0) return(__NR_msgrcv);
+#endif
+#ifdef __NR_msgsnd
+    if (strcmp(Name, "msgsnd")==0) return(__NR_msgsnd);
+#endif
+#ifdef __NR_msgget
+    if (strcmp(Name, "msgget")==0) return(__NR_msgget);
+#endif
+#ifdef __NR_msgctl
+    if (strcmp(Name, "msgctl")==0) return(__NR_msgctl);
 #endif
 
 
@@ -280,6 +351,13 @@ int SysCallGetID(const char *Name)
     if (strcmp(Name, "process_vm_writev")==0) return(__NR_process_vm_writev);
 #endif
 
+//a fairly innocent syscall that returns a filedescriptor 'to' a running process.
+//From what I can see, this cannot be used to change the process, but can be used
+//to switch to that processor's namespace, wait for it to exit, send signals to it etc
+
+#ifdef __NR_pidfd_open
+    if (strcmp(Name, "pidfd_open")==0) return(__NR_pidfd_open);
+#endif
 
 //kernel module syscalls. Very few programs should legitimately call these
 #ifdef __NR_create_module
@@ -300,10 +378,30 @@ int SysCallGetID(const char *Name)
 
 
 //from here on it's weird shit that a normal user wouldn't be calling
+#ifdef __NR_capset
+    if (strcmp(Name, "capset")==0) return(__NR_capset);
+#endif
 
 #ifdef __NR_utimes
     if (strcmp(Name, "utimes")==0) return(__NR_utimes);
 #endif
+
+#ifdef __NR_utimesat
+    if (strcmp(Name, "utimesat")==0) return(__NR_utimesat);
+#endif
+
+#ifdef __NR_futimesat
+    if (strcmp(Name, "futimesat")==0) return(__NR_futimesat);
+#endif
+
+#ifdef __NR_utimensat
+    if (strcmp(Name, "utimensat")==0) return(__NR_utimensat);
+#endif
+
+#ifdef __NR_futimens
+    if (strcmp(Name, "futimens")==0) return(__NR_futimens);
+#endif
+
 
 #ifdef __NR_bpf
     if (strcmp(Name, "bpf")==0) return(__NR_bpf);
@@ -429,6 +527,10 @@ int SocketCallGetID(const char *Name)
     if (strcmp(Name, "socket")==0) return(SYS_SOCKET);
 #endif
 
+#ifdef SYS_SOCKETPAIR
+    if (strcmp(Name, "socketpair")==0) return(SYS_SOCKETPAIR);
+#endif
+
 #ifdef SYS_CONNECT
     if (strcmp(Name, "connect")==0) return(SYS_CONNECT);
 #endif
@@ -456,18 +558,27 @@ int SocketCallGetID(const char *Name)
 
 const char *SyscallGroupLookup(const char *Name)
 {
-    if (strcmp(Name, "socket")==0) return("socket;socketcall(socket)");
-    else if (strcmp(Name, "socket(ip)")==0) return("socket(ip);socketcall(socket,ip)");
-    else if (strcmp(Name, "socket(unix)")==0) return("socket(unix);socketcall(socket,unix)");
-    else if (strcmp(Name, "socket(packet)")==0) return("socket(packet);socketcall(socket,packet)");
+    if (strcmp(Name, "socket")==0) return("socket;socketpair;socketcall(socket);socketcall(socketpair)");
+    else if (strcmp(Name, "socket(ip)")==0) return("socket(ip);socketpair(ip);socketcall(socket,ip);socketcall(socketpair,ip)");
+    else if (strcmp(Name, "socket(unix)")==0) return("socket(unix);socketpair(unix);socketcall(socket,unix);socketcall(socketpair,unix)");
+    else if (strcmp(Name, "socket(packet)")==0) return("socket(packet);socketpair(packet);socketcall(socket,packet);socketcall(socketpair,packet)");
     else if (strcmp(Name, "connect")==0) return("connect;socketcall(connect)");
     else if (strcmp(Name, "accept")==0) return("accept;accept4;socketcall(accept);socketcall(accept4)");
     else if (strcmp(Name, "bind")==0) return("bind;socketcall(bind)");
     else if (strcmp(Name, "listen")==0) return("listen;socketcall(listen)");
-    else if (strcmp(Name, "mmap")==0) return("mmap;mmap2");
-    else if (strcmp(Name, "mmap(exec)")==0) return("mmap(exec);mmap2(exec)");
+    else if (strcmp(Name, "link")==0) return("link;linkat");
+    else if (strcmp(Name, "symlink")==0) return("symlink;symlinkat");
+    else if (strcmp(Name, "unlink")==0) return("unlink;unlinkat");
+    else if (strcmp(Name, "mkdir")==0) return("mkdir;mkdirat");
+    else if (strcmp(Name, "rmdir")==0) return("rmdir;rmdirat");
+    else if (strcmp(Name, "rename")==0) return("rename;renameat;renameat2");
+    else if (strcmp(Name, "utimes")==0) return("utimes;utimesat;futimesat;utimensat;futimens");
+    else if (strcmp(Name, "truncate")==0) return("truncate;ftruncate;truncate64;ftruncate64");
+    else if (strcmp(Name, "chown")==0) return("chown;chown32;fchown;fchown32;fchownat;lchown;lchown32");
     else if (strcmp(Name, "chmod")==0) return("chmod;fchmod;fchmodat;lchmod");
     else if (strcmp(Name, "chmod(exec)")==0) return("chmod(exec);fchmod(exec);fchmodat(exec);lchmod(exec);open(exec);openat(exec);open2(exec);openat2(exec);creat(exec)");
+    else if (strcmp(Name, "mmap")==0) return("mmap;mmap2");
+    else if (strcmp(Name, "mmap(exec)")==0) return("mmap(exec);mmap2(exec)");
     else if (strcmp(Name, "group:open")==0) return("open;openat;open2;openat2;creat");
     else if (strcmp(Name, "group:creat()")==0) return("open(create);openat(create);open2(create);openat2(create);creat");
     else if (strcmp(Name, "group:fork")==0) return("clone;clone2;clone3;fork;vfork");
@@ -480,18 +591,27 @@ const char *SyscallGroupLookup(const char *Name)
     else if (strcmp(Name, "group:server")==0) return("accept;accept4;listen");
     else if (strcmp(Name, "group:swap")==0) return("swapon;swapoff");
     else if (strcmp(Name, "group:ns")==0) return("unshare;setns");
-    else if (strcmp(Name, "group:net")==0) return("socket;socketcall;connect;bind;listen;accept");
-    else if (strcmp(Name, "group:sysadmin")==0) return("settimeofday;clocksettime;clockadjtime;quotactl;reboot;swapon;swapoff;mount;umount;umount2;mknod;quotactl");
+    else if (strcmp(Name, "group:net")==0) return("socket;socketcall;connect;bind;listen;accept;accept4");
+    else if (strcmp(Name, "group:sysadmin")==0) return("settimeofday;clock_settime;clock_adjtime;quotactl;reboot;swapon;swapoff;mount;umount;umount2;mknod;quotactl;sethostname;setdomainname");
     else if (strcmp(Name, "group:keyring")==0) return("add_key;request_key;keyctl");
     else if (strcmp(Name, "group:shm")==0) return("shmat;shmdt;shmget;shmctl");
     else if (strcmp(Name, "group:fsrm")==0) return("unlink;rmdir");
+    else if (strcmp(Name, "group:filesystem")==0) return("link;symlink;unlink;rmdir;rename;mkdir;mknod;chmod;chown;truncate");
     else if (strcmp(Name, "group:ptrace")==0) return("ptrace;process_vm_readv;process_vm_writev;kcmp");
     else if (strcmp(Name, "group:kern_mod")==0) return("create_module;delete_module;init_module;finit_module;query_module");
     else if (strcmp(Name, "group:exec")==0) return("exec_with_loader;execv;execve;execveat");
     else if (strcmp(Name, "group:kexec")==0) return("kexec_load;kexec_file_load");
+    else if (strcmp(Name, "group:shm")==0) return("shmat;shmdt;shmget;shmctl");
+    else if (strcmp(Name, "group:sem")==0) return("semop;semget;semctl");
+    else if (strcmp(Name, "group:msgq")==0) return("msgrcv;msgsnd;msgget;msgctl");
+    else if (strcmp(Name, "group:ipc")==0) return("shmat;shmdt;shmget;shmctl;semop;semget;semctl;msgrcv;msgsnd;msgget;msgctl");
+
 
     return(Name);
 }
+
+
+
 
 int SeccompFilterAddSTMT(struct sock_filter **Filt, int Statement, uint32_t Arg)
 {
@@ -629,6 +749,8 @@ int SeccompFilterAddSyscall(struct sock_filter **Filt, int SysCall, const char *
         if (type > 0)
         {
             SeccompFilterAddSTMT(Filt, BPF_LD | BPF_W | BPF_ABS, (uint32_t) (offsetof(struct seccomp_data, args[pos])));
+            //each arg check is two statments, if it fails then we jump to the end of this block
+            //but we have to take those two statments off the distance to the end of th block
             jump -= 2;
             switch (type)
             {
@@ -734,6 +856,12 @@ static int SeccompParseArg0(int SyscallID, const char *Name, char **Args)
 
 #ifdef __NR_socket
         case __NR_socket:
+            Arg0=SeccompAddCheck(Args, "0=%d", LookupSocketFamily(Name));
+            break;
+#endif
+
+#ifdef __NR_socketpair
+        case __NR_socketpair:
             Arg0=SeccompAddCheck(Args, "0=%d", LookupSocketFamily(Name));
             break;
 #endif
@@ -877,9 +1005,26 @@ static int SeccompParseArg1(int SyscallID, int Arg0, const char *Name, char **Ar
         if (isdigit(*Name))
         {
             Arg1=atoi(Name);
-            Tempstr=FormatStr(Tempstr, "2=%d ", Arg1);
-            *Args=CatStr(*Args, Tempstr);
+            SeccompAddCheck(Args, "2=%d", Arg1);
         }
+        else
+        {
+
+            /* we cannot add further arguments to socket call, because arguments of socketcall
+               are passed as an array, and seccomp only has access to immediate values
+                    switch (SyscallID)
+                    {
+            #ifdef __NR_socketcall
+                    case __NR_socketcall:
+                        SeccompAddCheck(Args, "1=%d", LookupSocketFamily(Name));
+                        break;
+            #endif
+                    }
+            */
+
+
+        }
+
     }
 
     Destroy(Tempstr);
@@ -910,12 +1055,34 @@ void SeccompParseName(const char *Token, int *SyscallID, char **Args)
 }
 
 
+static const char *SeccompLookupActionName(int action)
+{
+    switch(action)
+    {
+    case SECCOMP_RET_ALLOW:
+        return("allow");
+        break;
+    case SECCOMP_RET_KILL:
+        return("kill");
+        break;
+    case SECCOMP_RET_ERRNO:
+        return("deny");
+        break;
+    case SECCOMP_RET_LOG:
+        return("log");
+        break;
+    }
+    return("unknown");
+}
+
+
 int SeccompFilterAddSyscallNames(struct sock_filter **Filt, const char *NameList, int Action)
 {
     int syscall_id;
     int NoOfStatements=0;
     char *Token=NULL, *Args=NULL;
     const char *ptr;
+
 
     ptr=GetToken(NameList, ";", &Token, 0);
     while (ptr)
@@ -930,19 +1097,56 @@ int SeccompFilterAddSyscallNames(struct sock_filter **Filt, const char *NameList
     return(NoOfStatements);
 }
 
-int SeccompFilterAddSyscallGroup(struct sock_filter **Filt, const char *NameList, int Action)
+
+char *SeccompExpandOnce(char *RetStr, const char *NameList)
 {
-    int NoOfStatements=0;
     char *Name=NULL;
     const char *ptr;
 
+    RetStr=CopyStr(RetStr, "");
     ptr=GetToken(NameList, ";", &Name, 0);
     while (ptr)
     {
-        NoOfStatements=SeccompFilterAddSyscallNames(Filt, SyscallGroupLookup(Name), Action);
+        RetStr=MCatStr(RetStr, SyscallGroupLookup(Name), ";", NULL);
         ptr=GetToken(ptr, ";", &Name, 0);
     }
 
+    Destroy(Name);
+
+    return(RetStr);
+}
+
+
+char *SeccompExpand(char *RetStr, const char *NameList)
+{
+    char *Tempstr=NULL;
+
+    RetStr=SeccompExpandOnce(RetStr, NameList);
+    Tempstr=SeccompExpandOnce(Tempstr, RetStr);
+    RetStr=StringListToUnique(RetStr, Tempstr, ";");
+
+    Destroy(Tempstr);
+
+    return(RetStr);
+}
+
+
+int SeccompFilterAddSyscallGroup(struct sock_filter **Filt, const char *NameList, int Action)
+{
+    int NoOfStatements=0;
+    char *Name=NULL, *Tempstr=NULL;
+    const char *ptr;
+
+    Tempstr=SeccompExpand(Tempstr, NameList);
+    if (LibUsefulDebugActive()) fprintf(stderr, "DEBUG: Seccomp %s: %s\n", SeccompLookupActionName(Action), Tempstr);
+    ptr=GetToken(Tempstr, ";", &Name, 0);
+    while (ptr)
+    {
+        NoOfStatements=SeccompFilterAddSyscallNames(Filt, Name, Action);
+        ptr=GetToken(ptr, ";", &Name, 0);
+    }
+
+    Destroy(Tempstr);
     Destroy(Name);
 
     return(NoOfStatements);
@@ -964,6 +1168,7 @@ void SeccompSetup(struct sock_filter **SeccompFilter, const char *Setup)
         if (strcmp(Name, "syscall_kill")==0) SeccompFilterAddSyscallGroup(SeccompFilter, Value, SECCOMP_RET_KILL);
         else if (strcmp(Name, "syscall_allow")==0) SeccompFilterAddSyscallGroup(SeccompFilter, Value, SECCOMP_RET_ALLOW);
         else if (strcmp(Name, "syscall_deny")==0) SeccompFilterAddSyscallGroup(SeccompFilter, Value, SECCOMP_RET_ERRNO);
+        else if (strcmp(Name, "syscall_log")==0) SeccompFilterAddSyscallGroup(SeccompFilter, Value, SECCOMP_RET_LOG);
         ptr=GetNameValuePair(ptr, "\\S", "=", &Name, &Value);
     }
 

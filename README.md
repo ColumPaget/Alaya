@@ -302,6 +302,11 @@ An access token URL can also be generated for an arbitary file using the 'Access
 'AccessToken' authentication can be turned off by simply not including it in the list of allowed authentication methods.
 
 
+URL-TOKEN AUTHENTICATION
+========================
+
+Alaya supports a special authentication type 'urltoken'. This generates a unique, and long-lived authentication token for a given URL. Unlike access-tokens these do not use a random secret that is automatically generated when alaya starts up, but instead use a user-configured secret. A URL is combined with a salt and a secret string, hashed with sha256, and then this hash is used to permit access to just that URL. To use this feature you must supply the secret using `URLTokenKey` in alaya's config file, or on the commandline with '-urltokenkey'.
+
 
 COOKIE AUTHENTICATION
 =====================
@@ -813,7 +818,7 @@ The amount of time that an item can be cached for can be changed using the '-cac
 Cache time can be set on a file-extension basis with the file-type command, like so:
 
 ```
-FileType=*.jpg,cache=3600
+FileType=\*.jpg,cache=3600
 ```
 
 Similarly cache time can be set for file VPaths like so:
@@ -821,6 +826,71 @@ Similarly cache time can be set for file VPaths like so:
 ```
 Path=files,/Docs/,/usr/local/share/documents,cache=3600
 ```
+
+
+URL_SHORTENER
+=============
+
+Since version 5.0 alaya containes a url shortener for urls it serves. This feature mostly exists to support client apps that generate qrcodes that can be scanned to take one to a url. 
+
+
+N.B. SHORTENED URLS ARE ASSUMED TO BE PUBLIC AND REQUESTS FOR THEM 'AUTHENTICATED'. Anyone with the short URL can access the file that URL points to without needing to log into the server.
+
+
+The feature must be enabled at compile-time with `--enable-short` to build it into alaya. To activate it at runtime the 'URLShortener' config-file option must be set. 
+
+```
+URLShortner=<url path>,<database directory>
+```
+
+This config option specifies:
+
+'url path'
+:  a relative url, e.g. '/s', that when people go to that url generates a shortened url. 
+
+'database directory'
+:  a directory in which to store the short-to-full url mappings
+
+
+e.g.
+
+```
+URLShortner=/s,/home/httpd/url-short/
+```
+
+would, for an example host called 'myhost' specify the 'magic' path of `http://myhost/s`. When going to this path one can supply HTTP parameters like so:
+
+`http://myhost/s?u=<url>`
+: store url in the shortener database
+
+`http://myhost/s?s=<short>`
+: query a url in the shortener database
+
+usage 1 (with the 'u' argument) will store the url in the shortener database return a document containing solely the shortened url
+usage 2 (with the 's' argument) will return a document containing solely the full url
+
+once a url is stored in the shortener database anyone asking for the short url will be served up content from the full url.
+
+The url in usage 1 MUST be http encoded, and SHOULD only be the 'path' part of the url. So to generate a short url for the url http://myhost.com/documents/quarterly report.pdf we would send:
+
+```
+https://myhost.com.com/s?u=/documents/quarterly%20report.pdf
+```
+
+and we would be returned a short url which from then on would redirect us to the original document if the short url is requested from the server.
+
+
+
+HARDENING ON LINUX
+==================
+
+On the Linux platform alaya uses the prctl syscall to set the values 'PR_NO_NEW_PRIVS' and 'PR_SET_MDWE'. 
+
+'PR_NO_NEW_PRIVS' tells the kernel to disallow a process from switching to superuser using methods like suid. This means that cgi-programs using suid permissions to carry out tasks as root will not work. It it enabled at compile time with `--enable-nosu`.
+
+'PR_SET_MDWE' is used to tell the kernel that any memory that is not currently mapped as executable, cannot become executable in future, and that new memory mappings cannot be both writable and executable. This hardens the process against buffer-overflow vulnerabilities and other types of exploit. However it also prevents starting up new programs via exec. This option is thus used in alaya code-paths that do not require launching an external program (which is just about everything except the code that launches cgi programs). However, PR_SET_MDWE has the side effect that debugging programs like valgrind will no longer work, reporting random errors in the alaya process. It it enabled at compile time with `--enable-mdwe`.
+
+Both 'PR_NO_NEW_PRIVS' and 'PR_SET_MDWE' and some other hardening options can be enabled at compile time with `--enable-harden`.
 
 
 EVENTS

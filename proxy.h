@@ -2,6 +2,8 @@
 #define ALAYA_PROXY_H
 
 #include "common.h"
+#include "http_session.h"
+
 
 int IsProxyMethod(int Method);
 void HTTPProxyRGETURL(HTTPSession *Session);

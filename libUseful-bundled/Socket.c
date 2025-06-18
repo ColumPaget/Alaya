@@ -81,7 +81,7 @@ int SocketParseConfig(const char *Config, TSockSettings *Settings)
     char *Name=NULL, *Value=NULL;
 
     Settings->Flags=0;
-    Settings->QueueLen=0;
+    Settings->QueueLen=128; //this is only used by server sockets
     Settings->Perms=-1;
     ptr=LibUsefulGetValue("TCP:Keepalives");
     if ( StrValid(ptr) &&  (! strtobool(ptr)) ) Settings->Flags |= SOCK_NOKEEPALIVE;
@@ -353,7 +353,7 @@ int BindSock(int Type, const char *Address, int Port, int Flags)
     //No reason to pass server/listen fdets across an exec
     if (Flags & BIND_CLOEXEC) fcntl(fd, F_SETFD, FD_CLOEXEC);
 
-    if (Flags & BIND_LISTEN) result=listen(fd,10);
+    if (Flags & BIND_LISTEN) result=listen(fd, 10);
 
 
     return(fd);
@@ -454,6 +454,7 @@ char *GetInterfaceDetails(char *RetStr, const char *Interface)
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd==-1) return(RetStr);
 
+    memset(&ifr, 0, sizeof(struct ifreq));
     ifr.ifr_addr.sa_family = AF_INET;
     strncpy(ifr.ifr_name, Interface, IFNAMSIZ-1);
 
@@ -990,7 +991,7 @@ int STREAMNetConnect(STREAM *S, const char *Proto, const char *Host, int Port, c
         if (Settings.Flags & SOCK_TCP_FULL_FLUSH) S->Flags |= SF_FULL_FLUSH;
         if (Settings.Flags & SOCK_TCP_QUICKACK) S->Flags |= SF_QUICKACK;
 
-        if (Settings.Flags & SOCK_NONBLOCK)
+        if (Settings.Flags & CONNECT_NONBLOCK)
         {
             S->State |= LU_SS_CONNECTING;
             S->Flags |= SF_NONBLOCK;

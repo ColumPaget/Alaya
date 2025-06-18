@@ -1,3 +1,8 @@
+v5.0 (2025-06-18)
+  * eliminate a bunch of memory leaks
+  * added url shortener
+  * added various hardening options at compile-time
+
 v4.6 (2025-03-10)
   * bundled libUseful dir now named libUseful-bundled to prevent confusion with any installed libUseful
   * Upgrade to libUseful-5, this should fix issues with rotating logfiles

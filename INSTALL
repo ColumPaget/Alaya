@@ -2,12 +2,25 @@ CONFIGURE OPTIONS
 
 run ./configure --help to see configure options. These include:
 
-	--enable-sendfile       enable sendfile support (default=yes)
-  --enable-capabilities       enable linux capabilities support
-  --enable-ssl          use Secure Sockets Layer (default=no)
-  --enable-ip6          use IPv6 (default=no)
-  --enable-largefiles           enable largefile support (default=no)
-  --enable-pam          enable Pluggable Authentication Modules (default=autodetect)
+  --enable-largefiles           enable largefile support (default=yes)
+  --enable-wall           use -Wall to get maximum compile warnings
+  --enable-werror         treat compile warnings as errors
+  --enable-harden         use 'FORTIFY_SOURCE=3' and stack-protect to harden source code
+  --enable-harden         enable both 'mdwe' and 'nosu' and other memory-harending features (default=no)
+  --enable-fortify        use 'FORTIFY_SOURCE=3' to harden source code
+  --enable-stack-protect  use '-fstack-protector-strong' to harden source code
+  --enable-mdwe           enable MDWE memory hardening (default=no)
+  --enable-nosu           enable prctl-based 'NO_NEW_PRIVS' to prevent su/sudo/suid (default=no)
+  --enable-sendfile       enable sendfile support (default=yes)
+  --enable-ip6            use IPv6 (default=no)
+  --enable-xattr          enable extended file attributes support (default=no)
+  --enable-socks          enable socks proxy support (default=no)
+  --enable-short          enable builtin url-shortener for local urls(default=no)
+  --enable-unshare        enable unshare containers support (default=no)
+  --enable-capabilities   enable linux capabilities support (default=no)
+  --enable-pam            enable Pluggable Authentication Modules (default=autodetect)
+  --enable-ssl            use Secure Sockets Layer (default=no)
+
 
 
 'sendfile support' allows alaya to use the linux 'sendfile' syscall which should lessen processor usage when copying files in plain http mode (sadly, it will not work for https)

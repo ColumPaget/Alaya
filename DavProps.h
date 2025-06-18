@@ -2,6 +2,7 @@
 #define DAV_PROPPATCH_H
 
 #include "common.h"
+#include "http_session.h"
 
 char *DavPropsGet(char *RetStr, const char *Target, const char *Property);
 int DavPropsStore(const char *Target, const char *Property, const char *Value);

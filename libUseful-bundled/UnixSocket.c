@@ -107,7 +107,7 @@ int UnixServerInit(int Type, const char *Path)
     {
         if (Type==SOCK_STREAM)
         {
-            result=listen(sock,10);
+            result=listen(sock, 10);
             if (result==0) return(sock);
             RaiseError(ERRFLAG_ERRNO, "UnixServerInit","failed to 'listen' on unix sock %s.",Path);
         }

@@ -26,6 +26,7 @@
 #include "MimeType.h"
 #include "ChrootHelper.h"
 #include "server.h"
+#include "linux.h"
 #include <sys/resource.h>
 
 ListNode *MimeTypes=NULL;
@@ -80,6 +81,14 @@ int ChildFunc(void *Data, int Flags)
     //go back to the default behavior for SIGPIPE. If a child process gets disconnected
     //from anything we don't want to keep sending to it.
     signal(SIGPIPE, SIG_DFL);
+
+
+    //this child process will never run a program, even if the
+    //peer requests cgi-programs etc.
+    //Instead it will ask the parent process to run the program
+    //and pipe the results to it. Thus it does not need to set
+    //memory to be exectuable
+    LinuxSetNoWriteExec(TRUE);
 
     ParentProcessPipe=STREAMFromDualFD(0,1);
     STREAMSetTimeout(ParentProcessPipe, 10);
@@ -143,16 +152,23 @@ void AcceptConnection(STREAM *Serv)
 //it crashed rather than exiting)
 void CollectChildProcesses()
 {
-    int i, status;
 #define NO_OF_PROCESSES 20
+    int i, status;
     pid_t *PidsList, owner, helper;
     int *StatusList;
     ListNode *Curr, *Next;
+    const char *ptr;
     STREAM *S;
 
+
+    //rather than get pids of exited processes one by one, 
+    //and then going through the connections list for every pid
+    //we get up to NO_OF_PROCESSES pids and go through the connections
+    //list once, as indexing an array of pids will be less processor
+    //costly than going through a linked list multiple times
     PidsList=(int *) calloc(NO_OF_PROCESSES,sizeof(pid_t));
     StatusList=(int *) calloc(NO_OF_PROCESSES,sizeof(int));
-    for (i=0; i < 20; i++)
+    for (i=0; i < NO_OF_PROCESSES; i++)
     {
         owner=waitpid(-1,&status,WNOHANG);
         if (owner < 1) break;
@@ -160,6 +176,8 @@ void CollectChildProcesses()
         if (WIFEXITED(status)) StatusList[i]=WEXITSTATUS(status);
     }
 
+
+    //here we go through our linked list only once, andcheck against collected pids
     Curr=ListGetNext(Connections);
     while (Curr)
     {
@@ -169,7 +187,13 @@ void CollectChildProcesses()
         if (StrValid(Curr->Tag))
         {
             owner=strtol(Curr->Tag, NULL, 10);
-            helper=(int) STREAMGetItem(S,"HelperPid");
+
+	    //get the 'helper process' pid associated with this connection
+            //check it against our exited pids, and if we find a match, close the connection
+	    ptr=STREAMGetValue(S,"AlayaHelperPid");
+            if (StrValid(ptr)) 
+	    {
+	    helper=(pid_t) strtol(ptr, NULL, 10);
 
             for (i=0; i < NO_OF_PROCESSES; i++)
             {
@@ -183,6 +207,7 @@ void CollectChildProcesses()
                     ListDeleteNode(Curr);
                     break;
                 }
+            }
             }
         }
 
@@ -333,16 +358,16 @@ int main(int argc, char *argv[])
     int result, i;
     pid_t pid;
 
+    LinuxSetNoWriteExec(FALSE);
     ProcessTitleCaptureBuffer(argv);
-    SSLAvailable();
 
     SetTimezoneEnv();
 
 //Drop most capabilities
     DropCapabilities(CAPS_LEVEL_STARTUP);
+
     nice(10);
     InitSettings();
-
 
 //We should handle failed User/Group switches within alaya,
 //so we don't need libUseful to handle them for us
@@ -420,7 +445,11 @@ int main(int argc, char *argv[])
                     ListDeleteItem(Connections,S);
                     STREAMClose(S);
                 }
-                else if (pid > 0) STREAMSetItem(S,"HelperPid",(void *) pid);
+                else if (pid > 0) 
+		{
+			Tempstr=FormatStr(Tempstr, "%lu", pid);
+			STREAMSetValue(S,"AlayaHelperPid", Tempstr);
+		}
                 break;
             }
         }
@@ -436,5 +465,5 @@ int main(int argc, char *argv[])
     LogFileFlushAll(TRUE);
     Destroy(Tempstr);
 
-return(0);
+    return(0);
 }

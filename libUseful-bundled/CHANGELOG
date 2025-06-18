@@ -1,3 +1,85 @@
+v5.57 (2025-06-16)
+  * Fix unguarded 'mount' in Container.c that prevents compile on non-linux platforms
+  * Add FindFileInPathSubDirectory, FindFilesInPathSubDirectory and FindFileInPrefixSubDirectory search functions to FileSystem.c
+  * Search harder for unicode-names.conf file using FindFileInPrefixSubDirectory 
+  * Optimise unicode names lookup support so we don't scan through unicode-names.conf for every character we lookup
+  * Add nerdfonts support using nerdfont.csv downloaded from  https://github.com/8bitmcu/NerdFont-Cheat-Sheet
+
+v5.56
+  * ditch attempted 'luarocks' support
+  * set STREAM->Size for http streams from Content-Length
+  * Fix unguarded 'unshare' in Containers.c preventing compile on systems that don't have that call (thanks again to barracuda156@github.com)
+  * Fix possible underflow in 'memset' in TerminalReadTextWithPrefix if typed string is zero length
+
+
+v5.55 (2025-05-28)
+  * use 'listen' on all server sockets. We've been getting away without it all these years.
+  * honor both 'TodayAttribs' and any 'StateAttribs' for a day in TerminalCalendar, so current day is always highlighted
+  * ListStats now stores 'AccessTime' if LIST_FLAG_TIMEOUT is not set
+  * ListSetMaxItems function added
+  * ListSetDestroyer function added
+  * ContainersApplyConfig now automatically switches to a 'user namespace' is current uid is not 0 (user is not root)
+  * ProcessApplyConfig 'security=nonet' now uses namespaces in addition to seccomp in order to limit network acccess
+  * externalize StrLenCacheInit function
+  
+
+v5.54 (2025-05-13)
+  * better debugging/error display for OpenSSL operations
+  * add more '--enable-harden' compiler flags
+
+v5.53 (2025-05-12)
+  * fix 'GetCertificateValue' function that's preventing compilation without openssl
+  * do not include 'bind' in 'server functions' in seccomp: binding to port 0 is needed in client mode and seccomp cannot see into a sockaddr object
+  * ongoing saga of MacOS support continues
+
+v5.52 (2025-05-11)
+  * Yet more work on MacOS compilation
+  * More work on seccomp, new seccomp 'levels' and 'modifiers' added
+  * added StringListToUnique function
+
+v5.51 (2025-05-03)
+  * Support 'inner text' within terminal progress bars
+  * Add more compiler-hardening options for ./configure --enable-harden 
+  * Make sure non-lgpl licensed parts are not compiled in, rather than just not called, if compiled with --enable-lgpl
+  * More changes from barracuda156@github.com for compiling on MacOS
+
+v5.50 (2025-04-12)
+  * Add TerminalCalendarSetDateStrState
+  * Add strcount
+
+v5.49 (2025-04-11)
+  * Fix issue with List/Map overlooking first item in list
+  * Added support to ProcessApplyConfig for "W^X" "memory deny write execute" using prctl on linux
+  * Added StripStartEndChars function in String.c
+
+v5.48 (2025-04-08)
+  * Add STREAM_TCP_ACCEPT and STREAM_UNIX_ACCEPT (server connections) to sendfile support
+  * Prevent use of sendfile on streams that become TLS/SSL via a 'STARTTLS' type method
+
+v5.47 (2025-04-06)
+  * Limit types of output stream we can use the 'sendfile' syscall with
+  * Reintroduce 'LICENSE' file in the hope that github detects it
+
+v5.46 (2025-03-28)
+  * Bugfix for 'eternal loop' when using OAuth and authentication fails
+  * Bugfix for 'STREAMCommit' not flushing all types of streams
+  * Added more OSINFO lookups (e.g. OSINFO_PAGESIZE)
+  * Autotools improvements from polynomial-c@github.com
+  * Ensure all .h files have 'extern "C"'
+  * License change to GPL or LGPL, depending on how libUseful is built (--enable-lgpl configure option added)
+
+v5.45 (2025-03-16)
+  * Bugfix for file compression autodetection
+
+v5.44 (2025-03-16)
+  * Changes from barracuda156@github.com for compiling on MacOS
+
+v5.43 (2025-03-15)
+  * More work on tidying up linked-lists implementation
+  * If a variable list/map is declared with 'LIST_FLAG_UNIQ' then assume items are added to the variable list only once, and don't try to look up previous items to replace them (big speed increase)
+  * Support using lzip application for compession/decompression of streams
+  * Add STREAMDetectCompression and compression autodetection for streams and files
+
 v5.42 (2025-03-08)
   * Make StrUnsafeTrunc a bit safer, by checking string is not null
   * Add 'daystate' feature to TerminalCalendars

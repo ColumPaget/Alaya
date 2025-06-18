@@ -8,7 +8,7 @@ exec_prefix=@exec_prefix@
 bindir=@sbindir@
 sysconfdir=@sysconfdir@
 FLAGS=$(CFLAGS) $(CPPFLAGS) @DEFS@ 
-OBJ=auth_access_token.o Authenticate.o auth_client_certificate.o auth_alaya_native.o auth_unix.o auth_pam.o MimeType.o DavProps.o Settings.o common.o server.o cgi.o FileProperties.o tar.o directory_listing.o FileDetailsPage.o VPath.o ChrootHelper.o UserAdminScreen.o Events.o ID3.o upload.o proxy.o websocket.o icecast.o xssi.o @STATIC_LIBS@
+OBJ=common.o http_session.o auth_access_token.o Authenticate.o auth_client_certificate.o auth_alaya_native.o auth_unix.o auth_pam.o MimeType.o DavProps.o settings.o server.o cgi.o FileProperties.o tar.o directory_listing.o FileDetailsPage.o VPath.o ChrootHelper.o UserAdminScreen.o Events.o ID3.o upload.o proxy.o websocket.o icecast.o xssi.o linux.o url_short.o @STATIC_LIBS@
 EXE=alaya
 
 all: $(OBJ)
@@ -44,11 +44,14 @@ ChrootHelper.o: ChrootHelper.c ChrootHelper.h
 DavProps.o: DavProps.c DavProps.h
 	$(CC) $(FLAGS) -c DavProps.c 
 
-Settings.o: Settings.c Settings.h
-	$(CC) $(FLAGS) -c Settings.c 
+settings.o: settings.c settings.h
+	$(CC) $(FLAGS) -c settings.c 
 
 common.o: common.c common.h
 	$(CC) $(FLAGS) -c common.c 
+
+http_session.o: http_session.c http_session.h
+	$(CC) $(FLAGS) -c http_session.c 
 
 server.o: server.c server.h
 	$(CC) $(FLAGS) -c server.c 
@@ -95,12 +98,20 @@ xssi.o: xssi.c xssi.h
 websocket.o: websocket.c websocket.h
 	$(CC) $(FLAGS) -c websocket.c
 
+linux.o: linux.c linux.h
+	$(CC) $(FLAGS) -c linux.c
+
+url_short.o: url_short.c url_short.h
+	$(CC) $(FLAGS) -c url_short.c
+
+
+
 
 clean:
-	rm -f *.o */*.o */*.so */*.a $(EXE)
+	rm -f *.o *.orig */*.o */*.so */*.a $(EXE)
 
 distclean:
-	-rm -f *.o */*.o */*.a */*.so $(EXE)
+	-rm -f *.o *.orig */*.o */*.so */*.a $(EXE)
 	-rm config.log config.status */config.log */config.status Makefile */Makefile
 	-rm -r autom4te.cache */autom4te.cache
 

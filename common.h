@@ -7,27 +7,13 @@
 #include "libUseful-5/libUseful.h"
 #endif
 
-#include "Settings.h"
+#include "settings.h"
 #include <glob.h>
 #include <sys/wait.h>
 #include <pwd.h>
 #include <fnmatch.h>
 
-
-
-//Flag values for Session->Flags
-#define SESSION_ENCODE_GZIP 1
-#define SESSION_ENCODE_XGZIP 2
-#define SESSION_OVERWRITE 8
-#define SESSION_KEEPALIVE 16
-#define SESSION_REUSE 32
-#define SESSION_AUTHENTICATED 64
-#define SESSION_SSL 128
-#define SESSION_ICECAST 256
-#define SESSION_ERR_BADURL 4096
-#define SESSION_ALLOW_UPLOAD 8192
-#define SESSION_UPLOAD_DONE 16384
-
+#include "http_session.h"
 
 
 #define ERR_OKAY 0
@@ -93,75 +79,18 @@ typedef struct
 
 
 
-typedef struct
-{
-    int Flags;
-    int AuthFlags;
-    char *Protocol;
-    char *Method;
-    int MethodID;
-    char *ResponseCode;
-    char *OriginalURL;
-    char *URL;
-    char *Path;
-    char *Arguments;
-    char *Cipher;
-    char *Destination;
-    char *ContentType;
-    char *ContentBoundary;
-    char *Cookies;
-    char *AuthDetails;
-    char *RemoteAuthenticate; //Used in proxy server mode
-    char *UserName;
-    char *Password;
-    char *AuthenticatedUser;
-    char *RealUser;
-    int RealUserUID;
-    char *Group;
-    gid_t GroupID;
-    char *StartDir;
-    char *HomeDir;
-    char *Host;
-    char *ClientIP;
-    char *ClientHost;
-    char *ClientMAC;
-    char *ClientReferrer;
-    char *UserAgent;
-    char *ServerName;
-    char *UserSettings;
-    char *SearchPath;
-    unsigned int ServerPort;
-    unsigned int ContentSize;
-    unsigned int CacheTime;
-    unsigned int Depth;
-    time_t LastModified;
-    time_t IfModifiedSince;
-    ListNode *Headers;
-    STREAM *S;
-} HTTPSession;
-
 
 
 extern char *Version;
 
-
-HTTPSession *HTTPSessionCreate();
-void HTTPSessionClear(void *);
-void HTTPSessionDestroy(void *);
-HTTPSession *HTTPSessionClone(HTTPSession *Src);
-HTTPSession *HTTPSessionResponse(HTTPSession *Src);
-char *HTTPSessionGetArg(char *RetStr, HTTPSession *Session, const char *Arg);
 
 void SetTimezoneEnv();
 
 void HandleError(int Flags, const char *FmtStr, ...);
 TPathItem *PathItemCreate(int Type, const char *URL, const char *Path);
 void PathItemDestroy(void *pi_ptr);
-
-char *FormatURL(char *Buff, HTTPSession *Session, const char *ItemPath);
 char *ParentDirectory(char *RetBuff, const char *Path);
-char *SessionGetArgument(char *RetBuff, HTTPSession *Session, const char *ReqName);
-int CopyURL(HTTPSession *Session, char *From, char *To);
+
 char *FindScriptHandlerForScript(char *RetStr, const char *ScriptPath);
 
 void DropCapabilities(int Level);

@@ -6,7 +6,43 @@
 #define TOK_SPACE 1
 #define TOK_CODE  2
 
-static const char *GetTokenStepThru(const char *Str, int Flags)
+
+//don't make this static. This isn't used directly by functions in this module
+//but is instead a utility function used in bindings to libUseful for languages
+//(e.g. lua) that lack good bitflag support (see use in libUseful-lua).
+int GetTokenParseConfig(const char *Config)
+{
+    const char *ptr;
+    int Flags=0;
+
+    for (ptr=Config; *ptr != '\0'; ptr++)
+    {
+        switch (*ptr)
+        {
+        case 'm':
+            Flags |= GETTOKEN_MULTI_SEPARATORS;
+            break;
+        case 'q':
+            Flags |= GETTOKEN_HONOR_QUOTES;
+            break;
+        case 'Q':
+            Flags |= GETTOKEN_QUOTES;
+            break;
+        case 's':
+            Flags |= GETTOKEN_INCLUDE_SEPARATORS;
+            break;
+        case '+':
+            Flags |= GETTOKEN_APPEND_SEPARATORS;
+            break;
+        }
+    }
+
+    return(Flags);
+}
+
+
+
+static const char *GetTokenStepThru(const char *Str, int *Flags)
 {
     const char *ptr;
 
@@ -17,17 +53,18 @@ static const char *GetTokenStepThru(const char *Str, int Flags)
         break;
 
     case '\\':
-        if (! (Flags & GETTOKEN_BACKSLASH))
+        if (! ((*Flags) & GETTOKEN_BACKSLASH))
         {
             //if we got a backslash, then skip past it and the character it quotes,
             //unless it's quoting a NULL character (which just ain't allowed)
+            *Flags |= GETTOKEN_FOUND_BACKSLASH;
             if ( *(Str+1) != '\0' ) return(Str+2);
         }
         break;
 
     case '"':
     case '\'':
-        if (Flags & GETTOKEN_HONOR_QUOTES)
+        if ((*Flags) & GETTOKEN_HONOR_QUOTES)
         {
             ptr=traverse_quoted(Str);
             ptr_incr(&ptr, 1);
@@ -42,8 +79,9 @@ static const char *GetTokenStepThru(const char *Str, int Flags)
 }
 
 
-//Does the current position match against Pattern
-int GetTokenSepMatch(const char *Pattern,const char **start, const char **end, int Flags)
+//Does the current position match against Pattern? 'Flags' is passed as a pointer because
+//GetTokenSepMatch can alter flags to record that it found backslash-quoting
+static int GetTokenSepMatch(const char *Pattern,const char **start, const char **end, int *Flags)
 {
     const char *pptr, *eptr;
     int MatchType=0;
@@ -93,7 +131,7 @@ int GetTokenSepMatch(const char *Pattern,const char **start, const char **end, i
         case '\\':
             //if we got a quoted character we can't have found
             //the separator, so return false
-            if (Flags & GETTOKEN_BACKSLASH)
+            if ((*Flags) & GETTOKEN_BACKSLASH)
             {
                 if (*eptr != *pptr) return(FALSE);
             }
@@ -101,13 +139,14 @@ int GetTokenSepMatch(const char *Pattern,const char **start, const char **end, i
             {
                 ptr_incr(&eptr, 1);
                 *start=eptr;
+                (*Flags) |= GETTOKEN_FOUND_BACKSLASH;
                 return(FALSE);
             }
             break;
 
         case '"':
         case '\'':
-            if (Flags & GETTOKEN_HONOR_QUOTES) return(FALSE);
+            if ((*Flags) & GETTOKEN_HONOR_QUOTES) return(FALSE);
             else if (*eptr != *pptr) return(FALSE);
             break;
 
@@ -151,16 +190,18 @@ int GetTokenSepMatch(const char *Pattern,const char **start, const char **end, i
 
 
 
-//Searches through 'String' for a match of a Pattern
-int GetTokenFindSeparator(const char *Pattern, const char *String, const char **SepStart, const char **SepEnd, int Flags)
+//Searches through 'String' for a match of a Pattern which is the 'separator' used to break up that string.
+//if we are using multiple seperators then we use GetTokenMultiSepMatch instead
+static int GetTokenFindSeparator(const char *Pattern, const char *String, const char **SepStart, const char **SepEnd, int *Flags)
 {
     const char *start_ptr=NULL, *end_ptr=NULL;
 
     start_ptr=String;
     while (*start_ptr != '\0')
     {
-        if ((*start_ptr=='\\') && (! (Flags & GETTOKEN_BACKSLASH)))
+        if ((*start_ptr=='\\') && (! ((*Flags) & GETTOKEN_BACKSLASH)))
         {
+            (*Flags) |= GETTOKEN_FOUND_BACKSLASH;
             ptr_incr(&start_ptr, 2);
             continue;
         }
@@ -185,7 +226,8 @@ int GetTokenFindSeparator(const char *Pattern, const char *String, const char **
 
 
 
-char **BuildMultiSeparators(const char *Pattern)
+//build a list of separators from a string where they are themselves seperated by '|'
+static char **BuildMultiSeparators(const char *Pattern)
 {
     const char *ptr, *next;
     int count=0;
@@ -223,7 +265,9 @@ char **BuildMultiSeparators(const char *Pattern)
 
 
 
-int GetTokenMultiSepMatch(char **Separators, const char **start_ptr, const char **end_ptr, int Flags)
+//if we are using multiple seperators, then this function finds them in a string
+//if we are using only one seperator string then we used GetTokenFindSeperator
+static int GetTokenMultiSepMatch(char **Separators, const char **start_ptr, const char **end_ptr, int *Flags)
 {
     char **sep_ptr;
     const char *sptr=NULL, *eptr=NULL, *tptr;
@@ -262,18 +306,23 @@ int GetTokenMultiSepMatch(char **Separators, const char **start_ptr, const char 
 
 
 //Once we've found our token we need to do various cleanups and post processing on it
-const char *GetTokenPostProcess(const char *SearchStr, const char *SepStart, const char *SepEnd, char **Token, int Flags)
+static const char *GetTokenPostProcess(const char *SearchStr, const char *SepStart, const char *SepEnd, char **Token, int Flags)
 {
     const char *sptr, *eptr;
+    char *Tempstr=NULL;
+    int OuterQuotes=FALSE;
 
-//There are two StrLens in this function. Don't try to replace them because
-// 1) the only trigger in rare occurances
-// 2) SearchStr will likely be a pointer into a string, so don't try StrLenFromCache
+//There are two strlens in this function. Don't try to replace them because
+// 1) they only trigger in rare occurances
+// 2) SearchStr will likely be a pointer into a string, not a full string
+// so don't try StrLenFromCache, 'cos it won't know, this is why we don't use 'StrLen'
+// as it just wastes cycles in this case
+// strlen is safe to use here, as other 'outer' functions check that SearchStr != NULL
 
     if (! SepStart)
     {
         *Token=CopyStr(*Token, SearchStr);
-        return(SearchStr + StrLen(SearchStr));
+        return(SearchStr + strlen(SearchStr));
     }
 
     sptr=SearchStr;
@@ -299,11 +348,19 @@ const char *GetTokenPostProcess(const char *SearchStr, const char *SepStart, con
             eptr--;
             if (*sptr==*eptr) sptr++;
             else eptr++;
+
+            OuterQuotes=TRUE;
         }
     }
 
     if (eptr >= sptr) *Token=CopyStrLen(*Token, sptr, eptr-sptr);
     else *Token=CopyStr(*Token, sptr);
+
+    if ( (! OuterQuotes) && (Flags & GETTOKEN_STRIP_QUOTES) && (Flags & GETTOKEN_FOUND_BACKSLASH) )
+    {
+        Tempstr=CopyStr(Tempstr, *Token);
+        *Token=UnQuoteStr(*Token, Tempstr);
+    }
 
     if (Flags & GETTOKEN_STRIP_SPACE)
     {
@@ -314,25 +371,15 @@ const char *GetTokenPostProcess(const char *SearchStr, const char *SepStart, con
 //return empty string, but not null
     if ((! SepEnd) || (*SepEnd=='\0'))
     {
-        SepEnd=SearchStr + StrLen(SearchStr);
+        SepEnd=SearchStr + strlen(SearchStr);
     }
+
+    Destroy(Tempstr);
 
     return(SepEnd);
 }
 
 
-
-const char *GetTokenSeparators(const char *SearchStr, char **Separators, char **Token, int Flags)
-{
-    const char *SepStart=NULL, *SepEnd=NULL;
-
-    /* this is a safety measure so that there is always something in Token*/
-    if (Token) *Token=CopyStr(*Token,"");
-    if ((! Token) || StrEnd(SearchStr)) return(NULL);
-    SepStart=SearchStr;
-    GetTokenMultiSepMatch(Separators, &SepStart, &SepEnd, Flags);
-    return(GetTokenPostProcess(SearchStr, SepStart, SepEnd, Token, Flags));
-}
 
 
 const char *GetToken(const char *SearchStr, const char *Separator, char **Token, int Flags)
@@ -366,7 +413,7 @@ const char *GetToken(const char *SearchStr, const char *Separator, char **Token,
         {
             //don't use StrLenFromCache on SearchStr, as it's a pointer into a string and will
             //only be in the cache at the start of the search
-            SepEnd=SearchStr+StrLen(SearchStr);
+            SepEnd=SearchStr+strlen(SearchStr);
             *Token=CopyStr(*Token,SearchStr);
             return(SepEnd);
         }
@@ -389,10 +436,10 @@ const char *GetToken(const char *SearchStr, const char *Separator, char **Token,
         {
             separators=BuildMultiSeparators(Separator);
             SepStart=SearchStr;
-            GetTokenMultiSepMatch(separators, &SepStart, &SepEnd, Flags);
+            GetTokenMultiSepMatch(separators, &SepStart, &SepEnd, &Flags);
             StringArrayDestroy(separators);
         }
-        else GetTokenFindSeparator(Separator, SearchStr, &SepStart, &SepEnd, Flags);
+        else GetTokenFindSeparator(Separator, SearchStr, &SepStart, &SepEnd, &Flags);
     }
 
     return(GetTokenPostProcess(SearchStr, SepStart, SepEnd, Token, Flags));
@@ -401,39 +448,6 @@ const char *GetToken(const char *SearchStr, const char *Separator, char **Token,
 
 
 
-
-
-
-
-int GetTokenParseConfig(const char *Config)
-{
-    const char *ptr;
-    int Flags=0;
-
-    for (ptr=Config; *ptr != '\0'; ptr++)
-    {
-        switch (*ptr)
-        {
-        case 'm':
-            Flags |= GETTOKEN_MULTI_SEPARATORS;
-            break;
-        case 'q':
-            Flags |= GETTOKEN_HONOR_QUOTES;
-            break;
-        case 'Q':
-            Flags |= GETTOKEN_QUOTES;
-            break;
-        case 's':
-            Flags |= GETTOKEN_INCLUDE_SEPARATORS;
-            break;
-        case '+':
-            Flags |= GETTOKEN_APPEND_SEPARATORS;
-            break;
-        }
-    }
-
-    return(Flags);
-}
 
 
 const char *GetNameValuePair(const char *Input, const char *PairDelim, const char *NameValueDelim, char **Name, char **Value)
@@ -448,16 +462,16 @@ const char *GetNameValuePair(const char *Input, const char *PairDelim, const cha
     //removing quotes, as if we have, say 'foo=1'='bar=2' we want to keep
     //the quotes in order that we can split it into 'foo=1' 'bar=2' not
     // 'foo' '1=bar=2'. Thus we use GETTOKEN_HONOR_QUOTES here.
-    ptr=GetToken(Input,PairDelim,&Token,GETTOKEN_HONOR_QUOTES);
+    ptr=GetToken(Input, PairDelim, &Token, GETTOKEN_HONOR_QUOTES);
     if (StrValid(Token))
     {
         //here we are doing the final split of a key/value pair,
         //so we can strip quotes
-        ptr2=GetToken(Token,NameValueDelim,Name,GETTOKEN_QUOTES);
-        //rather than 'GetToken' value, we strip copy all remaining
+        ptr2=GetToken(Token, NameValueDelim, Name, GETTOKEN_QUOTES);
+        //rather than 'GetToken' value,  we strip copy all remaining
         //and strip quotes explicitly
-        *Value=CopyStr(*Value,ptr2);
-        if (StrValid(*Value)) StripQuotes(*Value);
+        *Value=CopyStr(*Value, ptr2);
+        StripQuotes(*Value);
     }
 
     Destroy(Token);

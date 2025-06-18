@@ -1,5 +1,7 @@
 #include "HashJH.h"
 
+#ifdef USE_JH
+
 #include "jh_ref.h"
 
 int HashFinishJH(HASH *Hash, char **HashStr)
@@ -38,11 +40,12 @@ HASH *HashCloneJH(HASH *Hash)
     return(NewHash);
 }
 
+#endif
 
 
 int HashInitJH(HASH *Hash, const char *Name, int Length)
 {
-
+#ifdef USE_JH
     switch (Length)
     {
     case 224:
@@ -54,19 +57,19 @@ int HashInitJH(HASH *Hash, const char *Name, int Length)
         Hash->Update=HashUpdateJH;
         Hash->Finish=HashFinishJH;
         Hash->Clone=HashCloneJH;
+        return(TRUE);
         break;
 
-    default:
-        return(FALSE);
-        break;
     }
+#endif
 
-    return(TRUE);
+    return(FALSE);
 }
 
 
 void HashRegisterJH()
 {
+#ifdef USE_JH
     HashRegister("jh224", 224, HashInitJH);
     HashRegister("jh256", 256, HashInitJH);
     HashRegister("jh384", 384, HashInitJH);
@@ -75,4 +78,5 @@ void HashRegisterJH()
     HashRegister("jh-256", 256, HashInitJH);
     HashRegister("jh-384", 384, HashInitJH);
     HashRegister("jh-512", 512, HashInitJH);
+#endif
 }

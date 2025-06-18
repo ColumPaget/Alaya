@@ -7,6 +7,25 @@ libUseful provides a range of functions that simplify common programming tasks i
 
 libUseful has been compiled and used on various linux and freebsd systems.
 
+
+Author
+------
+libUseful is (C) 2009 Colum Paget. 
+
+Email: colums.projects@gmail.com
+
+
+
+License
+-------
+
+libUseful is licensed under either the Gnu Public License v3 or Lesser Gnu Public License v3. Some included code is GPL only, so to be under the Lesser Gnu Public License it must be built with the '--enable-lgpl' configure flag, which will leave those components out of the build.
+
+
+DISCLAIMER
+----------
+This is free software. It comes with no guarentees and I take no responsiblity if it makes your computer explode or opens a portal to the demon dimensions, or does anything.
+
 Install
 -------
 
@@ -56,14 +75,4 @@ Documentation
 Please read Quickstart.md for an overview of core paradigms of using libUseful. Individual functions are documented in the .h header files.
 
 
-Author
-------
-libUseful is (C) 2009 Colum Paget. It is released under the GPLv3 so you may do anything with them that the GPL allows.
-
-Email: colums.projects@gmail.com
-
-
-DISCLAIMER
-----------
-This is free software. It comes with no guarentees and I take no responsiblity if it makes your computer explode or opens a portal to the demon dimensions, or does anything.
 

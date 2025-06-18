@@ -17,9 +17,16 @@ char *FormatFileProperties(char *HTML, HTTPSession *Session, int FType, const ch
 
     if (Flags & FDETAILS_ACCESSTOKEN)
     {
-        GenerateRandomBytes(&Salt,24,ENCODE_HEX);
-        Tempstr=MakeAccessToken(Tempstr, Session->UserName, Salt, Session->ClientIP, URL);
+        GenerateRandomBytes(&Salt,32,ENCODE_RBASE64);
+        Tempstr=MakeAccessToken(Tempstr, Session->UserName, Settings.AccessTokenKey, Salt, Session->ClientIP, URL);
         HTML=MCatStr(HTML,"<tr bgcolor=#FFAAAA><td>Access Token</td><td colspan=2>",URL,"?AccessToken=",Tempstr,"</td></tr>",NULL);
+    }
+
+    if (Flags & FDETAILS_URLTOKEN)
+    {
+        GenerateRandomBytes(&Salt,32,ENCODE_RBASE64);
+        Tempstr=MakeAccessToken(Tempstr, Session->UserName, Settings.URLTokenKey, Salt, "", URL);
+        HTML=MCatStr(HTML,"<tr bgcolor=#FFAAAA><td>URL Token</td><td colspan=2>",URL,"?URLToken=",Tempstr,"</td></tr>",NULL);
     }
 
     if (FType != FILE_DIR)
@@ -106,7 +113,7 @@ void DirectoryItemEdit(STREAM *S, HTTPSession *Session, const char *Path, int Fl
 
     HTML=MCatStr(HTML,"<tr bgcolor=#FFCCCC><td>Actions</td><td colspan=2><input type=submit name='get:",Session->Path,"' value=Get /> <input type=submit name='del:",Session->Path,"' value=Del /> <input type=text name=renameto /><input type=submit name='renm:",Session->Path,"' value=Rename /><input type=submit name='genaccess:",Session->Path,"' value='Access Token'></td></tr>",NULL);
 
-    URL=FormatURL(URL,Session, Session->URL);
+    URL=HTTPSessionFormatURL(URL,Session, Session->URL);
     HTML=FormatFileProperties(HTML, Session, FType, URL, Path, Vars, Flags);
 
     //We must use the URL that this file was asked under, not its directory path. The directory path may not be

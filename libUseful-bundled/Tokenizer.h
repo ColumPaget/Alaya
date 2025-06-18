@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
-* SPDX-License-Identifier: GPL-3.0
+* SPDX-License-Identifier: LGPL-3.0-or-later
 */
 
 #ifndef LIBUSEFUL_TOKEN_H
@@ -72,6 +72,20 @@ nine
 
 Notice that 'GETTOKEN_QUOTES' also strips quotes from tokens. If you don't want the quotes stripped off, use GETTOKEN_HONOR_QUOTES instead.
 
+GETTOKEN_QUOTES only strips quotes that surround a token at start and end, it will not strip quotes that occur in the middle of a token, like this:
+
+title='this is the title'
+
+This is due to the common use of both \' and \" in strings in the english language, e.g. as the possessive apostrophe 
+or the use of \' to indicate feed and \" to indicate inches in imperial measurments.
+
+In situations where it is desirable to quote only a substring of a string, use backslash quoting, e.g.
+
+title=this\ is\ the\ title
+
+GetToken will not strip backslashes if the string is also wrapped in quotes.
+
+
 The GETTOKEN_INCLUDE_SEPARATORS flag causes separators to be passed as tokens, so
 
 
@@ -102,18 +116,18 @@ see examples/Tokenizer.c for examples
 
 //Flags for GetToken
 
-#define GETTOKEN_MULTI_SEPARATORS 1 //multiple seperators divided by '|'
-#define GETTOKEN_MULTI_SEP 1
-#define GETTOKEN_HONOR_QUOTES 2  //honor quotes but don't strip them
-#define GETTOKEN_STRIP_QUOTES 4  //strip quotes (but otherwise ignore)
-#define GETTOKEN_QUOTES 6  //honor and strip quotes
+#define GETTOKEN_MULTI_SEPARATORS   1 //multiple seperators divided by '|'
+#define GETTOKEN_MULTI_SEP          1
+#define GETTOKEN_HONOR_QUOTES       2  //honor quotes but don't strip them
+#define GETTOKEN_STRIP_QUOTES       4  //strip quotes (but otherwise ignore)
+#define GETTOKEN_QUOTES             6  //honor and strip quotes
 #define GETTOKEN_INCLUDE_SEPARATORS 8  //include separators as tokens
-#define GETTOKEN_INCLUDE_SEP 8
+#define GETTOKEN_INCLUDE_SEP        8
 #define GETTOKEN_APPEND_SEPARATORS 16 //append separators to previous token
-#define GETTOKEN_APPEND_SEP 16
-#define GETTOKEN_BACKSLASH  32  //treat backslashes as normal characters, rather than a form of quoting
-#define GETTOKEN_STRIP_SPACE 64 //strip whitespace from start and end of token
-
+#define GETTOKEN_APPEND_SEP        16
+#define GETTOKEN_BACKSLASH         32  //treat backslashes as normal characters, rather than a form of quoting
+#define GETTOKEN_STRIP_SPACE       64 //strip whitespace from start and end of token
+#define GETTOKEN_FOUND_BACKSLASH  128
 
 
 #ifdef __cplusplus

@@ -1,16 +1,17 @@
-#include "base32.h"
+#include "baseXX.h"
 
 
 
-/* This is surely not the fastest base32 decoder, it is written for understanding/legiblity, not speed.
- * first we convert base32 into a binary, as a string of '1' and '0' characters (binary coded decimal).
+/* This is surely not the fastest baseXX decoder, it is written for understanding/legiblity, not speed.
+ * first we convert baseXX into binary, as a string of '1' and '0' characters
  * Then we work through this string converting it into eight-bit values.
  * The reason it's done this way is that it's tough to handle 'overlapping bits' when dealing with characters
- * that represent 5-bit chunks of a string of 8-bit values, and the resulting code of trying to do it all
+ * that represent 5-bit or 6-bit chunks of a string of 8-bit values, and the resulting code of trying to do it all
  * with bit-shifting is rather unreadable
  */
 
-char *base32tobinary(char *RetStr, const char *In, const char *Encoder)
+//MaxChunk is the highest bit of a chunk, 16 for base32 and 32 for base64
+char *baseXXtobinary(char *RetStr, const char *In, const char *Encoder, int MaxChunk)
 {
     const char *ptr, *found;
     uint32_t val=0, bit;
@@ -22,8 +23,7 @@ char *base32tobinary(char *RetStr, const char *In, const char *Encoder)
         if (found) val=(found - Encoder);
         else break;
 
-//the highest value a base 32 character can express is 16 (0x10)
-        bit=16;
+        bit=MaxChunk;
 
 //unpack the value into a string of 1's and 0's. As we add 1's and 0's from later characters
 //we will get a contiguous stream of 1's and 0's that we can then break up into 8-bit chunks
@@ -39,14 +39,14 @@ char *base32tobinary(char *RetStr, const char *In, const char *Encoder)
 }
 
 
-int base32decode(unsigned char *Out, const char *In, const char *Encoder)
+int baseXXdecode(unsigned char *Out, const char *In, const char *Encoder, int MaxChunk)
 {
     char *Tempstr=NULL;
     unsigned char *p_Out;
     const char *ptr, *end;
     uint32_t val;
 
-    Tempstr=base32tobinary(Tempstr, In, Encoder);
+    Tempstr=baseXXtobinary(Tempstr, In, Encoder, MaxChunk);
 
     val=StrLen(Tempstr);
     val -= val % 8;
@@ -73,20 +73,21 @@ int base32decode(unsigned char *Out, const char *In, const char *Encoder)
 
 
 
-char *base32encode(char *RetStr, const char *Input, int Len, const char *Encoder, char Pad)
+char *baseXXencode(char *RetStr, const char *Input, int Len, int ChunkSize, const char *Encoder, char Pad)
 {
     char *Tempstr=NULL, *BCD=NULL;
     const char *ptr, *end;
     int val, len=0;
 
+
     RetStr=CopyStr(RetStr, "");
     BCD=encode_bcd_bytes(BCD, (unsigned const char *) Input, Len);
     end=BCD+StrLen(BCD);
 
-    for (ptr=BCD; ptr < end; ptr+=5)
+    for (ptr=BCD; ptr < end; ptr+=ChunkSize)
     {
-        Tempstr=CopyStrLen(Tempstr, ptr, 5);
-        Tempstr=PadStrTo(Tempstr, '0', 5);
+        Tempstr=CopyStrLen(Tempstr, ptr, ChunkSize);
+        Tempstr=PadStrTo(Tempstr, '0', ChunkSize);
         val=(int) parse_bcd_byte(Tempstr);
         RetStr=AddCharToBuffer(RetStr, len, Encoder[val]);
         len++;
@@ -102,3 +103,6 @@ char *base32encode(char *RetStr, const char *Input, int Len, const char *Encoder
     Destroy(BCD);
     return(RetStr);
 }
+
+
+

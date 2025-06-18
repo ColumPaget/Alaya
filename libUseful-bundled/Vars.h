@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
-* SPDX-License-Identifier: GPL-3.0
+* SPDX-License-Identifier: LGPL-3.0-or-later
 */
 
 #ifndef LIBUSEFUL_VARS_H
@@ -30,10 +30,10 @@ extern "C" {
 
 
 //get a variable from the list by name
-#define GetVar(List, Name) GetTypedVar((List), (Name), ANYTYPE)
+#define GetVar(List, Name) GetTypedVar((List), (Name), LIST_ITEM_ANYTYPE)
 
 //unset a variable by name
-#define UnsetVar(List, Name) UnsetTypedVar((List), (Name), ANYTYPE)
+#define UnsetVar(List, Name) UnsetTypedVar((List), (Name), LIST_ITEM_ANYTYPE)
 
 //set a variable with a type and a timestamp
 ListNode *SetDetailVar(ListNode *Vars, const char *Name, const char *Data, int ItemType, time_t Time);

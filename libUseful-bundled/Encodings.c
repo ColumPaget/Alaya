@@ -1,7 +1,39 @@
 #include "Encodings.h"
-#include "base64.h"
-#include "base32.h"
+#include "baseXX.h"
 #include "Http.h"
+
+
+
+//must do this here, not within the #ifdefs that are in the BASE64 functions
+#ifndef USE_LGPL
+#include "base64.h"
+#endif
+
+
+//There's two implementations of base64 included in libUseful. If libUseful is built with '--enable-lgpl'
+//then the native 'slow' encoder/decoder is used. But if libUseful is built in the default GPLv3 mode
+//then the faster GPLv2 code taken from fetchmail is used. The following two functions map one or the
+//other version.
+
+
+void TOBASE64(unsigned char **Out, unsigned char *In, int Len, const char *Encoder, char Pad)
+{
+#ifdef USE_LGPL
+    *Out=base64encode(*Out, In, Len, Encoder,Pad);
+#else
+    Radix64frombits(*Out, In, Len, Encoder,Pad);
+#endif
+}
+
+int FROMBASE64(char **Out, unsigned char *In, const char *Encoder, char Pad)
+{
+#ifdef USE_LGPL
+    return(base64decode((unsigned char *) *Out, In, Encoder));
+#else
+    return(Radix64tobits(*Out, In, Encoder, Pad));
+#endif
+}
+
 
 
 
@@ -393,39 +425,39 @@ char *EncodeBytes(char *RetStr, const char *Bytes, int len, int Encoding)
 
     case ENCODE_BASE64:
         RetStr=SetStrLen(RetStr,len * 4);
-        to64frombits((unsigned char *) RetStr,(unsigned char *) Bytes,len);
+        TOBASE64((unsigned char **) &RetStr,(unsigned char *) Bytes, len, BASE64_CHARS, '=');
         break;
 
     case ENCODE_IBASE64:
         RetStr=SetStrLen(RetStr,len * 4);
-        Radix64frombits((unsigned char *) RetStr,(unsigned char *) Bytes, len, IBASE64_CHARS,'\0');
+        TOBASE64((unsigned char **) &RetStr,(unsigned char *) Bytes, len, IBASE64_CHARS,'\0');
         break;
 
     case ENCODE_PBASE64:
         RetStr=SetStrLen(RetStr,len * 4);
-        Radix64frombits((unsigned char *) RetStr,(unsigned char *) Bytes, len, PBASE64_CHARS,'=');
+        TOBASE64((unsigned char **) &RetStr,(unsigned char *) Bytes, len, PBASE64_CHARS,'=');
         break;
 
     case ENCODE_RBASE64:
         RetStr=SetStrLen(RetStr,len * 4);
-        Radix64frombits((unsigned char *) RetStr,(unsigned char *) Bytes, len, RBASE64_CHARS,'=');
+        TOBASE64((unsigned char **) &RetStr,(unsigned char *) Bytes, len, RBASE64_CHARS,'=');
         break;
 
     case ENCODE_CRYPT:
         RetStr=SetStrLen(RetStr,len * 4);
-        Radix64frombits((unsigned char *) RetStr,(unsigned char *) Bytes, len, CRYPT_CHARS,'\0');
+        TOBASE64((unsigned char **) &RetStr,(unsigned char *) Bytes, len, CRYPT_CHARS,'\0');
         break;
 
     case ENCODE_XXENC:
         RetStr=SetStrLen(RetStr,len * 4);
-        Radix64frombits((unsigned char *) RetStr,(unsigned char *) Bytes, len, XXENC_CHARS,'\0');
+        TOBASE64((unsigned char **) &RetStr,(unsigned char *) Bytes, len, XXENC_CHARS,'\0');
         break;
 
     case ENCODE_UUENC:
         RetStr=SetStrLen(RetStr,len * 4);
         Tempstr=CopyStr(Tempstr, Bytes);
         strrep(Tempstr, ' ', '`');
-        Radix64frombits((unsigned char *) RetStr,(unsigned char *) Bytes,len,UUENC_CHARS,'`');
+        TOBASE64((unsigned char **) &RetStr,(unsigned char *) Bytes,len,UUENC_CHARS,'`');
         break;
 
     case ENCODE_ASCII85:
@@ -558,37 +590,37 @@ int DecodeBytes(char **Return, const char *Text, int Encoding)
 
     case ENCODE_BASE64:
         Padded=EncodingPad(Padded, Text, len, '=', 4);
-        len=Radix64tobits(*Return, Padded, BASE64_CHARS,'=');
+        len=FROMBASE64(Return, Padded, BASE64_CHARS,'=');
         break;
 
     case ENCODE_IBASE64:
         Padded=EncodingPad(Padded, Text, len, '=', 4);
-        len=Radix64tobits(*Return, Padded, IBASE64_CHARS,'=');
+        len=FROMBASE64(Return, Padded, IBASE64_CHARS,'=');
         break;
 
     case ENCODE_PBASE64:
         Padded=EncodingPad(Padded, Text, len, '=', 4);
-        len=Radix64tobits(*Return, Padded, PBASE64_CHARS,'=');
+        len=FROMBASE64(Return, Padded, PBASE64_CHARS,'=');
         break;
 
     case ENCODE_RBASE64:
         Padded=EncodingPad(Padded, Text, len, '=', 4);
-        len=Radix64tobits(*Return, Padded, RBASE64_CHARS,'=');
+        len=FROMBASE64(Return, Padded, RBASE64_CHARS,'=');
         break;
 
     case ENCODE_CRYPT:
         Padded=EncodingPad(Padded, Text, len, '=', 4);
-        len=Radix64tobits(*Return, Padded, CRYPT_CHARS,'=');
+        len=FROMBASE64(Return, Padded, CRYPT_CHARS,'=');
         break;
 
     case ENCODE_XXENC:
         Padded=EncodingPad(Padded, Text, len, '=', 4);
-        len=Radix64tobits(*Return, Padded, XXENC_CHARS,'=');
+        len=FROMBASE64(Return, Padded, XXENC_CHARS,'=');
         break;
 
     case ENCODE_UUENC:
         Padded=EncodingPad(Padded, Text, len, '|', 4);
-        len=Radix64tobits(*Return, Padded, UUENC_CHARS,'|');
+        len=FROMBASE64(Return, Padded, UUENC_CHARS,'|');
         break;
 
     case ENCODE_ASCII85:

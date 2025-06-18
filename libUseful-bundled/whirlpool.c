@@ -1,4 +1,16 @@
 /**
+
+This module (whirlpool.h and whirlpool.c) are modified from the reference implementation
+published by Paulo S.L.M. Barreto and Vincent Rijmen.
+
+The authors have stated: "WHIRLPOOL is not (and will never be) patented. It may be used free of charge for any purpose. The reference implementations are in the public domain."
+
+References:
+https://en.wikipedia.org/wiki/Whirlpool_(hash_function)
+https://web.archive.org/web/20171129084214/http://www.larc.usp.br/~pbarreto/WhirlpoolPage.html
+
+
+
  * The Whirlpool hashing function.
  *
  * <P>

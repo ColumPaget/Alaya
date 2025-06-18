@@ -2,10 +2,18 @@
 #include "libUseful.h"
 #include <glob.h>
 
+#include <sys/mount.h>
+
 #ifdef HAVE_UNSHARE
 #define _GNU_SOURCE
 #include <sched.h>
 #endif
+
+
+//things get a bit recursive below
+static int ContainerJoinNamespace(const char *Namespace, int type);
+
+
 
 static void InitSigHandler(int sig)
 {
@@ -19,6 +27,9 @@ static void ContainerInitProcess(int tunfd, int linkfd, pid_t Child, int RemoveR
     //this process is init, the child will carry on execution
     //if (chroot(".") == -1) RaiseError(ERRFLAG_ERRNO, "chroot", "failed to chroot to curr directory");
     ProcessSetTitle("init");
+
+    close(0);
+    close(1);
 
     memset(&sa,0,sizeof(sa));
     sa.sa_handler=InitSigHandler;
@@ -37,10 +48,119 @@ static void ContainerInitProcess(int tunfd, int linkfd, pid_t Child, int RemoveR
     */
 
     //must do proc after the fork so that CLONE_NEWPID takes effect
-    mkdir("/proc",0755);
-    FileSystemMount("","/proc","proc","");
+    //mkdir("/proc",0755);
+    //mount("", "/proc", "proc", 0, "hidepid=2");
+
+    //FileSystemMount("","/proc","proc","");
 
     while (waitpid(-1,NULL,0) != -1);
+}
+
+
+//if we are even unsharing our PIDS namespace, then we will need a
+//new 'init' process to look after pids in the namespace
+//(this is mostly just to reap exited/zombie processes)
+static pid_t ContainerLaunchInit(int Flags, const char *Dir)
+{
+    pid_t child, parent;
+
+    //as we are going to create an init for a namespace it needs to be session leader
+    //setsid();
+
+    //fork off a process that will be our 'init' process
+    child=fork();
+    if (child == 0)
+    {
+        setsid();
+        child=fork();
+        if (child !=0)
+        {
+            if ((! (Flags & PROC_ISOCUBE)) && StrValid(Dir)) ContainerInitProcess(-1, -1, child, FALSE);
+            else ContainerInitProcess(-1, -1, child, TRUE);
+            //ContainerInitProcess should never return, but we'll have this here anyway
+            _exit(0);
+        }
+    }
+    else _exit(0);
+
+    return(child);
+}
+
+
+
+
+static int ContainerUnsharePID(int Flags, const char *Namespace, const char *Dir)
+{
+    pid_t pid, init_pid=0;
+
+#ifdef HAVE_UNSHARE
+#ifdef CLONE_NEWPID
+
+    // NEWPID requires NEWNS which creates a new mount namespace, because we need to remount /roc
+    // within the new PID container
+    if (StrValid(Namespace)) ContainerJoinNamespace(Namespace, CLONE_NEWPID | CLONE_NEWNS);
+    else unshare(CLONE_NEWPID | CLONE_NEWNS);
+
+    //if we are given a namespace we assume there is already an init for it
+    //otherwise launch and init from the NEWPID process
+    if (! StrValid(Namespace))
+    {
+        init_pid=ContainerLaunchInit(Flags, Dir);
+        setpgid(init_pid, init_pid);
+    }
+
+    return(TRUE);
+
+#endif
+#else
+    RaiseError(0, "namespaces", "containers/unshare unavailable");
+#endif
+    return(FALSE);
+}
+
+
+static void ContainerSetHostname(const char *Namespace, const char *HostName)
+{
+    int val, result;
+
+#ifdef HAVE_UNSHARE
+#ifdef CLONE_NEWUTS
+    if (StrValid(Namespace)) ContainerJoinNamespace(Namespace, CLONE_NEWUTS);
+    else
+    {
+        unshare(CLONE_NEWUTS);
+        val=StrLen(HostName);
+        if (val != 0) result=sethostname(HostName, val);
+        else result=sethostname("container", 9);
+        if (result != 0) RaiseError(ERRFLAG_ERRNO, "ContainerNamespace", "Failed to sethostname for container.");
+    }
+#endif
+#else
+    RaiseError(0, "namespaces", "containers/unshare unavailable");
+#endif
+}
+
+
+
+static void ContainerSetEnvs(const char *Envs)
+{
+    char *Name=NULL, *Value=NULL;
+    const char *ptr;
+
+#ifdef HAVE_CLEARENV
+    clearenv();
+#endif
+
+    setenv("LD_LIBRARY_PATH","/lib:/usr/lib",TRUE);
+
+    ptr=GetNameValuePair(Envs, ",","=", &Name, &Value);
+    while (ptr)
+    {
+        setenv(Name, Value, TRUE);
+        ptr=GetNameValuePair(ptr, ",","=", &Name, &Value);
+    }
+    Destroy(Name);
+    Destroy(Value);
 }
 
 
@@ -94,7 +214,7 @@ static int ContainerJoinNamespace(const char *Namespace, int type)
 
 
 
-static void ContainerFilesys(const char *Config, const char *Dir, int Flags)
+static void ContainerPrepareFilesys(const char *Config, const char *Dir, int Flags)
 {
     pid_t pid;
     char *Tempstr=NULL, *Name=NULL, *Value=NULL;
@@ -127,7 +247,7 @@ static void ContainerFilesys(const char *Config, const char *Dir, int Flags)
 
     mkdir(Tempstr,0755);
     if (Flags & PROC_ISOCUBE)	FileSystemMount("",Tempstr,"tmpfs","");
-    if (chdir(Tempstr) !=0) RaiseError(ERRFLAG_ERRNO, "ContainerFilesys", "failed to chdir to %s", Tempstr);
+    if (chdir(Tempstr) !=0) RaiseError(ERRFLAG_ERRNO, "ContainerPrepareFilesys", "failed to chdir to %s", Tempstr);
 
     //always make a tmp directory
     mkdir("tmp",0777);
@@ -159,7 +279,7 @@ static void ContainerFilesys(const char *Config, const char *Dir, int Flags)
         tptr=Value;
         if (*tptr=='/') tptr++;
         MakeDirPath(tptr,0755);
-        if (link(Value, tptr) != 0) RaiseError(ERRFLAG_ERRNO, "ContainerFilesys", "Failed to link Value tptr.");
+        if (link(Value, tptr) != 0) RaiseError(ERRFLAG_ERRNO, "ContainerPrepareFilesys", "Failed to link Value tptr.");
         ptr=GetToken(ptr,",",&Value,GETTOKEN_QUOTES);
     }
 
@@ -191,148 +311,83 @@ static void ContainerFilesys(const char *Config, const char *Dir, int Flags)
 }
 
 
-static void ContainerNamespace(const char *Namespace, const char *HostName, int Flags)
-{
-    int val, result;
 
 #ifdef HAVE_UNSHARE
+#ifdef CLONE_NEWUSER
+
+static void ContainerNewUserNamespace(pid_t myPid, uid_t myUid, gid_t myGid)
+{
+    char *Path=NULL, *Tempstr=NULL;
+
+    unshare(CLONE_NEWUSER);
+
+
+//map our user number (0) in the namespace to our real user id outside it
+    Path=FormatStr(Path, "/proc/%d/uid_map", myPid);
+    Tempstr=FormatStr(Tempstr, "%ld %ld 1\n", myUid, myUid);
+    FileWrite(Path, Tempstr);
+
+
+//map our group number (0) in the namespace to our real gid outside it
+    Path=FormatStr(Path, "/proc/%d/setgroups", myPid);
+    FileWrite(Path, "deny");
+
+//map our user number (0) in the namespace to our real user id outside it
+    Path=FormatStr(Path, "/proc/%d/gid_map", myPid);
+    Tempstr=FormatStr(Tempstr, "%ld %ld 1\n", myGid, myGid);
+    FileWrite(Path, Tempstr);
+
+
+    Destroy(Tempstr);
+    Destroy(Path);
+}
+
+#endif
+#endif
+
+//uid and gid here are the EXTERNAL uid and gid outside of the container
+static void ContainerNamespace(const char *Namespace, const char *HostName, const char *Dir, int Flags, uid_t uid, gid_t gid)
+{
+#ifdef HAVE_UNSHARE
+
+    int val, result;
+
+
+//if we're not root, then we'll have to set up a user namespace
+    if (uid !=0) ContainerNewUserNamespace(getpid(), uid, gid);
+
+    if (Flags & PROC_CONTAINER_FS)
+    {
+#ifdef CLONE_NEWNS
+        if (StrValid(Namespace)) ContainerJoinNamespace(Namespace, CLONE_NEWNS);
+        else unshare(CLONE_NEWNS);
+
+//make container invisible to outside processes, apparently
+//  mount("none", "/", 0, MS_PRIVATE | MS_REC, NULL);
+#endif
+    }
 
 #ifdef CLONE_NEWNET
     if (StrValid(Namespace)) ContainerJoinNamespace(Namespace, CLONE_NEWNET);
     else if (Flags & PROC_CONTAINER_NET) unshare(CLONE_NEWNET);
 #endif
 
-    if (Flags & PROC_CONTAINER_FS)
-    {
-        //do these all individually because any one of them might be rejected
+
 #ifdef CLONE_NEWIPC
-//        if (StrValid(Namespace)) JoinNamespace(Namespace, CLONE_NEWIPC);
-//        else unshare(CLONE_NEWIPC);
+    if (StrValid(Namespace)) ContainerJoinNamespace(Namespace, CLONE_NEWIPC);
+    else if (Flags & PROC_CONTAINER_IPC) unshare(CLONE_NEWIPC);
 #endif
 
-#ifdef CLONE_FS
-        if (StrValid(Namespace)) ContainerJoinNamespace(Namespace, CLONE_FS);
-        else unshare(CLONE_FS);
-#endif
+    if (Flags & PROC_CONTAINER_PID) ContainerUnsharePID(Flags, Namespace, Dir);
+    if (StrValid(HostName)) ContainerSetHostname(Namespace, HostName);
 
-#ifdef CLONE_NEWNS
-        if (StrValid(Namespace)) ContainerJoinNamespace(Namespace, CLONE_NEWNS);
-        else unshare(CLONE_NEWNS);
-#endif
-    }
+
 
 #else
     RaiseError(0, "namespaces", "containers/unshare unavailable");
 #endif
 }
 
-
-static void ContainerSetHostname(const char *Namespace, const char *HostName)
-{
-    int val, result;
-
-#ifdef HAVE_UNSHARE
-#ifdef CLONE_NEWUTS
-    if (StrValid(Namespace)) ContainerJoinNamespace(Namespace, CLONE_NEWUTS);
-    else
-    {
-        unshare(CLONE_NEWUTS);
-        val=StrLen(HostName);
-        if (val != 0) result=sethostname(HostName, val);
-        else result=sethostname("container", 9);
-        if (result != 0) RaiseError(ERRFLAG_ERRNO, "ContainerNamespace", "Failed to sethostname for container.");
-    }
-#endif
-#else
-    RaiseError(0, "namespaces", "containers/unshare unavailable");
-#endif
-}
-
-
-
-static void ContainerSetEnvs(const char *Envs)
-{
-    char *Name=NULL, *Value=NULL;
-    const char *ptr;
-
-#ifdef HAVE_CLEARENV
-    clearenv();
-#endif
-
-    setenv("LD_LIBRARY_PATH","/lib:/usr/lib",TRUE);
-
-    ptr=GetNameValuePair(Envs, ",","=", &Name, &Value);
-    while (ptr)
-    {
-        setenv(Name, Value, TRUE);
-        ptr=GetNameValuePair(ptr, ",","=", &Name, &Value);
-    }
-    Destroy(Name);
-    Destroy(Value);
-}
-
-
-//if we are even unsharing our PIDS namespace, then we will need a
-//new 'init' process to look after pids in the namespace
-//(this is mostly just to reap exited/zombie processes)
-static pid_t ContainerLaunchInit(int Flags, const char *Dir)
-{
-    pid_t child, parent;
-
-    //as we are going to create an init for a namespace it needs to be session leader
-    //setsid();
-
-    //fork off a process that will be our 'init' process
-    child=fork();
-    if (child == 0)
-    {
-        setsid();
-        child=fork();
-        if (child !=0)
-        {
-            if ((! (Flags & PROC_ISOCUBE)) && StrValid(Dir)) ContainerInitProcess(-1, -1, child, FALSE);
-            else ContainerInitProcess(-1, -1, child, TRUE);
-            //ContainerInitProcess should never return, but we'll have this here anyway
-            _exit(0);
-        }
-    }
-    else _exit(0);
-
-    return(child);
-}
-
-
-
-
-static int ContainerUnsharePID(int Flags, const char *Namespace, const char *Dir)
-{
-    pid_t pid, init_pid=0;
-
-#ifdef HAVE_UNSHARE
-#ifdef CLONE_NEWPID
-
-
-    // NEWPID requires NEWNS which creates a new mount namespace, because we need to remount /proc
-    // within the new PID container
-    if (StrValid(Namespace)) ContainerJoinNamespace(Namespace, CLONE_NEWPID | CLONE_NEWNS);
-    else unshare(CLONE_NEWPID | CLONE_NEWNS);
-
-    //if we are given a namespace we assume there is already an init for it
-    //otherwise launch and init from the NEWPID process
-    if (! StrValid(Namespace))
-    {
-        init_pid=ContainerLaunchInit(Flags, Dir);
-        setpgid(init_pid, init_pid);
-    }
-
-    return(TRUE);
-
-#endif
-#else
-    RaiseError(0, "namespaces", "containers/unshare unavailable");
-#endif
-    return(FALSE);
-}
 
 
 static int ContainerParseConfig(const char *Config, char **HostName, char **Dir, char **Namespace, char **ChRoot, char **Envs)
@@ -392,22 +447,29 @@ static int ContainerParseConfig(const char *Config, char **HostName, char **Dir,
 }
 
 
-int ContainerApplyConfig(const char *Config)
+int ContainerApplyConfig(int Flags, const char *Config)
 {
     char *HostName=NULL, *SetupScript=NULL, *Namespace=NULL, *Envs=NULL;
     char *Dir=NULL, *ChRoot=NULL;
     char *Name=NULL, *Value=NULL;
     char *Tempstr=NULL;
     const char *ptr;
-    int Flags=0;
-    int result=TRUE;
+    int RetVal=TRUE, result;
     pid_t child;
+    uid_t external_uid;
+    gid_t external_gid;
 
 
-    Flags=ContainerParseConfig(Config, &HostName, &Dir, &Namespace, &ChRoot, &Envs);
+    external_uid=getuid();
+    external_gid=getgid();
+
+
+    Flags |= ContainerParseConfig(Config, &HostName, &Dir, &Namespace, &ChRoot, &Envs);
 
     if (Flags)
     {
+        ContainerNamespace(Namespace, HostName, Dir, Flags, external_uid, external_gid);
+
         if (Flags & PROC_CONTAINER_FS)
         {
             if (! StrValid(ChRoot))
@@ -415,7 +477,7 @@ int ContainerApplyConfig(const char *Config)
                 ChRoot=CopyStr(ChRoot, Dir);
                 Dir=CopyStr(Dir,"");
             }
-            ContainerFilesys(Config, ChRoot, Flags);
+            ContainerPrepareFilesys(Config, ChRoot, Flags);
 
             //we do not call CredsStoreOnFork here becausee it's assumed that we want to take the creds store with us, as
             //these forks are in order to change aspects of our program, rather than spawn a new process
@@ -426,25 +488,28 @@ int ContainerApplyConfig(const char *Config)
             }
         }
 
+#ifdef __linux__
+#ifdef MS_BIND
+        mkdir("proc", 0755);
+        if (external_uid==0) result=mount("", "proc", "proc", 0, NULL);
+        else result=mount("/proc", "proc", NULL, MS_REC | MS_BIND, NULL);
+#endif
+#endif
 
-        if (Flags & PROC_CONTAINER_PID) ContainerUnsharePID(Flags, Namespace, Dir);
-        if (StrValid(HostName)) ContainerSetHostname(Namespace, HostName);
-
-        //ContainerNamespace(Namespace, HostName, Flags);
-
-
-        ContainerSetEnvs(Envs);
+        //ContainerSetEnvs(Envs);
 
         if (Flags & PROC_CONTAINER_FS)
         {
             if (chroot(".") == -1)
             {
                 RaiseError(ERRFLAG_ERRNO, "ContainerApplyConfig", "failed to chroot to curr directory");
-                result=FALSE;
+                RetVal=FALSE;
             }
         }
 
-        if (result)
+
+        //'RetVal' is our 'so far so good' value
+        if (RetVal)
         {
             LibUsefulSetupAtExit();
             LibUsefulFlags |= LU_CONTAINER;
@@ -454,6 +519,9 @@ int ContainerApplyConfig(const char *Config)
                 if (chdir(Dir) !=0) RaiseError(ERRFLAG_ERRNO, "ContainerApplyConfig", "failed to chdir to %s", Dir);
             }
         }
+
+        if ( setuid(external_uid) != 0) RaiseError(ERRFLAG_ERRNO, "ContainerApplyConfig", "failed to switch user to %d", external_uid);
+        if ( setgid(external_gid) != 0) RaiseError(ERRFLAG_ERRNO, "ContainerApplyConfig", "failed to switch group to %d", external_gid);
     }
 
     Destroy(Tempstr);
@@ -465,6 +533,6 @@ int ContainerApplyConfig(const char *Config)
     Destroy(ChRoot);
     Destroy(Dir);
 
-    return(result);
+    return(RetVal);
 }
 

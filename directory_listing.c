@@ -228,7 +228,7 @@ static int LoadDir(const char *Path, HTTPSession *Session, int Flags, TPathItem 
             File->Mtime=Stat.st_mtime;
             File->Size=Stat.st_size;
         }
-	//can't get infor on file, just insert path
+        //can't get infor on file, just insert path
         else File=PathItemCreate(PATHTYPE_FILE, URL, Glob.gl_pathv[i]);
 
         Files[fcount]=File;
@@ -730,7 +730,7 @@ static void DirectorySendM3U(STREAM *S, HTTPSession *Session, const char *Path, 
             if (AuthenticateExamineMethods(Settings.AuthMethods, FALSE) & AUTH_ACCESSTOKEN)
             {
                 GenerateRandomBytes(&Salt,24,ENCODE_HEX);
-                AccessToken=MakeAccessToken(AccessToken, Session->UserName, Salt, Session->ClientIP, Files[i]->URL);
+                AccessToken=MakeAccessToken(AccessToken, Settings.AccessTokenKey, Session->UserName, Salt, Session->ClientIP, Files[i]->URL);
                 M3U=MCatStr(M3U,"?AccessToken=",AccessToken,NULL);
             }
             ListDestroy(Vars,Destroy);
@@ -1010,38 +1010,38 @@ void DirectoryDeleteSelected(STREAM *S, HTTPSession *Session, const char *Dir)
 
 void FreeFileList(int NoOfFiles, TPathItem **Files)
 {
-int i;
+    int i;
 
-if (! Files) return;
-for (i=0; i < NoOfFiles; i++)
-{
-PathItemDestroy(Files[i]);
-}
-free(Files);
+    if (! Files) return;
+    for (i=0; i < NoOfFiles; i++)
+    {
+        PathItemDestroy(Files[i]);
+    }
+    free(Files);
 }
 
 
 void DirectorySendFormatted(STREAM *S, HTTPSession *Session, const char *Path, int Format, int FormatFlags, int Flags)
 {
-TPathItem **Files=NULL;
-int max;
+    TPathItem **Files=NULL;
+    int max;
 
-            max=LoadDir(Path, Session, FormatFlags, &Files);
+    max=LoadDir(Path, Session, FormatFlags, &Files);
 
-            switch (Format)
-            {
-            case ACTION_M3U:
-                DirectorySendM3U(S,Session,Path,max,Files);
-                break;
-            case ACTION_CSV:
-                DirectorySendCSV(S,Session,Path,max,Files);
-                break;
-            case ACTION_HTML:
-                DirectorySendDirList(S,Session,Path,FormatFlags,max,Flags,Files);
-                break;
-            }
+    switch (Format)
+    {
+    case ACTION_M3U:
+        DirectorySendM3U(S,Session,Path,max,Files);
+        break;
+    case ACTION_CSV:
+        DirectorySendCSV(S,Session,Path,max,Files);
+        break;
+    case ACTION_HTML:
+        DirectorySendDirList(S,Session,Path,FormatFlags,max,Flags,Files);
+        break;
+    }
 
-	    FreeFileList(max, Files);
+    FreeFileList(max, Files);
 }
 
 
@@ -1049,7 +1049,7 @@ int DirectorySend(STREAM *S, HTTPSession *Session, const char *Path, ListNode *V
 {
     int DirSent=FALSE;
     char *Tempstr=NULL, *Token=NULL;
-    int FormatFlags=0, Format;
+    int FormatFlags=0, EditFlags=0, Format;
     int result=FALSE;
 
 //Maybe we can get out of sending the directory. Check 'IfModifiedSince'
@@ -1078,7 +1078,7 @@ int DirectorySend(STREAM *S, HTTPSession *Session, const char *Path, ListNode *V
         case ACTION_HTML:
         case ACTION_M3U:
         case ACTION_CSV:
-		DirectorySendFormatted(S, Session, Path, Format, FormatFlags, Flags);
+            DirectorySendFormatted(S, Session, Path, Format, FormatFlags, Flags);
             break;
 
         //TAR doesn't send a list of files, it sends the actual files, so it doesn't need to use
@@ -1086,17 +1086,24 @@ int DirectorySend(STREAM *S, HTTPSession *Session, const char *Path, ListNode *V
         case ACTION_PACK:
             result=DirectorySendPackedDir(S,Session,Path);
             break;
+
         case ACTION_UPLOAD:
             UploadSelectPage(S,Session,Path);
             break;
+
+        //see pages for a directory and the files in it, this gives a 'filemanager' view of the directory
         case ACTION_EDIT:
-            DirectoryItemEdit(S,Session,Path,0);
+            if (StrValid(Settings.AccessTokenKey)) EditFlags |= FDETAILS_ACCESSTOKEN;
+            if (StrValid(Settings.URLTokenKey)) EditFlags |= FDETAILS_URLTOKEN;
+            DirectoryItemEdit(S,Session,Path, EditFlags);
             break;
+
         case ACTION_EDIT_ACCESSTOKEN:
             DirectoryItemEdit(S,Session,Path, FDETAILS_ACCESSTOKEN);
             break;
+
         case ACTION_MKDIR:
-            Token=SessionGetArgument(Token, Session, "mkdir");
+            Token=HTTPSessionGetArg(Token, Session, "mkdir");
             Tempstr=CopyStr(Tempstr,Path);
             Tempstr=SlashTerminateDirectoryPath(Tempstr);
             Tempstr=CatStr(Tempstr,Token);
@@ -1116,7 +1123,7 @@ int DirectorySend(STREAM *S, HTTPSession *Session, const char *Path, ListNode *V
             break;
 
         case ACTION_RENAME:
-            Token=SessionGetArgument(Token, Session, "renameto");
+            Token=HTTPSessionGetArg(Token, Session, "renameto");
             Tempstr=CopyStr(Tempstr,Path);
             StrRTruncChar(Tempstr,'/');
             Tempstr=SlashTerminateDirectoryPath(Tempstr);

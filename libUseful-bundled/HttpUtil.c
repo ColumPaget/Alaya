@@ -15,9 +15,9 @@ void HTTPDecodeBasicAuth(const char *Auth, char **UserName, char **Password)
 }
 
 
-char *HTTPUnQuote(char *RetBuff, const char *Str)
+char *HTTPUnQuote(char *RetStr, const char *Str)
 {
-    char *RetStr=NULL, *Token=NULL;
+    char *Token=NULL;
     const char *ptr;
     int olen=0, ilen;
 
@@ -56,9 +56,9 @@ char *HTTPUnQuote(char *RetBuff, const char *Str)
 }
 
 
-char *HTTPQuoteChars(char *RetBuff, const char *Str, const char *CharList)
+char *HTTPQuoteChars(char *RetStr, const char *Str, const char *CharList)
 {
-    char *RetStr=NULL, *Token=NULL;
+    char *Token=NULL;
     const char *ptr;
     int olen=0, ilen;
 

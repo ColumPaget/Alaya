@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
-* SPDX-License-Identifier: GPL-3.0
+* SPDX-License-Identifier: LGPL-3.0-or-later
 */
 
 
@@ -46,11 +46,22 @@ The return value of Both CompressBytes and DecompressBytes is the length of data
 
 
 #include "includes.h"
-
+#include "Stream.h"
+#include "DataProcessing.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+//auto-detect compression type from first bytes in the stream
+//this function assumes it is passed an open stream that is
+//positioned at the start of file or stream. Returns 'gzip', 'bzip2', 'xz', 'lzip' or "" if no match
+const char *STREAMDetectCompression(STREAM *S);
+
+
+//these are normally only used internally by libUseful
+TProcessingModule *LU_CompressionModuleCreate(const char *Name, const char *Args);
+TProcessingModule *LU_DeCompressionModuleCreate(const char *Name, const char *Args);
 
 int zlibProcessorInit(TProcessingModule *ProcMod, const char *Args, unsigned char **Header, int *HeadLen);
 int CompressBytes(char **Out, const char *Alg, const char *In, unsigned long Len, int Level);

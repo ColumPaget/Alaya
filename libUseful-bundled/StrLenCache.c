@@ -1,5 +1,6 @@
 #include "StrLenCache.h"
 
+#ifdef USE_STRLEN_CACHE
 typedef struct
 {
     const char *Str;
@@ -10,15 +11,10 @@ static int StrLenCacheSize=0;
 static int StrLenCacheMinLen=100;
 static TStrLenCacheEntry *StrLenCache=NULL;
 
-void StrLenCacheInit(int Size, int MinStrLen)
-{
-    StrLenCache=(TStrLenCacheEntry *) calloc(Size, sizeof(TStrLenCacheEntry));
-    StrLenCacheSize=Size;
-    StrLenCacheMinLen=MinStrLen;
-}
 
 
-TStrLenCacheEntry *StrLenCacheFind(const char *Str)
+
+static TStrLenCacheEntry *StrLenCacheFind(const char *Str)
 {
     TStrLenCacheEntry *Entry;
 
@@ -34,27 +30,53 @@ TStrLenCacheEntry *StrLenCacheFind(const char *Str)
 
     return(NULL);
 }
+#endif
+
+
+int StrLenCacheInit(int Size, int MinStrLen)
+{
+#ifdef USE_STRLEN_CACHE
+    StrLenCache=(TStrLenCacheEntry *) calloc(Size, sizeof(TStrLenCacheEntry));
+    if (StrLenCache == NULL)
+    {
+        errno=ENOMEM;
+        return(FALSE);
+    }
+    StrLenCacheSize=Size;
+    StrLenCacheMinLen=MinStrLen;
+    return(TRUE);
+#endif
+
+    errno=ENOTSUP;
+    return(FALSE);
+}
+
 
 
 void StrLenCacheDel(const char *Str)
 {
+#ifdef USE_STRLEN_CACHE
     TStrLenCacheEntry *Entry;
 
     Entry=StrLenCacheFind(Str);
     if (Entry) Entry->Str=NULL;
+#endif
 }
 
 void StrLenCacheUpdate(const char *Str, int incr)
 {
+#ifdef USE_STRLEN_CACHE
     TStrLenCacheEntry *Entry;
 
     Entry=StrLenCacheFind(Str);
     if (Entry) Entry->len += incr;
+#endif
 }
 
 
 void StrLenCacheAdd(const char *Str, size_t len)
 {
+#ifdef USE_STRLEN_CACHE
     int i, emptyslot=-1;
 
     if (LibUsefulFlags & LU_STRLEN_NOCACHE) return;
@@ -87,20 +109,23 @@ void StrLenCacheAdd(const char *Str, size_t len)
         StrLenCache[emptyslot].Str=Str;
         StrLenCache[emptyslot].len=len;
     }
+#endif
 }
 
 
 int StrLenFromCache(const char *Str)
 {
-    TStrLenCacheEntry *Entry;
-
     if (! StrValid(Str)) return(0);
+
+#ifdef USE_STRLEN_CACHE
+    TStrLenCacheEntry *Entry;
 
     if (! (LibUsefulFlags & LU_STRLEN_NOCACHE))
     {
         Entry=StrLenCacheFind(Str);
         if (Entry) return(Entry->len);
     }
+#endif
 
 //okay, nothing worked, fall back to good old strlen
     return(strlen(Str));

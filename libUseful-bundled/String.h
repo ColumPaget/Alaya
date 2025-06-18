@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
-* SPDX-License-Identifier: GPL-3.0
+* SPDX-License-Identifier: LGPL-3.0-or-later
 */
 
 #ifndef LIBUSEFUL_STRING_H
@@ -81,6 +81,36 @@ extern "C" {
 //Quote some standard chars in a string with '\'. 
 #define EnquoteStr(Dest, Src) (QuoteCharsInStr((Dest), (Src), "'\"\r\n"))
 
+
+
+
+//uppercase a string
+char *strupr(char *Str);
+
+//lowercase a string
+char *strlwr(char *Str);
+
+//replace every instance of character 'c1' with character 'c2'
+char *strrep(char *Str, char c1, char c2);
+
+//replace any character in the list 'oldchars' with the charcter 'newchar
+char *strmrep(char *str, char *oldchars, char newchar);
+
+//strtol, except only considering the first 'len' bytes
+int strntol(const char **ptr, int len, int radix, long *value);
+
+//returns 'true' if 'str' is 'true' or 'y' (case insensitive) or any non-zero number
+int strtobool(const char *str);
+
+// returns true if string only contains alphabetic characters
+int istext(const char *Str);
+
+//returns true if string only contains digits
+int isnum(const char *Str);
+
+int strcount(const char *Str, char Char);
+
+
 //allocate or reallocate 'Len' bytes of memory to a resizeable string
 char *SetStrLen(char *Str, size_t Len);
 
@@ -126,32 +156,6 @@ char *AddCharToBuffer(char *Buffer, size_t Len, char Char);
 
 //add 'Len' Bytes to a string already containing 'DestLen' characters
 char *AddBytesToBuffer(char *Dest, size_t DestLen, char *Bytes, size_t Len);
-
-//uppercase a string
-char *strupr(char *Str);
-
-//lowercase a string
-char *strlwr(char *Str);
-
-//replace every instance of character 'c1' with character 'c2'
-char *strrep(char *Str, char c1, char c2);
-
-//replace any character in the list 'oldchars' with the charcter 'newchar
-char *strmrep(char *str, char *oldchars, char newchar);
-
-//strtol, except only considering the first 'len' bytes
-int strntol(const char **ptr, int len, int radix, long *value);
-
-
-//returns 'true' if 'str' is 'true' or 'y' (case insensitive) or any non-zero number
-int strtobool(const char *str);
-
-// returns true if string only contains alphabetic characters
-int istext(const char *Str);
-
-//returns true if string only contains digits
-int isnum(const char *Str);
-
 //Truncate a string to so many chars, WITHOUT CHECKING IT'S GOT THAT MANY
 //this saves a strlen and is mostly for internal use. 
 //It does at least check that the string is not NULL
@@ -178,7 +182,20 @@ char *StripLeadingWhitespace(char *Str);
 //strip carriage-return and linefeed characters from the end of a string
 char *StripCRLF(char *Str);
 
-//if string stars and ends with either ' or " strip those
+//If a string starts with a char in 'StartChars' then strip both that, and it's companion in 'EndChars'
+//e.g.  StripStartEndChars(Str, "[({", "])}");
+//if the string starts with '(', then the matching ')' is looked up in end chars and removed from the end if present
+//if '(' isn't matched by a ')' at the end, then it's not removed
+//StripStartEndChars returns the changed string, but as the strip is done using memmove there's no need
+//to write:
+//  Str=StripStartEndChars(Str, "(", ")");
+//it's enough to write:
+//  Str=StripStartEndChars(Str, "(", ")");
+char *StripStartEndChars(char *Str, const char *StartChars, const char *EndChars);
+
+//Strip either \" or \' characters surrounding a string. Only strips if the string starts and
+//ends with the same character (either \" or \'). Whitespace at start of string stripped too
+//DOESN'T strip backticks. 
 char *StripQuotes(char *Str);
 
 //for any of the chars listed in 'QuoteChars' quote them using '\' style quotes.

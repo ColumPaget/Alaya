@@ -1,6 +1,6 @@
 /*
 Copyright (c) 2015 Colum Paget <colums.projects@googlemail.com>
-* SPDX-License-Identifier: GPL-3.0
+* SPDX-License-Identifier: LGPL-3.0-or-later
 */
 
 #ifndef LIBUSEFUL_LIST
@@ -14,8 +14,10 @@ Items are stored as (void *) pointers, and can be tagged with a name by using 'L
 
 When the list is destroyed by the 'ListDestroy' function, a Destructor function can be passed in as the second argument which is used to destroy items stored in the list. If the items in the list aren't unique copies, but are pointers to things that exist outside of the list, then pass NULL as the destructor.
 
-For example:
+For example, the following adds two un-named items to a list (the strings "item 1" and "item 2" are the data stored in the list, not name tags for items):
 
+
+```
 ListNode *MyList, *Curr;
 
 MyList=ListCreate();
@@ -30,10 +32,67 @@ Curr=ListGetNext(Curr);
 }
 
 ListDestroy(MyList, Destroy);
+```
 
 
 Here we add two strings to the list, and use 'CopyStr' to make unique copies of them. These are then destroyed/freed using the standard 'Destroy' function, which is passed in as the second argument of 'ListDestroy'.
 
+
+Maps work similarly, with the only difference being the use of 'MapCreate' with a 'number of chains' argument. The below code creates a map of named items, with 128 sub-lists ("chains") in the map. It then looks up each of the items added and prints out their name tag.
+
+
+```
+ListNode *MyList, *Curr;
+char *Tempstr=NULL;
+int i;
+
+MyList=MapCreate(128, 0);
+
+for (i=0; i < 10000; i++)
+{
+Tempstr=FormatStr(Tempstr, "item %d", i);
+ListAddNamedItem(MyList, Tempstr, CopyStr(NULL, Tempstr));
+}
+
+
+for (i=0; i < 10000; i++)
+{
+Tempstr=FormatStr(Tempstr, "item %d", i);
+Curr=ListFindNamedItem(MyList, Tempstr);
+if (Curr) printf("Found: %s\n", Curr->Tag);
+}
+
+
+ListDestroy(MyList, Destroy);
+```
+
+
+Various flags can be passed as an optional Argument to 'ListCreate', e.g.
+
+
+```
+
+MyList=ListCreate(LIST_FLAG_CACHE);
+
+```
+
+or as the second argument of 'MapCreate', e.g.
+
+```
+
+MyList=MapCreate(4096, LIST_FLAG_CACHE);
+
+```
+
+
+The 'LIST_FLAG_CACHE' flag used in these examples caches the last item found in a lookup, so that if the same item is looked up many times in a row,
+it is returned more quickly. This is particularly useful with large maps with many sub-lists and many items in each sub-list, as the likelyhood of 
+looking up the same item twice in a given chain is much higher, as that chain is only visited for a subset of items in the map. This can speed up
+lookups as the whole sub-chain does not have to be explored to find the item, as the cached item will be returned immediately.
+
+
+The maximum length of a list, or of each subchain in a map, can be set with 'ListSetMaxItems', and Items can be timed-out from the
+list using 'LIST_FLAG_TIMEOUT. 
 
 */
 
@@ -44,16 +103,16 @@ Here we add two strings to the list, and use 'CopyStr' to make unique copies of 
 
 
 // Functions passsed to 'ListCreate' or 'MapCreate' or set against a ListNode item
-#define LIST_FLAG_DELETE 1      //internally used flag
-#define LIST_FLAG_CASE 2        //when doing searches with 'ListFindNamedItem' etc, use case
-#define LIST_FLAG_SELFORG 4     //self organize list so most used items are at the top
-#define LIST_FLAG_ORDERED 8     //create an 'ordered' list (so insert items in order)
-#define LIST_FLAG_CACHE 16      //cache the last found item (especially useful for maps)
-#define LIST_FLAG_TIMEOUT 32    //internally used flag 
-#define LIST_FLAG_MAP_HEAD   64 //internally used flag
-#define LIST_FLAG_MAP_CHAIN 128 //internally used flag
-#define LIST_FLAG_MAP (LIST_FLAG_MAP_HEAD | LIST_FLAG_MAP_CHAIN) //internally used flag
-#define LIST_FLAG_STATS 256     //internally used flag
+#define LIST_FLAG_DELETE      1   //internally used flag, currently unused
+#define LIST_FLAG_CASE        2   //when doing searches with 'ListFindNamedItem' etc, use case
+#define LIST_FLAG_SELFORG     4   //self organize list so most used items are at the top
+#define LIST_FLAG_ORDERED     8   //create an 'ordered' list (so insert items in order)
+#define LIST_FLAG_CACHE      16   //cache the last found item (especially useful for maps)
+#define LIST_FLAG_TIMEOUT    32   //remove items in the list that are older than the time set against them using 'ListNodeSetTime'
+#define LIST_FLAG_MAP_HEAD   64   //internally used flag to specify this node is the head of a map
+#define LIST_FLAG_MAP_CHAIN 128   //internally used flag to specify this node is the head of a map chain
+#define LIST_FLAG_MAP (LIST_FLAG_MAP_HEAD | LIST_FLAG_MAP_CHAIN) //internally used flag 
+#define LIST_FLAG_STATS     256   //internally used flag
 
 //list contains only one instance of a named item, so don't keep searching after first find.
 //N.B. This ignores item type, one instance of a name means exactly that, NOT one instance of 
@@ -66,23 +125,64 @@ Here we add two strings to the list, and use 'CopyStr' to make unique copies of 
 
 //these flags are available to be set against a listnode for whatever purpose the user
 //desires
-#define LIST_FLAG_USER1 1024
-#define LIST_FLAG_USER2 2048
-#define LIST_FLAG_USER3 4096
-#define LIST_FLAG_USER4 8192
-#define LIST_FLAG_USER5 16384
-#define LIST_FLAG_DEBUG 32768
+#define LIST_FLAG_USER1   1024
+#define LIST_FLAG_USER2   2048
+#define LIST_FLAG_USER3   4096
+#define LIST_FLAG_USER4   8192
+#define LIST_FLAG_USER5  16384
 
-#define ANYTYPE -1
+
+#define LIST_FLAG_DEBUG  32768
+
+
+#define LIST_ITEM_ANYTYPE -1
 
 
 #include <time.h>
+
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// function prototypes for 'destroy' and 'clone' functions used by
+// 'DestroyList' and 'CloneList'
+typedef void (*LIST_ITEM_DESTROY_FUNC)(void *);
+typedef void *(*LIST_ITEM_CLONE_FUNC)(void *);
+
+
+
+//ListStats started out as a structure to store how many times a node in a list is accessed ("Hits")
+//and it's last access time. However, since then it's become a multi-use structure. 
+
+//Data nodes in a list only have a "ListStats" item if the list has been created with the LIST_FLAG_STATS flag
+//or if they've been created with the LIST_FLAG_TIMEOUT (see below)
+
+//Head nodes of a list don't have a "Hits" value, and instead "Hits" is used to store the number
+//of items in the list. For this and other reasons, head nodes always have a 'stats' subitem.
+
+//If LIST_FLAG_TIMEOUT is set on a list, then the 'Time' field is used in combination 
+//with the 'ListNodeSetTime' function to set an expiry time for items in a list. In this
+//situation 'last access time' is not available. 
+
+//If the 'ListSetMaxItems' function is used to set a maximum number of items in the list, then the 'Max'
+//value is set in ListStats, and if the list, or a chain in a map, has more items than this, then
+//items are deleted from the top of the list. Items at the top are presumed to be the oldest, but this
+//may not be true with self-ordered lists.
+
+//Destroyer is a function that can be set with either 'ListSetDestroyer' or 'ListSetMaxItems' which is
+//called to destroy items in the list when they time out, or are deleted because the list has exceeded
+//the 'Max' items level.
+ 
 
 typedef struct
 {
     time_t Time;
 //In the 'head' item 'Hits' is used to hold the count of items in the list
     unsigned long Hits;
+    unsigned long Max;
+		LIST_ITEM_DESTROY_FUNC Destroyer;
 } ListStats;
 
 
@@ -104,11 +204,13 @@ typedef struct lnode
 } ListNode;
 
 
-//things not worthy of a full function or which pull tricks with macros
+//below are macros for things not worthy of a full function or which pull tricks with macros
 
 //this allows 'ListCreate' to be called with flags or without
 #define ListCreate(F) (ListInit(F + 0))
 
+
+//Get first item in a list, or in a map chain
 #define MapChainGetHead(Node) (((Node)->Flags & LIST_FLAG_MAP_CHAIN) ? (Node) : Node->Head)
 
 //if L isn't NULL then return L->Head, it's fine if L->Head is null
@@ -137,14 +239,9 @@ typedef struct lnode
 //in map heads ItemType is used to hold the number of buckets
 #define MapChainCount(Head) (((Head)->Flags & LIST_FLAG_MAP) ? (Head)->ItemType : 0)
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
-// function prototypes for 'destroy' and 'clone' functions used by
-// 'DestroyList' and 'CloneList'
-typedef void (*LIST_ITEM_DESTROY_FUNC)(void *);
-typedef void *(*LIST_ITEM_CLONE_FUNC)(void *);
+
+//real functions start here
 
 unsigned long ListSize(ListNode *Node);
 
@@ -156,6 +253,16 @@ ListNode *ListInit(int Flags);
 
 //SetFlags on a list
 void ListSetFlags(ListNode *List, int Flags);
+
+
+//Set a function that will be called to destroy items in the list
+//this is used by The List-Max-Items and LIST_FLAT_TIMEOUT features
+void ListSetDestroyer(ListNode *List, LIST_ITEM_DESTROY_FUNC Destroyer);
+
+//Set maximum length of the list. For maps, this will be
+//the maximum length that any chain can grow to.
+void ListSetMaxItems(ListNode *Node, unsigned long Max, LIST_ITEM_DESTROY_FUNC Destroyer);
+
 
 //Set time on a list. Normally this is automatically set on insertion
 void ListNodeSetTime(ListNode *Node, time_t When);

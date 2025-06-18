@@ -1,3 +1,5 @@
+#ifdef USE_JH
+
 #include "jh_ref.h"
 #include <string.h>
 
@@ -354,4 +356,4 @@ unsigned int JHFinal(hashState *state, unsigned char *hashval)
     return(len);
 }
 
-
+#endif

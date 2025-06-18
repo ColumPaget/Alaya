@@ -82,6 +82,20 @@ char *StripDirectorySlash(char *DirPath)
 }
 
 
+char *AppendPath(char *Path, const char *SubDirectory, const char *File)
+{
+    Path=SlashTerminateDirectoryPath(Path);
+    if (StrValid(SubDirectory))
+    {
+        Path=CatStr(Path, SubDirectory);
+        Path=SlashTerminateDirectoryPath(Path);
+    }
+    Path=CatStr(Path, File);
+
+    return(Path);
+}
+
+
 int MakeDirPath(const char *Path, int DirMask)
 {
     const char *ptr;
@@ -163,9 +177,11 @@ int FileMoveToDir(const char *FilePath, const char *Dir)
 }
 
 
-int FindFilesInPath(const char *File, const char *Path, ListNode *Files)
+
+
+int FindFilesInPathSubDirectory(const char *File, const char *Path, const char *SubDirectory, ListNode *Files)
 {
-    char *Tempstr=NULL, *CurrPath=NULL;
+    char *CurrPath=NULL;
     const char *ptr;
     int i;
     glob_t Glob;
@@ -179,17 +195,15 @@ int FindFilesInPath(const char *File, const char *Path, ListNode *Files)
 
     while (ptr)
     {
-        CurrPath=SlashTerminateDirectoryPath(CurrPath);
-        Tempstr=MCopyStr(Tempstr,CurrPath,File,NULL);
+        CurrPath=AppendPath(CurrPath, SubDirectory, File);
 
-        glob(Tempstr,0,0,&Glob);
+        glob(CurrPath, 0, 0, &Glob);
         for (i=0; i < Glob.gl_pathc; i++) ListAddItem(Files,CopyStr(NULL,Glob.gl_pathv[i]));
         globfree(&Glob);
 
         ptr=GetToken(ptr,":",&CurrPath,0);
     }
 
-    DestroyString(Tempstr);
     DestroyString(CurrPath);
 
     return(ListSize(Files));
@@ -197,13 +211,20 @@ int FindFilesInPath(const char *File, const char *Path, ListNode *Files)
 
 
 
-char *FindFileInPath(char *InBuff, const char *File, const char *Path)
+int FindFilesInPath(const char *File, const char *Path, ListNode *Files)
 {
-    char *Tempstr=NULL, *CurrPath=NULL, *RetStr=NULL, *Link=NULL;
+    return(FindFilesInPathSubDirectory(File, Path, NULL, Files));
+}
+
+
+
+char *FindFileInPathSubDirectory(char *RetStr, const char *File, const char *SubDirectory, const char *Path)
+{
+    char *CurrPath=NULL, *Link=NULL;
     struct stat Stat;
     const char *ptr;
 
-    RetStr=CopyStr(InBuff,"");
+    RetStr=CopyStr(RetStr, "");
 
     if (*File=='/')
     {
@@ -214,19 +235,18 @@ char *FindFileInPath(char *InBuff, const char *File, const char *Path)
 
     while (ptr)
     {
-        CurrPath=SlashTerminateDirectoryPath(CurrPath);
-        Tempstr=MCopyStr(Tempstr,CurrPath,File,NULL);
-        if (lstat(Tempstr, &Stat)==0)
+        CurrPath=AppendPath(CurrPath, SubDirectory, File);
+        if (lstat(CurrPath, &Stat)==0)
         {
             //if we find an symlink, then remember it, but don't return it,
             //in the hope that we will find a better match
             if (S_ISLNK(Stat.st_mode))
             {
-                if (! StrValid(Link)) Link=CopyStr(Link, Tempstr);
+                if (! StrValid(Link)) Link=CopyStr(Link, CurrPath);
             }
             else
             {
-                RetStr=CopyStr(RetStr,Tempstr);
+                RetStr=CopyStr(RetStr,CurrPath);
                 break;
             }
         }
@@ -238,9 +258,36 @@ char *FindFileInPath(char *InBuff, const char *File, const char *Path)
     //then return that link
     if (! StrValid(RetStr)) RetStr=CopyStr(RetStr, Link);
 
-    DestroyString(Tempstr);
     DestroyString(CurrPath);
     DestroyString(Link);
+
+    return(RetStr);
+}
+
+
+
+char *FindFileInPath(char *RetStr, const char *File, const char *Path)
+{
+    return(FindFileInPathSubDirectory(RetStr, File, NULL, Path));
+}
+
+
+char *FindFileInPrefixSubDirectory(char *RetStr, const char *File, const char *SubDirectory, const char *Path)
+{
+    char *Dir=NULL;
+    const char *ptr;
+
+    ptr=GetToken(Path, ":", &Dir, 0);
+    while (ptr)
+    {
+        Dir=StripDirectorySlash(Dir);
+        StrRTruncChar(Dir, '/');
+        RetStr=FindFileInPathSubDirectory(RetStr, Path, SubDirectory, File);
+        if (StrValid(RetStr)) break;
+        ptr=GetToken(ptr, ":", &Dir, 0);
+    }
+
+    Destroy(Dir);
 
     return(RetStr);
 }
@@ -254,6 +301,14 @@ int FileExists(const char *FileName)
 
     if (stat(FileName,&StatData) == 0) return(1);
     else return(0);
+}
+
+size_t FileSize(const char *FileName)
+{
+    struct stat StatData;
+
+    if (stat(FileName,&StatData) == 0) return(StatData.st_size);
+    else return(-1);
 }
 
 
@@ -794,3 +849,18 @@ int FileSetSTREAMFlags(const char *Path, int Set, int Unset)
 }
 
 
+
+int FileWrite(const char *Path, const char *Data)
+{
+    STREAM *S;
+    int len=0;
+
+    S=STREAMOpen(Path, "wc");
+    if (S)
+    {
+        len=STREAMWriteBytes(S, Data, StrLen(Data));
+        STREAMClose(S);
+    }
+
+    return(len);
+}

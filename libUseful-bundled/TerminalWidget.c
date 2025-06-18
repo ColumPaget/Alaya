@@ -28,7 +28,7 @@ void TerminalWidgetParseConfig(TERMWIDGET *TW, const char *Config)
     char *Name=NULL, *Value=NULL;
     const char *ptr;
 
-		if (! StrValid(Config)) return;
+    if (! StrValid(Config)) return;
 
     ptr=GetNameValuePair(Config, "\\S", "=", &Name, &Value);
     while (ptr)
@@ -65,6 +65,10 @@ void TerminalWidgetParseConfig(TERMWIDGET *TW, const char *Config)
 
         case 'h':
             if (strcasecmp(Name, "height")==0) TW->high=atoi(Value);
+            break;
+
+        case 'i':
+            if (strcasecmp(Name, "innertext")==0) SetVar(TW->Options, "innertext", Value);
             break;
 
         case 'o':

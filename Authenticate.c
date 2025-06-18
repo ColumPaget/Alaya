@@ -7,8 +7,8 @@
 
 
 
-const char *AuthMethods[]= {"none", "open", "deny", "native", "pam", "pam-account", "passwd", "shadow", "digest", "certificate", "accesstoken", "cookie",NULL};
-typedef enum {AUTHTOK_NONE, AUTHTOK_OPEN, AUTHTOK_DENY, AUTHTOK_NATIVE, AUTHTOK_PAM, AUTHTOK_PAM_ACCT, AUTHTOK_PASSWD, AUTHTOK_SHADOW, AUTHTOK_DIGEST, AUTHTOK_CERTIFICATE, AUTHTOK_ACCESSTOKEN, AUTHTOK_ACCESSTOKEN_HTTP, AUTHTOK_COOKIE} TAuthTokens;
+const char *AuthMethods[]= {"none", "open", "deny", "native", "pam", "pam-account", "passwd", "shadow", "digest", "certificate", "cookie", "accesstoken", "urltoken", NULL};
+typedef enum {AUTHTOK_NONE, AUTHTOK_OPEN, AUTHTOK_DENY, AUTHTOK_NATIVE, AUTHTOK_PAM, AUTHTOK_PAM_ACCT, AUTHTOK_PASSWD, AUTHTOK_SHADOW, AUTHTOK_DIGEST, AUTHTOK_CERTIFICATE, AUTHTOK_COOKIE, AUTHTOK_ACCESSTOKEN, AUTHTOK_URLTOKEN} TAuthTokens;
 
 
 
@@ -96,7 +96,8 @@ int AuthenticateExamineMethods(const char *Methods, int LogErrors)
             MethodsFound |= AUTH_ACCESSTOKEN;
             break;
 
-        case AUTHTOK_ACCESSTOKEN_HTTP:
+        case AUTHTOK_URLTOKEN:
+            MethodsFound |= AUTH_URLTOKEN;
             break;
         }
 
@@ -115,7 +116,7 @@ int AuthenticateExamineMethods(const char *Methods, int LogErrors)
         {
             LogToFile(Settings.LogPath, "WARNING: 'open' authentication is enabled along with other authentication types. 'open' authentication means no authentication, so other auth types will be disabled.");
         }
-        else if (  (MethodsFound & AUTH_DIGEST) && (((MethodsFound & ~(AUTH_DIGEST | AUTH_ACCESSTOKEN)) !=0) ) )
+        else if (  (MethodsFound & AUTH_DIGEST) && (((MethodsFound & ~(AUTH_DIGEST | AUTH_ACCESSTOKEN | AUTH_URLTOKEN)) !=0) ) )
         {
             LogToFile(Settings.LogPath, "WARNING: 'digest' authentication is enabled along with other authentication types. Digest authentication requires plain-text passwords in the *native* alaya authentication file, and cannot authenticate against /etc/passwd, /etc/shadow or PAM.  Most clients will use digest in preference to 'basic' authentication. Thus including 'digest' will thus disable other authentication types.");
         }
@@ -262,9 +263,8 @@ int Authenticate(HTTPSession *Session)
     char *AuthenticationsTried=NULL;
 //struct group *grent;
 
-    AuthenticationsTried=CopyStr(AuthenticationsTried, "");
 
- LogToFile(Settings.LogPath, "AUTH: Authentication '%s'. Password: '%s'", Session->UserName, Session->Password);
+    LogToFile(Settings.LogPath, "AUTH: Authentication '%s'. Password: '%s'", Session->UserName, Session->Password);
     if (! CheckServerAllowDenyLists(Session->UserName))
     {
         LogToFile(Settings.LogPath, "AUTH: Authentication failed for UserName '%s'. User not allowed to log in",Session->UserName);
@@ -279,6 +279,7 @@ int Authenticate(HTTPSession *Session)
     }
 
 
+    AuthenticationsTried=CopyStr(AuthenticationsTried, "");
 //check for this as it changes behavior of other auth types
     ptr=GetToken(Settings.AuthMethods, ",", &Token, 0);
     while (ptr)
@@ -326,6 +327,11 @@ int Authenticate(HTTPSession *Session)
         else if (strcasecmp(Token, "accesstoken")==0)
         {
             result=AuthAccessToken(Session, Session->Password);
+            AuthenticationsTried=MCatStr(AuthenticationsTried, Token, " ", NULL);
+        }
+        else if (strcasecmp(Token, "urltoken")==0)
+        {
+            result=AuthURLToken(Session, Session->Password);
             AuthenticationsTried=MCatStr(AuthenticationsTried, Token, " ", NULL);
         }
         else if (strcasecmp(Token, "cookie")==0)
@@ -404,6 +410,7 @@ int Authenticate(HTTPSession *Session)
     }
 
 
+    Destroy(AuthenticationsTried);
     Destroy(Token);
     return(result);
 }

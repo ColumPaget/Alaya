@@ -1,4 +1,6 @@
 #include "Unicode.h"
+#include "FileSystem.h"
+#include "StringList.h"
 
 static int GlobalUnicodeLevel=0;
 static ListNode *UnicodeNamesCache=NULL;
@@ -7,6 +9,41 @@ void UnicodeSetUTF8(int level)
 {
     GlobalUnicodeLevel=level;
 }
+
+
+char *UnicodeEncodeChar(char *RetStr, int UnicodeLevel, int Code)
+{
+    char *Tempstr=NULL;
+
+    if ((Code==0) || (UnicodeLevel == 0)) return(AddCharToStr(RetStr, '?'));
+
+    if (Code < 0x800)
+    {
+        Tempstr=FormatStr(Tempstr,"%c%c",128+64+((Code & 1984) >> 6), 128 + (Code & 63));
+    }
+    else if (Code < 0x10000)
+    {
+        Tempstr=CopyStr(Tempstr, "?");
+        if ((UnicodeLevel > 1) && (Code < 0x10000)) Tempstr=FormatStr(Tempstr,"%c%c%c", (Code >> 12) | 224, ((Code >> 6) & 63) | 128, (Code & 63) | 128);
+    }
+    else
+    {
+        Tempstr=CopyStr(Tempstr, "?");
+        if ((UnicodeLevel > 2) && (Code < 0x110000)) Tempstr=FormatStr(Tempstr,"%c%c%c%c", (Code >> 18) | 240, ((Code >> 12) & 63) | 128, ((Code >> 6) & 63) | 128, (Code & 63) | 128);
+    }
+
+    RetStr=CatStr(RetStr,Tempstr);
+    DestroyString(Tempstr);
+
+    return(RetStr);
+}
+
+
+char *UnicodeStr(char *RetStr, int Code)
+{
+    return(UnicodeEncodeChar(RetStr, GlobalUnicodeLevel, Code));
+}
+
 
 
 char *BufferAddUnicodeChar(char *RetStr, unsigned int len, unsigned int uchar)
@@ -128,75 +165,85 @@ unsigned int UnicodeDecode(const char **ptr)
 
 
 
-char *UnicodeEncodeChar(char *RetStr, int UnicodeLevel, int Code)
+int UnicodeStrFromCache(char **RetStr, const char *Name)
 {
-    char *Tempstr=NULL;
-
-    if ((Code==0) || (UnicodeLevel == 0)) return(AddCharToStr(RetStr, '?'));
-
-    if (Code < 0x800)
-    {
-        Tempstr=FormatStr(Tempstr,"%c%c",128+64+((Code & 1984) >> 6), 128 + (Code & 63));
-    }
-    else if (Code < 0x10000)
-    {
-        Tempstr=CopyStr(Tempstr, "?");
-        if ((UnicodeLevel > 1) && (Code < 0x10000)) Tempstr=FormatStr(Tempstr,"%c%c%c", (Code >> 12) | 224, ((Code >> 6) & 63) | 128, (Code & 63) | 128);
-    }
-    else
-    {
-        Tempstr=CopyStr(Tempstr, "?");
-        if ((UnicodeLevel > 2) && (Code < 0x110000)) Tempstr=FormatStr(Tempstr,"%c%c%c%c", (Code >> 18) | 240, ((Code >> 12) & 63) | 128, ((Code >> 6) & 63) | 128, (Code & 63) | 128);
-    }
-
-    RetStr=CatStr(RetStr,Tempstr);
-    DestroyString(Tempstr);
-
-    return(RetStr);
-}
-
-
-char *UnicodeStr(char *RetStr, int Code)
-{
-    return(UnicodeEncodeChar(RetStr, GlobalUnicodeLevel, Code));
-}
-
-
-
-char *UnicodeStrFromNameAtLevel(char *RetStr, int UnicodeLevel, const char *Name)
-{
-    STREAM *S;
-    char *Tempstr=NULL, *Token=NULL;
-    const char *ptr;
     ListNode *Node;
-    int code=0;
+    long code;
 
-
-    if (! UnicodeNamesCache) UnicodeNamesCache=ListCreate();
     Node=ListFindNamedItem(UnicodeNamesCache, Name);
     if (Node)
     {
         code=strtol((const char *) Node->Item, NULL, 16);
-        return(UnicodeStr(RetStr, code));
+        *RetStr=UnicodeStr(*RetStr, code);
+        return(TRUE);
     }
 
-    Tempstr=CopyStr(Tempstr, LibUsefulGetValue("Unicode:NamesFile"));
-    if (StrValid(Tempstr)) Tempstr=CopyStr(Tempstr, getenv("UNICODE_NAMES_FILE"));
-    if (! StrValid(Tempstr)) Tempstr=MCopyStr(Tempstr, SYSCONFDIR,  "unicode-names.conf", NULL);
+    return(FALSE);
+}
+
+static STREAM *UnicodeNamesFileOpen(const char *FName, const char *EnvVarName, const char *LibUsefulVar)
+{
+    char *Tempstr=NULL;
+    STREAM *S=NULL;
+
+    if (StrValid(LibUsefulVar)) Tempstr=CopyStr(Tempstr, LibUsefulGetValue(LibUsefulVar));
+    if ( (! StrValid(Tempstr)) && (StrValid(EnvVarName)) ) Tempstr=CopyStr(Tempstr, getenv(EnvVarName));
+
+    if (! StrValid(Tempstr)) Tempstr=MCopyStr(Tempstr, SYSCONFDIR,  "/", FName, NULL);
+    if (access(Tempstr, R_OK) !=0) Tempstr=FindFileInPrefixSubDirectory(Tempstr, getenv("PATH"), "/etc/", FName);
 
     S=STREAMOpen(Tempstr, "r");
+
+    Destroy(Tempstr);
+    return(S);
+}
+
+
+int UnicodeNamesInCache(const char *Names)
+{
+    char *Name=NULL;
+    const char *ptr;
+    int result=TRUE;
+
+    ptr=GetToken(Names, ",", &Name, 0);
+    while (ptr)
+    {
+        if (! ListFindNamedItem(UnicodeNamesCache, Name))
+        {
+            result=FALSE;
+            break;
+        }
+        ptr=GetToken(ptr, ",", &Name, 0);
+    }
+
+    Destroy(Name);
+
+    return(result);
+}
+
+
+
+int UnicodeNameCachePreloadFromFile(const char *FName, const char *EnvVarName, const char *LibUsefulVar, const char *Names)
+{
+    char *Name=NULL, *Tempstr=NULL;
+    const char *ptr;
+    int RetVal=FALSE;
+    STREAM *S;
+
+
+    S=UnicodeNamesFileOpen(FName, EnvVarName, LibUsefulVar);
     if (S)
     {
         Tempstr=STREAMReadLine(Tempstr, S);
         while (Tempstr)
         {
             StripTrailingWhitespace(Tempstr);
-            ptr=GetToken(Tempstr, "\\S", &Token, 0);
-            if (CompareStrNoCase(Token, Name)==0)
+            ptr=GetToken(Tempstr, "\\S|,", &Name, GETTOKEN_MULTI_SEP);
+
+            if (StrValid(Name) && InStringList(Name, Names, ","))
             {
+                if (! UnicodeNamesCache) UnicodeNamesCache=ListCreate();
                 SetVar(UnicodeNamesCache, Name, ptr);
-                code=strtol(ptr, NULL, 16);
-                break;
             }
             Tempstr=STREAMReadLine(Tempstr, S);
         }
@@ -204,9 +251,73 @@ char *UnicodeStrFromNameAtLevel(char *RetStr, int UnicodeLevel, const char *Name
     }
 
     Destroy(Tempstr);
-    Destroy(Token);
+    Destroy(Name);
 
-    return(UnicodeEncodeChar(RetStr, UnicodeLevel, code));
+    return(RetVal);
+}
+
+
+
+int UnicodeNameCachePreload(const char *Names)
+{
+if (GlobalUnicodeLevel == 0) return(FALSE);
+
+if (UnicodeNamesInCache(Names)) return(TRUE);
+if (UnicodeNameCachePreloadFromFile("unicode-names.conf", "UNICODE_NAMES_FILE", "Unicode:NamesFile", Names)) return(TRUE);
+if (UnicodeNamesInCache(Names)) return(TRUE);
+if (GlobalUnicodeLevel > 8)
+{
+if (UnicodeNameCachePreloadFromFile("nerdfont.csv.txt", "NERDFONTS_NAMES_FILE", "NerdFonts:NamesFile", Names)) return(TRUE);
+if (UnicodeNameCachePreloadFromFile("nerdfont.csv", NULL, NULL, Names)) return(TRUE);
+if (UnicodeNameCachePreloadFromFile("nerdfont.txt", NULL, NULL, Names)) return(TRUE);
+}
+
+return(FALSE);
+}
+
+
+
+int UnicodeNameCachePreloadFromTerminalStr(const char *String)
+{
+    char *Names=NULL, *Name=NULL;
+    const char *ptr;
+    int result;
+
+    for (ptr=String; *ptr != '\0'; ptr++)
+    {
+        if (*ptr=='~')
+        {
+            ptr++;
+            if (*ptr==':')
+            {
+		//using GETTOKEN_INCLUDE_SEP means the ':' is included in the list of tokens
+		//so when we call GetToken here, the ptr it returns isn't past the closing ':'
+		//it's right on it. ptr++ in the for statment then moves us past this token
+                ptr=GetToken(ptr+1, ":", &Name, GETTOKEN_INCLUDE_SEP);
+                Names=StringListAdd(Names, Name, ",");
+            }
+
+        }
+    }
+
+    result=UnicodeNameCachePreload(Names);
+
+    Destroy(Names);
+    Destroy(Name);
+
+    return(result);
+}
+
+
+
+
+char *UnicodeStrFromNameAtLevel(char *RetStr, int UnicodeLevel, const char *Name)
+{
+    if (UnicodeStrFromCache(&RetStr, Name)) return(RetStr);
+    UnicodeNameCachePreload(Name);
+
+    UnicodeStrFromCache(&RetStr, Name);
+    return(RetStr);
 }
 
 

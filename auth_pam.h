@@ -8,6 +8,7 @@ this file contains functions relating to authentication via Pluggable Authentica
 #define ALAYA_AUTH_PAM
 
 #include "Authenticate.h"
+#include "http_session.h"
 
 int AuthPAM(HTTPSession *Session);
 int AuthPAMCheckAccount(HTTPSession *Session);

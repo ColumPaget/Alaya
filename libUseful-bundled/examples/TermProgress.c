@@ -15,11 +15,11 @@ TerminalClear(Term);
 
 //TP=TerminalProgressCreate(Term, "prompt='progress: ' left-contain=' -=' right-contain='=- ' progress=| width=20");
 //TP=TerminalProgressCreate(Term, "prompt='progress: ' progress=' ' progress-attribs=~i width=20");
-TP=TerminalProgressCreate(Term, "prompt='progress: ' width=20");
-//TP=TerminalProgressCreate(Term, "prompt='progress: ' progress=' ' attribs=~B progress-attribs=~W left-contain='' right-contain=' ' x=4 width=-4");
+//TP=TerminalProgressCreate(Term, "prompt='progress: ' width=20");
+TP=TerminalProgressCreate(Term, "prompt='progress: ' progress=' ' attribs=~B~w progress-attribs=~W~b left-contain='[' right-contain=']' innertext='$(percent)%' width=20");
 for (i=0; i <= 20; i++) 
 {
-Tempstr=FormatStr(Tempstr, "NOW AT: %d", i);
+Tempstr=FormatStr(Tempstr, " NOW AT: %d", i);
 TerminalProgressUpdate(TP, i, 20, Tempstr);
 sleep(1);
 }

@@ -295,8 +295,8 @@ void STREAMReAllocBuffer(STREAM *S, int size, int Flags)
     }
     else
     {
-        if (! (RW & SF_WRONLY)) S->InputBuff =(unsigned char *) realloc(S->InputBuff,size);
-        if (! (RW & SF_RDONLY)) S->OutputBuff=(unsigned char *) realloc(S->OutputBuff,size);
+        if (! (RW & SF_WRONLY)) S->InputBuff =(unsigned char *) realloc(S->InputBuff, size);
+        if (! (RW & SF_RDONLY)) S->OutputBuff=(unsigned char *) realloc(S->OutputBuff, size);
     }
 
     if (ibuf)
@@ -518,7 +518,6 @@ static int STREAMBasicSendBytes(STREAM *S, const char *Data, int DataLen)
 //and is called in Websocket.c
 int STREAMPushBytes(STREAM *S, const char *Data, int DataLen)
 {
-
     if (S->State & LU_SS_SSL) return(OpenSSLSTREAMWriteBytes(S, Data, DataLen));
     return(STREAMBasicSendBytes(S, Data, DataLen));
 }
@@ -638,7 +637,7 @@ void STREAMClear(STREAM *S)
 /*A stream can have a series of 'processor modules' associated with it' */
 /*which do things to the data before it is read/written. This function  */
 /*pumps the data through the processor list, and eventually writes it out */
-int STREAMReadThroughProcessors(STREAM *S, char *Bytes, int InLen)
+int STREAMReadThroughProcessors(STREAM *S, char *Bytes, long InLen)
 {
     TProcessingModule *Mod;
     ListNode *Curr;
@@ -673,6 +672,7 @@ int STREAMReadThroughProcessors(STREAM *S, char *Bytes, int InLen)
             {
                 OutputBuff=(char *) realloc(OutputBuff, olen);
                 //if InLen < 0 then we are requesting a flush
+
                 if (InLen < 0) result=Mod->Read(Mod, p_Input, len, &OutputBuff, &olen,  TRUE);
                 else result=Mod->Read(Mod, p_Input, len, &OutputBuff, &olen,  FALSE);
 
@@ -1170,8 +1170,16 @@ static STREAM *STREAMSetupDataProcessorModules(STREAM *S, const char *Config)
 
     if (S->Flags & SF_COMPRESSED)
     {
-        if (S->Flags & SF_RDONLY) if (! STREAMAddStandardDataProcessor(S, "decompress", "gzip", "")) SetupGood=FALSE;
-            else if (S->Flags & SF_WRONLY) if (! STREAMAddStandardDataProcessor(S, "compress", "gzip", "")) SetupGood=FALSE;
+        // do not remove { braces in the below, otherwise you'll add the 'else if' to the
+        // internal if of the first block. All hail astyle for helping me find this issue
+        if (S->Flags & SF_RDONLY)
+        {
+            if (! STREAMAddStandardDataProcessor(S, "decompress", "auto", "")) SetupGood=FALSE;
+        }
+        else if (S->Flags & SF_WRONLY)
+        {
+            if (! STREAMAddStandardDataProcessor(S, "compress", "gzip", "")) SetupGood=FALSE;
+        }
     }
 
     if (S->Flags & SF_ENCRYPT) if (! STREAMAddStandardDataProcessor(S, "crypto", "", Config)) SetupGood=FALSE;
@@ -1579,6 +1587,7 @@ static int STREAMReadCharsToBuffer_Default(STREAM *S, char *Buffer, int Len)
     if ((S->Type == STREAM_TYPE_FILE) && (S->Flags & SF_RDLOCK)) flock(S->in_fd,LOCK_SH);
 
     bytes_read=read(S->in_fd, Buffer, Len);
+
     //if select said there was stuff to read, but there wasn't, then the socket must be closed
     //sockets can return '0' when closed, so we normalize this to -1 here
     if (bytes_read < 1) bytes_read=-1;
@@ -1659,6 +1668,7 @@ int STREAMReadCharsToBuffer(STREAM *S)
     //Here we perform the actual read
     if (read_result==1)
     {
+
         val=S->BuffSize - S->InEnd;
         if (val < 0) return(1);
         tmpBuff=(char *) realloc(tmpBuff, val);
@@ -2141,21 +2151,20 @@ int STREAMReadBytesToTerm(STREAM *S, char *Buffer, int BuffSize,unsigned char Te
 }
 
 
-char *STREAMReadToTerminator(char *Buffer, STREAM *S, unsigned char Term)
+char *STREAMReadToTerminator(char *RetStr, STREAM *S, unsigned char Term)
 {
     int result, len=0, avail=0, bytes_read=0;
-    char *RetStr=NULL;
     const unsigned char *p_Term;
     int IsClosed=FALSE;
 
     if (! S)
     {
         RaiseError(0, "STREAMReadToTerminator", "NULL stream object passed to function");
-        Destroy(Buffer);
+        Destroy(RetStr);
         return(NULL);
     }
 
-    RetStr=CopyStr(Buffer,"");
+    RetStr=CopyStr(RetStr,"");
     while (1)
     {
         len=0;
@@ -2228,12 +2237,11 @@ char *STREAMReadToTerminator(char *Buffer, STREAM *S, unsigned char Term)
 
 
 
-char *STREAMReadToMultiTerminator(char *Buffer, STREAM *S, char *Terms)
+char *STREAMReadToMultiTerminator(char *RetStr, STREAM *S, char *Terms)
 {
     int inchar, len=0;
-    char *Tempptr;
 
-    Tempptr=CopyStr(Buffer,"");
+    RetStr=CopyStr(RetStr, "");
 
     inchar=STREAMReadChar(S);
 
@@ -2244,7 +2252,7 @@ char *STREAMReadToMultiTerminator(char *Buffer, STREAM *S, char *Terms)
     {
         if (inchar > 0)
         {
-            Tempptr=AddCharToBuffer(Tempptr,len,(char) inchar);
+            RetStr=AddCharToBuffer(RetStr,len,(char) inchar);
             len++;
 
             if (strchr(Terms,inchar)) break;
@@ -2253,20 +2261,20 @@ char *STREAMReadToMultiTerminator(char *Buffer, STREAM *S, char *Terms)
     }
 
 
-    *(Tempptr+len)='\0';
+    *(RetStr+len)='\0';
 
-//if ((inchar==STREAM_CLOSED) && (errno==ECONNREFUSED)) return(Tempptr);
+//if ((inchar==STREAM_CLOSED) && (errno==ECONNREFUSED)) return(RetStr);
     if (
         ((inchar==STREAM_CLOSED) || (inchar==STREAM_DATA_ERROR))
         &&
-        (StrEnd(Tempptr))
+        (StrEnd(RetStr))
     )
     {
-        free(Tempptr);
+        free(RetStr);
         return(NULL);
     }
 
-    return(Tempptr);
+    return(RetStr);
 }
 
 
@@ -2402,11 +2410,11 @@ char *STREAMGetValue(STREAM *S, const char *Name)
 }
 
 
-void STREAMSetValue(STREAM *S, const char *Name, const char *Value)
+ListNode *STREAMSetValue(STREAM *S, const char *Name, const char *Value)
 {
-    if (! S) return;
+    if (! S) return(NULL);
     if (! S->Values) S->Values=ListCreate();
-    SetVar(S->Values,Name,Value);
+    return(SetVar(S->Values,Name,Value));
 }
 
 void *STREAMGetItem(STREAM *S, const char *Name)
@@ -2544,11 +2552,16 @@ int STREAMFind(STREAM *S, const char *Item, const char *Delimiter, char **RetStr
 }
 
 
+//linux supports the 'sendfile' call which implmenents zero-copy transfer of
+//data from one file descriptor to another. This is efficient, but unsuitable
+//for transfer of any data where libUseful has to modify that data in transit
+//e.g. compression, encryption or HTTP 'chunking'
 static int UseKernelSendFile(STREAM *In, STREAM *Out, int Flags)
 {
     if (! (Flags & SENDFILE_KERNEL)) return(FALSE);
     switch (In->Type)
     {
+    //the sendfile manual page states that input cannot be a socket
     case STREAM_TYPE_FILE:
     case STREAM_TYPE_PIPE:
         break;
@@ -2558,9 +2571,40 @@ static int UseKernelSendFile(STREAM *In, STREAM *Out, int Flags)
         break;
     }
 
+    switch (Out->Type)
+    {
+    //the sendfile manual page states that, since linux 2.6.33, the output can be
+    //any file. However, we can't use it for TLS/HTTPS/Websocket or other streams
+    //that require any kind of special processing of the output data.
+    //STREAM_TYPE_SSH is implemented as a pipe to an ssh process, so it should work.
+    case STREAM_TYPE_FILE:
+    case STREAM_TYPE_PIPE:
+    case STREAM_TYPE_TCP:
+    case STREAM_TYPE_TCP_ACCEPT:  //this means 'tcp server accepted connection'
+    case STREAM_TYPE_UDP:
+    case STREAM_TYPE_UNIX:
+    case STREAM_TYPE_UNIX_ACCEPT:
+    case STREAM_TYPE_UNIX_DGRAM:
+    case STREAM_TYPE_TTY:
+    case STREAM_TYPE_SSH:
+        break;
+
+    default:
+        return(FALSE);
+        break;
+    }
+
+
+    //we cannot use sendfile with TLS/SSL
+    if (In->State & LU_SS_SSL) return(FALSE);
+    if (Out->State & LU_SS_SSL) return(FALSE);
+
+    //we cannot use sendfile if there are any processing modules that modify incoming
+    //or outgoing data before/after this sendfile call
     if  (ListSize(In->ProcessingModules) > 0) return(FALSE);
     if  (ListSize(Out->ProcessingModules) > 0) return(FALSE);
 
+    //if we get here then we've passed all checks and kernel sendfile is safe to use
     return(TRUE);
 }
 
@@ -2618,6 +2662,8 @@ unsigned long STREAMSendFile(STREAM *In, STREAM *Out, unsigned long Max, int Fla
         }
 #endif
 
+        //we check 'UseSendFile' again here, because the sendfile attempt can
+        //turn sendfile off if it fails on the first try
         if (! UseSendFile)
         {
             //How much do we have queued in the in-stream?
@@ -2697,6 +2743,9 @@ int STREAMCommit(STREAM *S)
 {
     HTTPInfoStruct *Item;
 
+    //Always flush on a stream commit
+    STREAMFlush(S);
+
     if (! (S->Flags & SF_RDONLY) )
     {
         Item=(HTTPInfoStruct *) STREAMGetItem(S, "HTTP:InfoStruct");
@@ -2708,7 +2757,6 @@ int STREAMCommit(STREAM *S)
     // close our stdout
     if (S->Type==STREAM_TYPE_PIPE)
     {
-        STREAMFlush(S);
         close(S->out_fd);
         S->out_fd=-1;
         return(TRUE);

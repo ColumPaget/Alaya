@@ -1,4 +1,6 @@
 #include "HashWhirlpool.h"
+
+#ifdef USE_WHIRL
 #include "whirlpool.h"
 
 int HashFinishWhirlpool(HASH *Hash, char **HashStr)
@@ -37,20 +39,26 @@ HASH *HashCloneWhirlpool(HASH *Hash)
     return(NewHash);
 }
 
-
+#endif
 
 int HashInitWhirlpool(HASH *Hash, const char *Name, int Len)
 {
+#ifdef USE_WHIRL
     Hash->Ctx=(void *) calloc(1,sizeof(WHIRLPOOLstruct));
     WHIRLPOOLinit((WHIRLPOOLstruct *) Hash->Ctx);
     Hash->Update=HashUpdateWhirlpool;
     Hash->Finish=HashFinishWhirlpool;
     Hash->Clone=HashCloneWhirlpool;
     return(TRUE);
+#else
+    return(FALSE);
+#endif
 }
 
 void HashRegisterWhirlpool()
 {
+#ifdef USE_WHIRL
     HashRegister("whirl", 0, HashInitWhirlpool);
     HashRegister("whirlpool", 0, HashInitWhirlpool);
+#endif
 }
