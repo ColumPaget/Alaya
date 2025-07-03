@@ -260,19 +260,19 @@ int UnicodeNameCachePreloadFromFile(const char *FName, const char *EnvVarName, c
 
 int UnicodeNameCachePreload(const char *Names)
 {
-if (GlobalUnicodeLevel == 0) return(FALSE);
+    if (GlobalUnicodeLevel == 0) return(FALSE);
 
-if (UnicodeNamesInCache(Names)) return(TRUE);
-if (UnicodeNameCachePreloadFromFile("unicode-names.conf", "UNICODE_NAMES_FILE", "Unicode:NamesFile", Names)) return(TRUE);
-if (UnicodeNamesInCache(Names)) return(TRUE);
-if (GlobalUnicodeLevel > 8)
-{
-if (UnicodeNameCachePreloadFromFile("nerdfont.csv.txt", "NERDFONTS_NAMES_FILE", "NerdFonts:NamesFile", Names)) return(TRUE);
-if (UnicodeNameCachePreloadFromFile("nerdfont.csv", NULL, NULL, Names)) return(TRUE);
-if (UnicodeNameCachePreloadFromFile("nerdfont.txt", NULL, NULL, Names)) return(TRUE);
-}
+    if (UnicodeNamesInCache(Names)) return(TRUE);
+    if (UnicodeNameCachePreloadFromFile("unicode-names.conf", "UNICODE_NAMES_FILE", "Unicode:NamesFile", Names)) return(TRUE);
+    if (UnicodeNamesInCache(Names)) return(TRUE);
+    if (GlobalUnicodeLevel > 8)
+    {
+        if (UnicodeNameCachePreloadFromFile("nerdfont.csv.txt", "NERDFONTS_NAMES_FILE", "NerdFonts:NamesFile", Names)) return(TRUE);
+        if (UnicodeNameCachePreloadFromFile("nerdfont.csv", NULL, NULL, Names)) return(TRUE);
+        if (UnicodeNameCachePreloadFromFile("nerdfont.txt", NULL, NULL, Names)) return(TRUE);
+    }
 
-return(FALSE);
+    return(FALSE);
 }
 
 
@@ -290,9 +290,9 @@ int UnicodeNameCachePreloadFromTerminalStr(const char *String)
             ptr++;
             if (*ptr==':')
             {
-		//using GETTOKEN_INCLUDE_SEP means the ':' is included in the list of tokens
-		//so when we call GetToken here, the ptr it returns isn't past the closing ':'
-		//it's right on it. ptr++ in the for statment then moves us past this token
+                //using GETTOKEN_INCLUDE_SEP means the ':' is included in the list of tokens
+                //so when we call GetToken here, the ptr it returns isn't past the closing ':'
+                //it's right on it. ptr++ in the for statment then moves us past this token
                 ptr=GetToken(ptr+1, ":", &Name, GETTOKEN_INCLUDE_SEP);
                 Names=StringListAdd(Names, Name, ",");
             }

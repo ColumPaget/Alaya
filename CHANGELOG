@@ -1,3 +1,7 @@
+v5.1
+  * bugfix for 'hang' occuring when connections not correctly cleaned up after disconnect
+  * upgrade to latest libuseful
+
 v5.0 (2025-06-18)
   * eliminate a bunch of memory leaks
   * added url shortener

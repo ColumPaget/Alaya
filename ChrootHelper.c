@@ -847,7 +847,10 @@ pid_t HandleChildProcessRequest(STREAM *S)
 
     Tempstr=STREAMReadLine(Tempstr,S);
 
-    if (! Tempstr) return(FALSE);
+    //we return STREAM_CLOSED (a negative value)
+    //because when successful we instead return the pid
+    //of the process we are talking to via this connection
+    if (! Tempstr) return(STREAM_CLOSED);
 
     StripTrailingWhitespace(Tempstr);
     if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath, "HANDLE CHROOT REQUEST: %s",Tempstr);

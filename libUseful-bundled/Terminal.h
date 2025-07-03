@@ -126,30 +126,32 @@ typedef enum {ANSI_NONE, ANSI_BLACK, ANSI_RED, ANSI_GREEN, ANSI_YELLOW, ANSI_BLU
 
 #define TERM_AUTODETECT -1
 
-#define TERM_HIDETEXT  1   //hide text (default is show it)
-#define TERM_SHOWSTARS 2   //show stars instead of text (for passwords)
-#define TERM_SHOWTEXTSTARS 4 //show stars+last character typed
-#define TERM_NOCOLOR       8
-#define TERM_HIDECURSOR 32   //hide the cursor
-#define TERM_RAWKEYS 64      //switch a terminal into 'raw' mode rather than canonical (usually you want this)
-#define TERMBAR_UPPER 128
-#define TERMBAR_LOWER 256
-#define TERM_SAVEATTRIBS  512    // save terminal attributes to they can be reset by TerminalReset (you usually want this)
-#define TERM_SAVE_ATTRIBS 512    // save terminal attributes to they can be reset by TerminalReset (you usually want this)
-#define TERM_MOUSE        1024   //send xterm mouse events for buttons 1 2 and 3
-#define TERM_WHEELMOUSE   2048   //send xterm mouse events for buttons 1 2 and 3, and wheel buttons (4 and 5)
-#define TERM_ALIGN_CENTER 4096
-#define TERM_ALIGN_RIGHT  8192
+#define TERM_HIDETEXT         1   //hide text (default is show it) mostly for TerminalReadPrompt TerminalReadText
+#define TERM_SHOWSTARS        2   //show stars instead of text (for passwords) mostly for TerminalReadPrompt TerminalReadText
+#define TERM_SHOWTEXTSTARS    4   //show stars+last character type, mostly for TerminalReadPrompt TerminalReadText
+#define TERM_NOCOLOR          8
+#define TERM_NEWLINE         16   //when user enters data go to next line (mostly for TerminalReadPrompt TerminalReadText which stays on same line by default)
+#define TERM_HIDECURSOR      32   //hide the cursor
+#define TERM_RAWKEYS         64   //switch a terminal into 'raw' mode rather than canonical (usually you want this)
+#define TERMBAR_UPPER       128
+#define TERMBAR_LOWER       256
+#define TERM_SAVEATTRIBS    512   // save terminal attributes to they can be reset by TerminalReset (you usually want this)
+#define TERM_SAVE_ATTRIBS   512   // save terminal attributes to they can be reset by TerminalReset (you usually want this)
+#define TERM_MOUSE         1024   //send xterm mouse events for buttons 1 2 and 3
+#define TERM_WHEELMOUSE    2048   //send xterm mouse events for buttons 1 2 and 3, and wheel buttons (4 and 5)
+#define TERM_ALIGN_CENTER  4096
+#define TERM_ALIGN_RIGHT   8192
 #define TERM_FOCUS_EVENTS 16384  //send window focusin/focusout events (these appear as keystrokes XTERM_FOCUS_IN and XTERM_FOCUS_OUT)
 
 
 //These flags can be passed in the Flags argument of ANSICode
-#define ANSI_HIDE  65536
-#define ANSI_BOLD  131072
-#define ANSI_FAINT 262144
-#define ANSI_UNDER 524288
-#define ANSI_BLINK 1048576
-#define ANSI_INVERSE  2097152
+#define ANSI_HIDE         65536
+#define ANSI_BOLD        131072
+#define ANSI_FAINT       262144
+#define ANSI_UNDER       524288
+#define ANSI_BLINK      1048576
+#define ANSI_INVERSE    2097152
+
 #define ANSI_NORM "\x1b[0m"
 #define ANSI_BACKSPACE 0x08
 
@@ -361,16 +363,18 @@ int TerminalTextConfig(const char *Config);
 //N.B. this requires the termainl to have been initialized with the TERM_RAWKEYS flag set, otherwise the terminal driver will handle this
 //job in 'canonical' mode
 //Supported Flags are:
-//	 TERM_HIDETEXT which causes typed characters to be hidden
+//   TERM_NEWLINE go onto next line when user enters data
+//   TERM_HIDETEXT which causes typed characters to be hidden
 //   TERM_SHOWSTARS which echoes '*' instead of the typed character (intended for use with password entry)
-//   TERM_SHOWTEXTSTARS which echoes a character, but overwrites it with '*' when the next character is typed, so that only one character of
-//       a password is visible at any time
+//   TERM_SHOWTEXTSTARS which echoes a character, but overwrites it with '*' when the next character is typed, so that only one character of a password is visible at any time
 char *TerminalReadText(char *RetStr, int Flags, STREAM *S);
 
-//as TerminalReadText but with a prompt 
+//as TerminalReadText but with a prompt. 
+//Attributes can be set for the prompt using the TextPrompt:Active and TextPrompt:Done theme values in TerminalTheme.h  
 char *TerminalReadPrompt(char *RetStr, const char *Prompt, int Flags, STREAM *S);
 
 //as TerminalReadText but with a prompt and supplied history
+//Attributes can be set for the prompt using the TextPrompt:Active and TextPrompt:Done theme values in TerminalTheme.h  
 char *TerminalReadPromptWithHistory(char *RetStr, const char *Prompt, int Flags, ListNode *History, STREAM *S);
 
 //get width and height/length of a terminal

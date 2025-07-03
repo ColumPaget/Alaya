@@ -311,9 +311,6 @@ char *HTMLUnQuote(char *RetStr, const char *Data)
                 len++;
             }
 
-
-
-
         }
         else
         {

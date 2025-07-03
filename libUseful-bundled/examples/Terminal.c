@@ -28,13 +28,17 @@ char *Tempstr=NULL, *Input=NULL;
 TERMBAR *TB;
 
 Term=STREAMFromDualFD(0,1);
-TerminalInit(Term, TERM_RAWKEYS);
+TerminalInit(Term, TERM_RAWKEYS | TERM_SAVE_ATTRIBS);
 TerminalClear(Term);
 
 Interact(Term, "~y~RHello. Type something and I'll ~eecho it~>~0\r\n", 0);
 Interact(Term, "~r~WNow type something and I'll ~ehide it~>~0\r\n", TERM_HIDETEXT);
 Interact(Term, "~c~BNow type something and I'll ~estar it out like a password~>~0\r\n", TERM_SHOWSTARS);
 Interact(Term, "~w~GNow type something and I'll ~estar but show the last letter~>~0\r\n", TERM_SHOWTEXTSTARS);
+
+Tempstr=TerminalReadPrompt(Tempstr, "prompt no newline: ", 0,  Term);
+Tempstr=TerminalReadPrompt(Tempstr, "prompt WITH newline: ", TERM_NEWLINE, Term);
+
 TerminalPutStr("~iOkay, that's all folks. exiting..~>~0\r\n", Term);
 
 sleep(3);

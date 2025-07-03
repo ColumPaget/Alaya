@@ -1,3 +1,10 @@
+v5.58 (2025-07-02)
+  * Fix unguarded PR_MDWE_NO_INHERIT in Process.c. Not all linux kernels/headers have this flag.
+  * Added TERM_NEWLINE flag so TerminalReadPrompt can go to a newline after entry if desired
+  * Add TextPrompt theming
+  * Many improvements to PasswordFile.c including file locking, credential deletion, handle 'bad' chars in username, password and extra
+
+
 v5.57 (2025-06-16)
   * Fix unguarded 'mount' in Container.c that prevents compile on non-linux platforms
   * Add FindFileInPathSubDirectory, FindFilesInPathSubDirectory and FindFileInPrefixSubDirectory search functions to FileSystem.c

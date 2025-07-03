@@ -159,21 +159,28 @@ void CollectChildProcesses()
     ListNode *Curr, *Next;
     const char *ptr;
     STREAM *S;
+    int NoChildren=FALSE;
 
 
-    //rather than get pids of exited processes one by one, 
+    //rather than get pids of exited processes one by one,
     //and then going through the connections list for every pid
     //we get up to NO_OF_PROCESSES pids and go through the connections
     //list once, as indexing an array of pids will be less processor
     //costly than going through a linked list multiple times
     PidsList=(int *) calloc(NO_OF_PROCESSES,sizeof(pid_t));
-    StatusList=(int *) calloc(NO_OF_PROCESSES,sizeof(int));
     for (i=0; i < NO_OF_PROCESSES; i++)
     {
         owner=waitpid(-1,&status,WNOHANG);
-        if (owner < 1) break;
-        PidsList[i]=owner;
-        if (WIFEXITED(status)) StatusList[i]=WEXITSTATUS(status);
+        if (owner < 1)
+        {
+            if (errno==ECHILD) NoChildren=TRUE;
+            break;
+        }
+
+        // if the process is just stopped, or continued, then we don't
+        // want to close our connection to it. Only do so if it exited
+        // or was signalled/killed
+        if (WIFEXITED(status) || WIFSIGNALED(status)) PidsList[i]=owner;
     }
 
 
@@ -188,26 +195,29 @@ void CollectChildProcesses()
         {
             owner=strtol(Curr->Tag, NULL, 10);
 
-	    //get the 'helper process' pid associated with this connection
+            //get the 'helper process' pid associated with this connection
             //check it against our exited pids, and if we find a match, close the connection
-	    ptr=STREAMGetValue(S,"AlayaHelperPid");
-            if (StrValid(ptr)) 
-	    {
-	    helper=(pid_t) strtol(ptr, NULL, 10);
-
-            for (i=0; i < NO_OF_PROCESSES; i++)
+            ptr=STREAMGetValue(S,"AlayaHelperPid");
+            if (StrValid(ptr))
             {
-                if (PidsList[i] < 1) break;
-                if (
-                    (owner==PidsList[i]) ||
-                    ((helper==PidsList[i]) && (StatusList[i]==0))
-                )
+                helper=(pid_t) strtol(ptr, NULL, 10);
+
+                for (i=0; i < NO_OF_PROCESSES; i++)
                 {
-                    STREAMClose(S);
-                    ListDeleteNode(Curr);
-                    break;
+                    if (PidsList[i] > 0)
+                    {
+                        if (
+                            NoChildren ||
+                            (owner==PidsList[i]) ||
+                            (helper==PidsList[i])
+                        )
+                        {
+                            STREAMClose(S);
+                            ListDeleteNode(Curr);
+                            break;
+                        }
+                    }
                 }
-            }
             }
         }
 
@@ -215,7 +225,6 @@ void CollectChildProcesses()
     }
 
     Destroy(PidsList);
-    Destroy(StatusList);
 }
 
 
@@ -445,11 +454,11 @@ int main(int argc, char *argv[])
                     ListDeleteItem(Connections,S);
                     STREAMClose(S);
                 }
-                else if (pid > 0) 
-		{
-			Tempstr=FormatStr(Tempstr, "%lu", pid);
-			STREAMSetValue(S,"AlayaHelperPid", Tempstr);
-		}
+                else if (pid > 0)
+                {
+                    Tempstr=FormatStr(Tempstr, "%lu", pid);
+                    STREAMSetValue(S,"AlayaHelperPid", Tempstr);
+                }
                 break;
             }
         }

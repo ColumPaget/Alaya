@@ -10,6 +10,9 @@ ListNode *TerminalThemeInit()
 
     TermTheme=ListCreate();
 
+    SetVar(TermTheme, "TextPrompt:Active", "~e");
+    SetVar(TermTheme, "TextPrompt:Done", "");
+
     SetVar(TermTheme, "Menu:CursorLeft", ">");
     SetVar(TermTheme, "Menu:SelectedLeft", "*");
     SetVar(TermTheme, "Menu:CursorAttribs", "~e");
@@ -63,6 +66,7 @@ const char *TerminalThemeGet(const char *Scope, const char *Attrib)
 
     Destroy(Tempstr);
 
+    if (! p_Value) return("");
     return(p_Value);
 }
 

@@ -1,4 +1,4 @@
-AC_INIT([libUseful], [5.57], [colums.projects@gmail.com])
+AC_INIT([libUseful], [5.58], [colums.projects@gmail.com])
 
 
 dnl define a function we can use to check if a compiler flag
@@ -444,9 +444,9 @@ echo "compile with -fstack-protector-strong - $cf_use_stackprotect"
 echo "CFLAGS=$CFLAGS"
 
 AS_IF([test "$ac_cv_sys_file_offset_bits" = "64"], [
-    echo "Largefiles ( > 2GB ) enabled"
+    echo "Largefiles ( > 2GB on 32bit x86) enabled"
 ], [
-    echo "Largefiles ( > 2GB ) NOT enabled"
+    echo "Largefiles ( > 2GB on 32bit x86) NOT enabled"
 ])
 
 AS_IF([test "$cf_have_getxattr" = "yes"], [

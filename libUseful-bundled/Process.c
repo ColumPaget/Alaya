@@ -365,7 +365,22 @@ int ProcessNoWriteExec(int Inherit)
 #ifdef PR_SET_MDWE
 
     Flags |= PR_MDWE_REFUSE_EXEC_GAIN;
-    if (! Inherit) Flags |= PR_MDWE_NO_INHERIT;
+
+    if (! Inherit)
+    {
+        //some kernels (seen with kernel version 6.6.6, because of course) don't have PR_MDWE_NO_INHERIT
+        //in those cases if 'no inherit' was asked for we return FALSE without attempting to set MDWE
+        //as doing so would prevent exec from happening even though the request for 'no inherit' implies
+        //exec may be desired.
+
+#ifdef PR_MDWE_NO_INHERIT
+        Flags |= PR_MDWE_NO_INHERIT;
+#else
+        RaiseError(ERRFLAG_ERRNO, "ProcessNoWriteExec", "'NoWriteExec' (W^X) memory protection called for with NO_INHERIT, but kernel or prctrl.h does not support PR_MDWE_NO_INHERIT. Not applying memory protections.");
+        return(FALSE);
+#endif
+    }
+
 //set, then check that the set worked. This correctly handles situations where we ask to set more than once
 //as the second attempt may 'fail', but we already have the desired result
     prctl(PR_SET_MDWE, Flags, 0, 0, 0);

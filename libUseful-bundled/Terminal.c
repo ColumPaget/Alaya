@@ -1000,11 +1000,56 @@ int TerminalTextConfig(const char *Config)
 
 
 
+static void TerminalReadLineDraw(TLineEdit *LE, int Flags, const char *Prefix, const char *Style, int State, STREAM *S)
+{
+char *Tempstr=NULL, *Text=NULL;
+const char *p_Theme;
+int len;
+
+        Text=CopyStr(Text, LE->Line);
+	p_Theme=TerminalThemeGet("TextPrompt", Style);
+        Tempstr=MCopyStr(Tempstr, "\r~>", p_Theme, Prefix, "~0", NULL);
+
+        if (LE->Len > 0)
+        {
+            if (Flags & TERM_SHOWTEXTSTARS)
+            {
+                len=StrLen(Text);
+                if (len > 0)
+                {
+                    //if the user has hit enter, then star out all the text
+                    if (State == LINE_EDIT_ENTER) memset(Text, '*', len);
+                    //otherwise allow last typed character to be seen
+                    else memset(Text, '*', len-1);
+                }
+            }
+            else if (Flags & TERM_SHOWSTARS) memset(Text, '*', StrLen(Text));
+
+            if (! (Flags & TERM_HIDETEXT))
+            {
+                Tempstr=CatStr(Tempstr, Text);
+                if (LE->Cursor != LE->Len)
+                {
+		    //redraw up to cursor to position cursor without needing to use 
+		    //cursor movement commands. N.B. we do not clear to end of line (~>) here
+        	    Tempstr=MCatStr(Tempstr, "\r", p_Theme, Prefix, "~0", NULL);
+                    Tempstr=CatStrLen(Tempstr, Text, LE->Cursor);
+                }
+            }
+        }
+
+        TerminalPutStr(Tempstr, S);
+        STREAMFlush(S);
+
+Destroy(Tempstr);
+Destroy(Text);
+}
+
+
 char *TerminalReadTextWithPrefix(char *RetStr, int Flags, const char *Prefix, ListNode *History, STREAM *S)
 {
     TLineEdit *LE;
     int len, inchar, result, LineEditFlags=0;
-    char *Tempstr=NULL, *Text=NULL;
     TKEY_CALLBACK_FUNC Func;
 
     if (Flags & (TERM_HIDETEXT | TERM_SHOWSTARS | TERM_SHOWTEXTSTARS)) LineEditFlags |= LINE_EDIT_NOMOVE;
@@ -1024,58 +1069,29 @@ char *TerminalReadTextWithPrefix(char *RetStr, int Flags, const char *Prefix, Li
     {
         result=LineEditHandleChar(LE, inchar);
 
-        Text=CopyStr(Text, LE->Line);
-        Tempstr=MCopyStr(Tempstr, "\r~>", Prefix, NULL);
-
-        if (LE->Len > 0)
-        {
-            if (Flags & TERM_SHOWTEXTSTARS)
-            {
-                len=StrLen(Text);
-                if (len > 0)
-                {
-                    //if the user has hit enter, then star out all the text
-                    if (result==LINE_EDIT_ENTER) memset(Text, '*', len);
-                    //otherwise allow last typed character to be seen
-                    else memset(Text, '*', len-1);
-                }
-            }
-            else if (Flags & TERM_SHOWSTARS) memset(Text, '*', StrLen(Text));
-
-            if (! (Flags & TERM_HIDETEXT))
-            {
-                Tempstr=CatStr(Tempstr, Text);
-                if (LE->Cursor != LE->Len)
-                {
-                    Tempstr=MCatStr(Tempstr, "\r", Prefix, NULL);
-                    Tempstr=CatStrLen(Tempstr, Text, LE->Cursor);
-                }
-            }
-        }
-
-        TerminalPutStr(Tempstr, S);
-        STREAMFlush(S);
-
         if (result == LINE_EDIT_ENTER)
         {
             RetStr=CopyStr(RetStr, LE->Line);
             if (History) LineEditAddToHistory(LE, RetStr);
+    	    TerminalReadLineDraw(LE, Flags, Prefix, "Done", LINE_EDIT_ENTER, S);
+            if (Flags & TERM_NEWLINE) TerminalPutStr("\r\n", S);
             break;
         }
 
+	TerminalReadLineDraw(LE, Flags, Prefix, "Active", result, S);
         inchar=TerminalReadChar(S);
 
         Func=STREAMGetItem(S, "KeyCallbackFunc");
         if (Func) Func(S, inchar);
     }
 
+
     LineEditSwapHistory(LE, NULL);
     LineEditDestroy(LE);
-    Destroy(Tempstr);
-    Destroy(Text);
 
     return(RetStr);
 }
+
 
 
 char *TerminalReadText(char *RetStr, int Flags, STREAM *S)
