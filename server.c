@@ -647,7 +647,6 @@ void AlayaServerSendResponse(STREAM *S, HTTPSession *Session, const char *Respon
         Response->MethodID=Session->MethodID;
         Response->LastModified=Session->LastModified;
         Response->Flags |= Session->Flags & (SESSION_KEEPALIVE | SESSION_AUTHENTICATED);
-        //Response->Flags |= SESSION_KEEPALIVE;
         Response->ClientIP=CopyStr(Response->ClientIP, Session->ClientIP);
         Response->Path=CopyStr(Response->Path, Session->Path);
         Response->Method=CopyStr(Response->Method, Session->Method);
@@ -1339,10 +1338,54 @@ static int HTTPMethodAllowed(HTTPSession *Session)
 }
 
 
+static int HTTPServerIPAllowed(HTTPSession *Session)
+{
+    char *Token=NULL;
+    const char *ptr;
+
+    if (! StrValid(Settings.AllowIPs)) return(TRUE);
+
+    ptr=GetToken(Settings.AllowIPs, ",", &Token, 0);
+    while (ptr)
+    {
+        if (pmatch_one(Token, Session->ClientIP, StrLen(Session->ClientIP), NULL, NULL, 0))
+        {
+            Destroy(Token);
+            return(TRUE);
+        }
+        ptr=GetToken(ptr, ",", &Token, 0);
+    }
+
+
+    LogToFile(Settings.LogPath,"IP not allowed: %s\n", Session->ClientIP);
+
+    Destroy(Token);
+    return(FALSE);
+}
+
+
 static int HTTPServerAuthenticate(HTTPSession *Session)
 {
     int result=FALSE;
     TPathItem *VPath;
+
+    if (! HTTPServerIPAllowed(Session))
+    {
+        Session->Flags |= SESSION_AUTH_FAIL;
+        return(FALSE);
+    }
+
+
+    if (! Settings.AuthFlags & FLAG_AUTH_REQUIRED)
+    {
+        //if we do not need to authenticate the user, then at least look up their
+        //details so we know which real user/group they map to
+        AuthenticateLookupUserDetails(Session);
+        return(TRUE);
+    }
+
+    if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"PREAUTH: %s against %s %s\n", Session->UserName,Settings.AuthPath,Settings.AuthMethods);
+
 
     //This handles someone clicking a 'logout' button
     if (! HTTPServerHandleRegister(Session, LOGIN_CHECK_ALLOWED))
@@ -1351,7 +1394,7 @@ static int HTTPServerAuthenticate(HTTPSession *Session)
         return(FALSE);
     }
 
-
+    //if we are already authenticated, then it must be a 'keep alive' session
     if (Session->Flags & SESSION_AUTHENTICATED)
     {
         if (strcmp(Session->UserName, Session->AuthenticatedUser)==0)
@@ -1363,36 +1406,48 @@ static int HTTPServerAuthenticate(HTTPSession *Session)
         else LogToFile(Settings.LogPath,"AUTH: ERROR: Session Keep-Alive active, but user has changed to %s@%s (%s) %s %s. Refusing authentication", Session->ClientIP, Session->ClientHost, Session->ClientIP, Session->Method, Session->Path);
     }
 
-    //Consider vpath Auhentication
-    VPath=VPathFind(PATHTYPE_LOCAL, Session->Path);
-    if (VPath && (VPath->Flags & PATHITEM_NOAUTH)) Session->Flags |= SESSION_AUTHENTICATED;
+    //consider  that we might have a shortened URL. Those are considered authenticated.
+    if (Session->Shortener == SHORT_ACT_QUERY) result=TRUE;
 
-    //Consider AccessToken Authentication for this URL!
-    if ((! (Session->Flags & SESSION_AUTHENTICATED)) && (Session->AuthFlags & (FLAG_AUTH_ACCESS_TOKEN | FLAG_AUTH_URL_TOKEN))) ParseAccessToken(Session);
+    //try vpath Authentication
+    if (result != TRUE)
+    {
+        VPath=VPathFind(PATHTYPE_LOCAL, Session->Path);
+        if (VPath && (VPath->Flags & PATHITEM_NOAUTH)) result=TRUE;
+    }
 
-    if (Session->AuthFlags & FLAG_AUTH_PRESENT)
+    //try AccessToken Authentication for this URL!
+    if ( (result != TRUE) && (Session->AuthFlags & (FLAG_AUTH_ACCESS_TOKEN | FLAG_AUTH_URL_TOKEN))) ParseAccessToken(Session);
+
+    if ( (result != TRUE) && (Session->AuthFlags & FLAG_AUTH_PRESENT) )
     {
         //if this looks back-to-front it's because for some methods we only get the username
         //after we've completed authentication (e.g. it's taken from a cookie)
 
         //ANYTHING OTHER THAN TRUE FROM AUTHENTICATE MEANS IT FAILED
         if ((Authenticate(Session)==TRUE) && StrValid(Session->UserName)) result=TRUE;
-        //If authentication provided any users settings, then apply those
-        if (StrValid(Session->UserSettings)) ParseConfigItemList(Session->UserSettings);
-
-        //The FLAG_SSL_CERT_REQUIRED flag might have been set by user settings
-        //during authentication, so check it again here
-        if (! AuthClientCertificate(Session, Session->S)) result=FALSE;
-
-        if (result) HTTPServerHandleRegister(Session, LOGGED_IN);
-        else HTTPServerHandleRegister(Session, LOGIN_FAIL);
     }
+
+    //If authentication provided any users settings, then apply those
+    if (StrValid(Session->UserSettings)) ParseConfigItemList(Session->UserSettings);
+
+    //The FLAG_SSL_CERT_REQUIRED flag might have been set by user settings
+    //during authentication, so check it again here
+    if (! AuthClientCertificate(Session, Session->S)) result=FALSE;
+
 
     if (result==TRUE)
     {
         Session->AuthenticatedUser=CopyStr(Session->AuthenticatedUser, Session->UserName);
         Session->Flags |= SESSION_AUTHENTICATED;
+        HTTPServerHandleRegister(Session, LOGGED_IN);
         ProcessSetTitle("alaya %s@%s", Session->AuthenticatedUser, Session->ClientIP);
+        LogToFile(Settings.LogPath,"AUTHENTICATED: %s@%s for '%s %s' against %s %s\n", Session->UserName, Session->ClientIP, Session->Method, Session->Path,Settings.AuthPath,Settings.AuthMethods);
+    }
+    else
+    {
+        HTTPServerHandleRegister(Session, LOGIN_FAIL);
+        Session->Flags |= SESSION_AUTH_FAIL;
     }
 
     return(result);
@@ -1694,49 +1749,136 @@ void HTTPServerFindAndSendDocument(STREAM *S, HTTPSession *Session, int Flags)
 
 
 
+static void HTTPServerHandleMethods(HTTPSession *Session)
+{
+    int result;
+
+    switch (Session->MethodID)
+    {
+    case METHOD_POST:
+        if (! VPathProcess(Session->S, Session, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE)) HTTPServerHandlePost(Session->S, Session);
+        break;
+
+    case METHOD_GET:
+        if (Session->Shortener != SHORT_ACT_STORE)
+        {
+            result=HTTPServerProcessActions(Session->S, Session);
+            if (! result) HTTPServerFindAndSendDocument(Session->S, Session, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
+        }
+        break;
+
+    case METHOD_RGET:
+    case METHOD_RPOST:
+        HTTPProxyRGETURL(Session);
+        break;
+
+    case METHOD_HEAD:
+        HTTPServerFindAndSendDocument(Session->S, Session,HEADERS_KEEPALIVE);
+        break;
+
+    case METHOD_PUT:
+        HTTPServerRecieveURL(Session->S, Session);
+        break;
+
+    case METHOD_MKCOL:
+        HTTPServerMkDir(Session->S, Session, DIRTYPE_NORMAL);
+        break;
+
+    case METHOD_DELETE:
+        HTTPServerDelete(Session->S, Session);
+        break;
+
+    case METHOD_MOVE:
+        HTTPServerMove(Session->S, Session);
+        break;
+
+    case METHOD_COPY:
+        HTTPServerCopy(Session->S, Session);
+        break;
+
+    case METHOD_PROPFIND:
+        HTTPServerPropFind(Session->S, Session);
+        break;
+
+    case METHOD_PROPPATCH:
+        HTTPServerPropPatch(Session->S, Session);
+        break;
+
+    case METHOD_OPTIONS:
+        HTTPServerOptions(Session->S, Session);
+        break;
+
+    case METHOD_CONNECT:
+        HTTPProxyConnect(Session);
+        break;
+
+    case METHOD_LOCK:
+        HTTPServerHandleLock(Session->S, Session);
+        break;
+
+    case METHOD_UNLOCK:
+        HTTPServerHandleLock(Session->S, Session);
+        break;
+
+    //Caldav Extension
+    case METHOD_MKCALENDAR:
+        HTTPServerMkDir(Session->S, Session, DIRTYPE_CALDAV);
+        break;
+
+
+    case METHOD_WEBSOCKET:
+    case METHOD_WEBSOCKET75:
+        WebsocketConnect(Session->S, Session);
+        //we can't reuse websocket connections. They are persistent, but they are opaque to
+        //the HTTP server
+        Session->Flags &= ~SESSION_REUSE;
+        break;
+
+
+    default:
+        AlayaServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
+        break;
+    }
+}
+
 
 
 void HTTPServerHandleHTTPConnection(HTTPSession *Session)
 {
-    char *Tempstr=NULL, *Method=NULL, *URL=NULL;
-    int AuthOkay=TRUE, result, val;
-    int ShortenerLookup=SHORT_ACT_NONE;
+    char *Tempstr=NULL;
+    int AuthOkay=TRUE;
 
     while (1)
     {
         if (! HTTPServerReadHeaders(Session)) break;
 
-        ProcessSessionEventTriggers(Session);
 
-        if (Settings.Flags & FLAG_LOG_MORE_VERBOSE) LogToFile(Settings.LogPath,"PREAUTH: %s against %s %s\n", Session->UserName,Settings.AuthPath,Settings.AuthMethods);
-        if (Settings.AuthFlags & FLAG_AUTH_REQUIRED)
-        {
-            AuthOkay=FALSE;
-
+        //if the URL Shortner is in use, then check if we have a 'short' URL that
+        //expands into another one. If we do, then this request is considered to
+        //be authenticated
 #ifdef USE_URL_SHORTENER
-            ShortenerLookup=URLShortHandle(Session);
-            if (ShortenerLookup ==  SHORT_ACT_QUERY) AuthOkay=TRUE;
+        Session->Shortener=URLShortHandle(Session);
 #endif
 
-            if (HTTPServerAuthenticate(Session)) AuthOkay=TRUE;
+        AuthOkay=FALSE;
+        if (HTTPServerAuthenticate(Session)) AuthOkay=TRUE;
+        ProcessSessionEventTriggers(Session);
 
-            if (AuthOkay == TRUE)
-            {
-                LogToFile(Settings.LogPath,"AUTHENTICATED: %s@%s for '%s %s' against %s %s\n", Session->UserName, Session->ClientIP, Session->Method, Session->Path,Settings.AuthPath,Settings.AuthMethods);
-            }
-            else
-            {
-                if (IsProxyMethod(Session->MethodID)) AlayaServerSendHTML(Session->S, Session, "407 UNAUTHORIZED","Proxy server requires authentication.");
-                else AlayaServerSendHTML(Session->S, Session, "401 UNAUTHORIZED","Server requires authentication.");
+        // if AuthMethods has been set to deny, which can happen in ProcessSessionEventTriggers for instance
+        // then don't allow login
+        if (CompareStr(Settings.AuthMethods, "deny")==0) AuthOkay=FALSE;
 
-                if (Session->AuthFlags & FLAG_AUTH_PRESENT) LogToFile(Settings.LogPath,"AUTHENTICATE FAIL: %s@%s for '%s %s' against %s %s\n", Session->UserName, Session->ClientIP, Session->Method, Session->Path,Settings.AuthPath,Settings.AuthMethods);
+
+        if (AuthOkay != TRUE)
+        {
+            if (IsProxyMethod(Session->MethodID)) AlayaServerSendHTML(Session->S, Session, "407 UNAUTHORIZED","Proxy server requires authentication.");
+            else AlayaServerSendHTML(Session->S, Session, "401 UNAUTHORIZED","Server requires authentication.");
+
+            if (Session->AuthFlags & FLAG_AUTH_PRESENT)
+            {
+                LogToFile(Settings.LogPath,"AUTHENTICATE FAIL: %s@%s for '%s %s' against %s %s\n", Session->UserName, Session->ClientIP, Session->Method, Session->Path,Settings.AuthPath,Settings.AuthMethods);
             }
         }
-//seems odd, but this will lookup user details for the 'default user' (normally 'nobody' or 'wwwrun')
-        else AuthenticateLookupUserDetails(Session);
-
-
-
 
 
         if (! HTTPMethodAllowed(Session)) AlayaServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
@@ -1757,92 +1899,7 @@ void HTTPServerHandleHTTPConnection(HTTPSession *Session)
             if (Session->Flags & SESSION_KEEPALIVE) Session->Flags |= SESSION_REUSE;
 
 
-            switch (Session->MethodID)
-            {
-            case METHOD_POST:
-                if (! VPathProcess(Session->S, Session, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE)) HTTPServerHandlePost(Session->S, Session);
-                break;
-
-            case METHOD_GET:
-                if (ShortenerLookup != SHORT_ACT_STORE)
-                {
-                    result=HTTPServerProcessActions(Session->S, Session);
-                    if (! result) HTTPServerFindAndSendDocument(Session->S, Session, HEADERS_SENDFILE|HEADERS_USECACHE|HEADERS_KEEPALIVE);
-                }
-                break;
-
-            case METHOD_RGET:
-            case METHOD_RPOST:
-                HTTPProxyRGETURL(Session);
-                break;
-
-            case METHOD_HEAD:
-                HTTPServerFindAndSendDocument(Session->S, Session,HEADERS_KEEPALIVE);
-                break;
-
-            case METHOD_PUT:
-                HTTPServerRecieveURL(Session->S, Session);
-                break;
-
-            case METHOD_MKCOL:
-                HTTPServerMkDir(Session->S, Session, DIRTYPE_NORMAL);
-                break;
-
-            case METHOD_DELETE:
-                HTTPServerDelete(Session->S, Session);
-                break;
-
-            case METHOD_MOVE:
-                HTTPServerMove(Session->S, Session);
-                break;
-
-            case METHOD_COPY:
-                HTTPServerCopy(Session->S, Session);
-                break;
-
-            case METHOD_PROPFIND:
-                HTTPServerPropFind(Session->S, Session);
-                break;
-
-            case METHOD_PROPPATCH:
-                HTTPServerPropPatch(Session->S, Session);
-                break;
-
-            case METHOD_OPTIONS:
-                HTTPServerOptions(Session->S, Session);
-                break;
-
-            case METHOD_CONNECT:
-                HTTPProxyConnect(Session);
-                break;
-
-            case METHOD_LOCK:
-                HTTPServerHandleLock(Session->S, Session);
-                break;
-
-            case METHOD_UNLOCK:
-                HTTPServerHandleLock(Session->S, Session);
-                break;
-
-            //Caldav Extension
-            case METHOD_MKCALENDAR:
-                HTTPServerMkDir(Session->S, Session, DIRTYPE_CALDAV);
-                break;
-
-
-            case METHOD_WEBSOCKET:
-            case METHOD_WEBSOCKET75:
-                WebsocketConnect(Session->S, Session);
-                //we can't reuse websocket connections. They are persistent, but they are opaque to
-                //the HTTP server
-                Session->Flags &= ~SESSION_REUSE;
-                break;
-
-
-            default:
-                AlayaServerSendHTML(Session->S, Session, "503 Not implemented","HTTP method disallowed or not implemented.");
-                break;
-            }
+            HTTPServerHandleMethods(Session);
         }
 
         LogToFile(Settings.LogPath,"TRANSACTION COMPLETE: %s %s for %s@%s (%s)", Session->Method, Session->Path, Session->UserName, Session->ClientHost, Session->ClientIP);
@@ -1850,14 +1907,12 @@ void HTTPServerHandleHTTPConnection(HTTPSession *Session)
 
         STREAMFlush(Session->S);
         if (! (Session->Flags & SESSION_REUSE)) break;
-        break;
+
 //LogToFile(Settings.LogPath,"REUSE: %s %s for %s@%s (%s)", Session->Method, Session->Path, Session->UserName, Session->ClientHost, Session->ClientIP);
     }
 
 
     Destroy(Tempstr);
-    Destroy(Method);
-    Destroy(URL);
 }
 
 

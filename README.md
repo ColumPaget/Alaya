@@ -42,42 +42,119 @@ USAGE
 
 ```
 alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-sslv <version>] [-key <path>] [-cert <path>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>]
-
-	-v:		Verbose logging.
-	-v -v:		Even more verbose logging.
-	-a:		Specify the authentication file for 'built in' authentication.
-	-A:		Authentication methods. Comma separated list of 'pam', 'passwd', 'shadow', 'native', and 'accesstoken'. For to use alaya native authentication, with alaya's own password file just use 'native' on its own. See more in 'AUTHENTICATION' below.
-	-d:		No daemon, don't background process.
-	-f:		Path to config file, defaults to /etc/alaya.conf, but alaya can be configured by command-line args only.
-	-O:		Open, don't require authentication.
-	-h:		'ChHome mode', switch to users home dir and chroot.
-	-i:		Set interface listen on, allows running separate servers on the same port on different interfaces/network cards. For IPv4 either the interface name or address can be used (i.e. -i eth0 or -i 192.168.8.44) for IPv6 the IPv6 address must be used, (e.g. -i fe80::201:7ff6:ca5a:226b%wlan0). For unix sockets the 'address' (which is the file path) must start with '/'.
-	-l:		Path to log file, default is to use 'syslog' instead.
-	-m:		HTTP Methods (GET, PUT, DELETE, PROPFIND) that are allowed.
-Comma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for readonly DAV.
-'BASE' will set GET,POST,HEAD. 'DAV' will set everything needed for WebDAV. 'RGET' will allow proxy-server gets. 'PROXY' will enable CONNECT and RGET. 'DAV,PROXY' enables everything.
-	-p:		Set port to listen on.
-	-P:		Path for pid file.
-	-r:		'ChRoot mode', chroot into directory and offer services from it
-	-sslv: Lowest SSL Version to use. One of ssl, tls, tls1.2, tls1.2
-	-key:   Keyfile for SSL (HTTPS)
-	-cert:  Certificate for SSL (HTTPS). This can be a certificate chain bundled in .pem format.
-	-ciphers:		List of SSL ciphers to use.
-	-dhparams:		Path to a file containing Diffie Helmann parameters for Perfect Forward Secrecy.
-  -pfs:         Use Perfect Forward Secrecy. Will not generate Diffie Helmann parameters unless -dhgenerate is supplied too
-	-client-cert:		Settings for SSL client certificate authentication. Three levels are available: 'required' means a client MUST supply a certificate, but that it may still be required to log in through normal authentication. 'sufficient' means that a client CAN supply a certificate, and that the certificate is all the authentication that's needed. 'required+sufficient' means that a client MUST provide a certificate, and that this certificate is sufficient for authentication.
-	-verify-path:		Path to a file, or a directory, containing Authority certificates for verifying client certificates.
-	-cgi:   Directory containing cgi programs. These programs will be accessible even though they are outside of a 'chroot'
-	-hashfile:  File containing cryptographic hashes of cgi-scripts. This file contains the output of the md5sum, shasum, sha256sum or sha512sum utilities.
-	-ep:		'External path' containing files that will be accessible even outside a chroot.
-	-u:		User to run cgi-programmes and default 'real user' for any 'native users' that don't have one specified.
-	-g:		Group to run server in (this will be the default group for users)
-	-allowed:		Comma separated list of users allowed to login (default without this switch is 'all users can login'
-	-denied:		Comma separated list of users DENIED login
-	-realm:		Realm for HTTP Authentication
-	-cache:		Takes an argument in seconds which is the max-age recommended for browser caching. Setting this to zero will turn off caching in the browser. Default is 10 secs.
-	-compress:		Compress documents and responses. This can have three values, 'yes', 'no' or 'partial'. 'Partial' means alaya will compress directory listings and other internally genrated pages, but not file downloads.
 ```
+
+
+COMMAND-LINE OPTIONS
+====================
+
+
+`-v`
+: Verbose logging.
+
+`-v -v`
+: Even more verbose logging.
+
+`-a <path>`
+: Specify the authentication file for 'built in' authentication.
+
+`-A <method>,<method>...`
+: Authentication methods. Comma separated list of 'pam', 'passwd', 'shadow', 'native', and 'accesstoken'. For to use alaya native authentication, with alaya's own password file just use 'native' on its own. See more in 'AUTHENTICATION' below.
+
+`-d`
+: No daemon, don't background process.
+
+`-f <path>`
+: Path to config file, defaults to /etc/alaya.conf, but alaya can be configured by command-line args only.
+
+`-O`
+: Open, don't require authentication.
+
+`-h`
+: 'ChHome mode', switch to users home dir and chroot.
+
+`-i <interface>`
+: Set interface listen on, allows running separate servers on the same port on different interfaces/network cards. For IPv4 either the interface name or address can be used (i.e. -i eth0 or -i 192.168.8.44) for IPv6 the IPv6 address must be used, (e.g. -i fe80::201:7ff6:ca5a:226b%wlan0). For unix sockets the 'address' (which is the file path) must start with '/'.
+
+`-l <path>`
+: Path to log file, default is to use 'syslog' instead.
+
+`-m <method>,<method>...`
+: HTTP Methods (GET, PUT, DELETE, PROPFIND) that are allowed. Comma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for readonly DAV.  'BASE' will set GET,POST,HEAD. 'DAV' will set everything needed for WebDAV. 'RGET' will allow proxy-server gets. 'PROXY' will enable CONNECT and RGET. 'DAV,PROXY' enables everything.
+
+`-p <port>`
+: Set port to listen on.
+
+`-P <path>`
+: Path for pid file.
+
+`-r <path>`
+: 'ChRoot mode', chroot into directory and offer services from it
+
+`-sslv <version>`
+: Lowest SSL Version to use. One of ssl, tls, tls1.2, tls1.2
+
+`-key <path>`
+: Keyfile for SSL (HTTPS)
+
+`-cert <path>`
+: Certificate for SSL (HTTPS). This can be a certificate chain bundled in .pem format.
+
+`-ciphers <name>,<name>...`
+: List of SSL ciphers to use.
+
+`-dhparams <path>`
+: Path to a file containing Diffie Helmann parameters for Perfect Forward Secrecy.
+
+`-pfs`
+: Use Perfect Forward Secrecy. Will not generate Diffie Helmann parameters unless -dhgenerate is supplied too
+
+`-client-cert [required|sufficient|required+sufficient]`
+: Settings for SSL client certificate authentication. Three levels are available:    'required' means a client MUST supply a certificate, but that it may still be required to log in through normal authentication. 'sufficient' means that a client CAN supply a certificate, and that the certificate is all the authentication that's needed. 'required+sufficient' means that a client MUST provide a certificate, and that this certificate is sufficient for authentication.
+
+`-verify-path <path>`
+: Path to a file, or a directory, containing Authority certificates for verifying client certificates.
+
+`-cgi <path>`
+: Directory containing cgi programs. These programs will be accessible even though they are outside of a 'chroot'
+
+`-hashfile <path>`
+: File containing cryptographic hashes of cgi-scripts. This file contains the output of the md5sum, shasum, sha256sum or sha512sum utilities.
+
+`-ep <path>`
+: 'External path' containing files that will be accessible even outside a chroot.
+
+`-u <user>`
+: User to run cgi-programmes and default 'real user' for any 'native users' that don't have one specified.
+
+`-g <group>`
+: Group to run server in (this will be the default group for users)
+
+`-allowed <user>,<user>...`
+: Comma separated list of users allowed to login (default without this switch is 'all users can login'
+
+`-denied <user>,<user>...`
+: Comma separated list of users DENIED login
+
+`-realm <string>`
+: Realm for HTTP Authentication
+
+`-cache <max age>`
+: Takes an argument in seconds which is the max-age recommended for browser caching. Setting this to zero will turn off caching in the browser. Default is 10 secs.
+
+`-compress [yes|no|partial]`
+: Compress documents and responses. This can have three values, 'yes', 'no' or 'partial'. 'Partial' means alaya will compress directory listings and other internally genrated pages, but not file downloads.
+
+`-t <seconds>`
+: Timeout in seconds for 'idle' clients
+
+`-ttl <value>`
+: Max packet TTL for connections
+
+`-allow-ips <pattern>,<pattern>...`
+: Comma-seperated list of shell/fnmatch patterns of IP addresses allowed to connect
+
+
 
 
 USER SETUP FOR ALAYA NATIVE AUTHENTICATION
@@ -89,12 +166,12 @@ Add User
 --------
 
 ```
-	alaya -user add [-a <auth path>] [-e <password encryption type>]  [-h <user home directory>] <Username> <Password> <Setting> <Setting> <Setting>
+  alaya -user add [-a <auth path>] [-e <password encryption type>]  [-h <user home directory>] <Username> <Password> <Setting> <Setting> <Setting>
 
-	-a:		Specify the authentication file for 'built in' authentication.
-	-h:		Specify home directory of new user.
-	-u:		Specify 'real user' that this user maps to.
-	-e:		Specify password encryption type (sha1, sha512, sha256, md5, null, or plain).
+  -a:    Specify the authentication file for 'built in' authentication.
+  -h:    Specify home directory of new user.
+  -u:    Specify 'real user' that this user maps to.
+  -e:    Specify password encryption type (sha1, sha512, sha256, md5, null, or plain).
 ```
 
 Config file type settings (like 'ChHome' or 'ChRoot=/var/shared' or 'HttpMethods=GET,PUT,PROPFIND' or 'Path=cgi,/cgi-bin/,/usr/share/cgi' can be added so that these settings are specific to a user
@@ -103,23 +180,23 @@ Add user with home directory /home/Guest and a number of settings
 ------------------------------------------------------------------
 
 ```
-	alaya -user add Guest Password -a /etc/FileServices.auth -e sha1 -h /home/Guest 'Path=cgi,/cgi-bin/,/usr/share/cgi' 'Path=files,/docs/,/usr/share/docs' ChHome 'SSLClientCertificate=required'
+  alaya -user add Guest Password -a /etc/FileServices.auth -e sha1 -h /home/Guest 'Path=cgi,/cgi-bin/,/usr/share/cgi' 'Path=files,/docs/,/usr/share/docs' ChHome 'SSLClientCertificate=required'
 
-	alaya -user add test testing123 -h /home/test -e sha1 SSLClientCertificate=required
+  alaya -user add test testing123 -h /home/test -e sha1 SSLClientCertificate=required
 ```
 
 Delete User
 -----------
 
 ```
-	alaya -user del [-a <auth path>] <Username>
+  alaya -user del [-a <auth path>] <Username>
 ```
 
 List Users
 ----------
 
 ```
-	alaya -user list
+  alaya -user list
 ```
 
 
@@ -136,59 +213,164 @@ There should be an example config file in the source distribution. It's worth lo
 
 Config file entries are:
 
-```
-include=<path>    		Include another config file in this config.
-Chroot=<dir>			Specifies directory to serve requests out of
-ChHome				Serve requests out of users home directory
-AllowUsers=<list>		Only allow these users access.
-DenyUsers=<list>		Deny these users access.
-Port=<port>			Port to listen on
-LogFile=<path>    		Log file path
-PidFile=<path>    		Pid file path
-AuthPath=<path>			Path to native authentication file(s)
-AuthRealm=<realm>		Realm for HTTP authentication
-BindAddress=<addr>		Interface to serve requests on
-HttpMethods=<list>		List of methods like GET, PUT that are allowed
-AuthMethods=<list>  		Which methods (native, shadow, passwd, pam, accesstoken) should be used for user authentication, and in what order. See more in 'AUTHENTICATION' below.
-SSLKey=<path>			Path to SSL key file
-SSLCert=<path>			Path to SSL certificate file
-SSLVersion=<ssl version> 	Lowest SSL Version to use. Can be 'ssl', 'tls', 'tls1.1' or 'tls1.2'. 
-SSLCiphers=<cipher list> 	List of Ciphers to use with SSL (in standard openssl format)
-SSLVerifyPath=<path>		Path to file or directory containing Certificate Authority certificates for peer authentication.
-SSLClientCertificate=<type>	'required', 'sufficient' or 'required+sufficient' (See 'Client Certificates' below)
-SSLDHParams=<path>		Path to an openssl generated Diffie Helman parameters file. Auto-activates Perfect Forward Secrecy.
-PFS=<yes|no>                    Use Perfect Forward Secrecy (not needed if SSLDHParams is supplied. Without SSLDHParams will use ElipticCurve algorithms).
-PerfectForwardSecrecy=<yes|no>  Use Perfect Forward Secrecy (not needed if SSLDHParams is supplied. Without SSLDHParams will use ElipticCurve algorithms).
-Path=<type>,<alias>,<path>	Path to a trusted directory outside of a chroot jail, which is made accessible as a 'virtual' directory under the top-level of the chroot. Currently there are two types of path 'cgi', for cgi programs, and 'files' for a standard directory made available in this way. (See 'VPaths' below)
-FileType=<pattern>,<settings>  Settings for files that match 'pattern'. See 'SETTINGS FOR FILE TYPES' below.
-Event=<type>:<match string>,<match str>,<match str>...:Script
-LogVerbose			More information in log file
-MaxLogSize=<max bytes>		Max log file size. A suffix can be used to express size, e.g.  1G, 2M, 900k. When max size is reached the logfile is renamed to have a '-' suffix, and a new file opened.
-DefaultUser=<username>	Default user that is used both for running cgi scripts, and for 'native' users that have no specified 'real' user
-DefaultGroup=<groupname>	Default group for webserver
-DirListType=<type>  Type of directory listings served. Can be 'none', 'basic', 'fancy' or 'interactive', with other flags to see optional properties. See 'DIRECTORY LISTINGS' below.
-Compression=<yes|no|partial> Use HTTP compression. 'Partial' will mean that only internally generated pages are compressed, not downloaded files.
-ScriptHashFile=<path>		Path to a file containing integrity hashes of cgi scripts. 
-ScriptHandler:<type>=<path>	Path to interpreter to handle scripts with the extension <type>
-CustomHeader=<full HTTP header>   Custom HTTP header to be added to all server responses.
-LookupClientName 	 	If present then lookup client hostnames with DNS and use in logging. The default is just to log the ip-address, as this is faster.
-SanitizeAllowTags=<tag list>	List of HTML tags allowed to be used in 'POST' to cgi-scripts. If left blank, then all are allowed, if set, then all but the listed html elements will be stripped 
-UserAgentSettings=UserAgentString,Settings		Settings to be applied when a particular user agent string is seen.
-FileCacheTime=<seconds>		Amount of time to recommend the browser	caches documents for.
-ListenQueue=<num>           	Number of connections to queue waiting for 'accept'. Default is 10.
-HttpKeepAlive=<yes|no>		Use http keep-alive
-ReusePort=<yes|no>		Bind server socket with SO_REUSEPORT allowing multiple server processes to bind to the same port (on by default).
-UseNamespaces=<yes|no>		Use linux namespaces to isolate the connection-handler processes (on by default).
-TcpFastOpen=<https|yes|no>  Use 'tcp fast open'. 'https' only enables this in for encrypted channels, which is the default due to some security concerns.
 
-MaxMemory=<max bytes>		Maximum amount of memory per alaya process. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
-MaxStack=<max bytes>		Maximum Stack Size. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
-PackFormats=<list>	        List of 'pack formats' to offer in the 'download as packed' item on the directory page.
-WebsocketHandler:<path>:<protocol>=<script path>   Specify a program that handles websockets requests to a particular path and protocol.
-DenyProxy=<host>:<port>     Configuration for proxy systems, see 'PROXY' section below
-AllowProxy=<host>:<port> [redirect=<host>:<port>] [ssl]   Configuration for proxy systems, see 'PROXY' section below
+`include=<path>`
+: Include another config file in this config.
 
-```
+`Chroot=<dir>`
+: Specifies directory to serve requests out of
+
+`ChHome`
+: Serve requests out of users home directory
+
+`AllowUsers=<list>`
+: Only allow these users access.
+
+`DenyUsers=<list>`
+: Deny these users access.
+
+`Port=<port>`
+: Port to listen on
+
+`LogFile=<path>`
+: Log file path
+
+`PidFile=<path>`
+: Pid file path
+
+`AuthPath=<path>`
+: Path to native authentication file(s)
+
+`AuthRealm=<realm>`
+: Realm for HTTP authentication
+
+`BindAddress=<addr>`
+: Interface to serve requests on
+
+`HttpMethods=<list>`
+: List of methods like GET, PUT that are allowed
+
+`AuthMethods=<list>`
+: Which methods (native, shadow, passwd, pam, accesstoken) should be used for user authentication, and in what order. See more in 'AUTHENTICATION' below.
+
+`SSLKey=<path>`
+: Path to SSL key file
+
+`SSLCert=<path>`
+: Path to SSL certificate file
+
+`SSLVersion=<ssl version>`
+: Lowest SSL Version to use. Can be 'ssl', 'tls', 'tls1.1' or 'tls1.2'. 
+
+`SSLCiphers=<cipher list>`
+: List of Ciphers to use with SSL (in standard openssl format)
+
+`SSLVerifyPath=<path>`
+: Path to file or directory containing Certificate Authority certificates for peer authentication.
+
+`SSLClientCertificate=<type>`
+: 'required', 'sufficient' or 'required+sufficient' (See 'Client Certificates' below)
+
+`SSLDHParams=<path>`
+: Path to an openssl generated Diffie Helman parameters file. Auto-activates Perfect Forward Secrecy.
+
+`PFS=<yes|no>`
+: Use Perfect Forward Secrecy (not needed if SSLDHParams is supplied. Without SSLDHParams will use ElipticCurve algorithms).
+
+`PerfectForwardSecrecy=<yes|no>`
+: Use Perfect Forward Secrecy (not needed if SSLDHParams is supplied. Without SSLDHParams will use ElipticCurve algorithms).
+
+`Path=<type>,<alias>,<path>`
+: Path to a trusted directory outside of a chroot jail, which is made accessible as a 'virtual' directory under the top-level of the chroot. Currently there are two types of path 'cgi', for cgi programs, and 'files' for a standard directory made available in this way. (See 'VPaths' below)
+
+`FileType=<pattern>,<settings>`
+: Settings for files that match 'pattern'. See 'SETTINGS FOR FILE TYPES' below.
+
+`LogVerbose`
+: More information in log file
+
+`MaxLogSize=<max bytes>`
+: Max log file size. A suffix can be used to express size, e.g.  1G, 2M, 900k. When max size is reached the logfile is renamed to have a '-' suffix, and a new file opened.
+
+`DefaultUser=<username>`
+: Default user that is used both for running cgi scripts, and for 'native' users that have no specified 'real' user
+
+`DefaultGroup=<groupname>`
+: Default group for webserver
+
+`DirListType=<type>`
+: Type of directory listings served. Can be 'none', 'basic', 'fancy' or 'interactive', with other flags to see optional properties. See 'DIRECTORY LISTINGS' below.
+
+`Compression=<yes|no|partial>`
+:Use HTTP compression. 'Partial' will mean that only internally generated pages are compressed, not downloaded files.
+
+`ScriptHashFile=<path>`
+: Path to a file containing integrity hashes of cgi scripts. 
+
+`ScriptHandler: <type>=<path>`
+: Path to interpreter to handle scripts with the extension <type>
+
+`CustomHeader=<full HTTP header>`
+: Custom HTTP header to be added to all server responses.
+
+`LookupClientName`
+: If present then lookup client hostnames with DNS and use in logging. The default is just to log the ip-address, as this is faster.
+
+`SanitizeAllowTags=<tag list>`
+: List of HTML tags allowed to be used in 'POST' to cgi-scripts. If left blank, then all are allowed, if set, then all but the listed html elements will be stripped 
+
+`UserAgentSettings=<UserAgentString>,<Settings>`
+: Settings to be applied when a particular user agent string is seen.
+
+`FileCacheTime=<seconds>`
+: Amount of time to recommend the browser  caches documents for.
+
+`ListenQueue=<num>`
+: Number of connections to queue waiting for 'accept'. Default is 10.
+
+`HttpKeepAlive=<yes|no>`
+: Use http keep-alive
+
+`ReusePort=<yes|no>`
+: Bind server socket with SO_REUSEPORT allowing multiple server processes to bind to the same port (on by default).
+
+`UseNamespaces=<yes|no>`
+: Use linux namespaces to isolate the connection-handler processes (on by default).
+
+`TcpFastOpen=<https|yes|no>`
+: Use 'tcp fast open'. 'https' only enables this in for encrypted channels, which is the default due to some security concerns.
+
+`MaxMemory=<max bytes>`
+: Maximum amount of memory per alaya process. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
+
+`MaxStack=<max bytes>`
+: Maximum Stack Size. A suffix can be used to express the size as, for instance, 1G, 2M, 900k
+
+`ActivityTimeout=<value>`
+: Amount of time, in seconds that a Client connection can be 'idle'
+
+`TTL=<value>`
+: Max TTL of TCP packets from alaya server
+
+`PackFormats=<list>`
+: List of 'pack formats' to offer in the 'download as packed' item on the directory page.
+
+`WebsocketHandler: <path>:<protocol>=<script path>`
+: Specify a program that handles websockets requests to a particular path and protocol.
+
+`DenyProxy=<host>: <port>`
+: Configuration for proxy systems, see 'PROXY' section below
+
+`AllowProxy=<host>: <port> [redirect=<host>:<port>] [ssl]`
+: Configuration for proxy systems, see 'PROXY' section below
+
+`AllowIPs=<pattern>,<pattern>...` 
+: Only allow hosts whose IP matches one of shell/fnmatch style '<pattern>' to connect
+
+`Event=<type>:<match string>,<match str>,<match str>...:<action>`
+: Trigger an action when an event occurs. See 'EVENTS' below.
+
+
 
 
 HTTPS ENCRYPTION
@@ -203,10 +385,10 @@ The optional '-ciphers' command-line-argument and the 'SSLCiphers' config file e
 The optional '-sslv' command-line-argument and the 'SSLVersion' config file entry can be used to set the minimum SSL version to use. This can be one of:
 
 ```
-ssl			sslv3 and above (so sslv3 + any tls)
-tls			any tls
-tls1.1	tls1.1 and above
-tls1.2	tls1.2 and above
+ssl      sslv3 and above (so sslv3 + any tls)
+tls      any tls
+tls1.1  tls1.1 and above
+tls1.2  tls1.2 and above
 ```
 
 
@@ -250,25 +432,25 @@ NATIVE AUTHENTICATION
 If alaya authenticates using 'native' authentication, then the users are 'virtual', they don't exist as 'real' users on the system, and so they really run as a default user and default group (defaults to 'nobody' or 'wwwrun' if such an account exists). This default user and default group can be set in the config file, or else a suitable default is found. The 'real user' and 'real group' can also be set on a user-by-user basis using a setup like:
 
 ```
-	alaya -user add bill bills-password DefaultUser=nobody
+  alaya -user add bill bills-password DefaultUser=nobody
 ```
 
 If you want 'bill' to actually be the system-user 'bill', but have a different password for alaya, then you can configure him/her/it as:
 
 ```
-	alaya -user add bill bills-alaya-password DefaultUser=bill
+  alaya -user add bill bills-alaya-password DefaultUser=bill
 ```
 
 Alaya supports multiple hashing methods for passwords stored in the native file. The default is sha256. Available types are:
 
 ```
-	md5, sha1, sha256, sha512, htdigest-md5, plain, null
+  md5, sha1, sha256, sha512, htdigest-md5, plain, null
 ```
 
 You can set up a user with a specific type by:
 
 ```
-	alaya -user add bill -e sha1 bills-password
+  alaya -user add bill -e sha1 bills-password
 ```
 
 The 'plain' encryption type is plain-text, which must be used if using HTTP Digest Authentication. The 'null' encryption type allows someone to log in with a blank password.
@@ -276,13 +458,13 @@ The 'plain' encryption type is plain-text, which must be used if using HTTP Dige
 Many settings that can be put in the config-file can also be booked against a specific user. So:
 
 ```
-	alaya -user add bill bills-password DefaultUser=nobody DefaultGroup=users ChRoot=/tmp HTTPMethods=GET
+  alaya -user add bill bills-password DefaultUser=nobody DefaultGroup=users ChRoot=/tmp HTTPMethods=GET
 ```
 
 would map the virtual user 'bill' to the real user 'nobody', in group 'users', and on login they'll be chrooted to '/tmp'. They will only be allowed to use the HTTP GET method.
 
-	
-	
+  
+  
 SYSTEM AUTHENTICATION
 =====================
 
@@ -366,11 +548,11 @@ DIRECTORY LISTINGS
 Alaya supports a number of types of directory listing. These are set using the 'DirListType' config option. Available types are:
 
 ```
-None					Refuse to show directories, only allow downloading of files
-Basic					Just list directory/file names
-Fancy					A much fancier listing of directory/file names, sizes, types, modified times, and other information
-Interactive		This type provides buttons that allow users to delete, rename or upload files.
-Full					Turn on everything except IndexPages
+None          Refuse to show directories, only allow downloading of files
+Basic          Just list directory/file names
+Fancy          A much fancier listing of directory/file names, sizes, types, modified times, and other information
+Interactive    This type provides buttons that allow users to delete, rename or upload files.
+Full          Turn on everything except IndexPages
 ```
 
 In addition to the type of listing, the DirListType config option accepts a number of comma-seperated modifiers. These are:
@@ -379,7 +561,7 @@ In addition to the type of listing, the DirListType config option accepts a numb
 IndexPages     Search for an index.html file in a directory, and show that instead of the directory
 Media          If a directory contains media files, then offer the option to download a .m3u playlist of them.
                This can then be  passed to a media playing app like mplayer, or some such.
-ShowVPaths	   Show VPaths as though they were subdirectories in the users top-level directory
+ShowVPaths     Show VPaths as though they were subdirectories in the users top-level directory
 TarDownloads   Offer downloads of entire directories as tarballs
 MimeIcons      Use icons for filetypes, instead of text description of mimetype. See 'MIMEICON VPATHS' below
 ```
@@ -387,9 +569,9 @@ MimeIcons      Use icons for filetypes, instead of text description of mimetype.
 Examples:
 
 ```
-	DirListType=none,IndexPages   Don't allow access to directory listings, but show index.html pages where available.
+  DirListType=none,IndexPages   Don't allow access to directory listings, but show index.html pages where available.
 
-	DirListType=Fancy,Media      Show 'fancy' directory listings, and offer .m3u playlists in directories with media files.
+  DirListType=Fancy,Media      Show 'fancy' directory listings, and offer .m3u playlists in directories with media files.
 ```
 
 
@@ -451,7 +633,7 @@ Path=cgi,/cgi-bin/,/usr/share/cgi-progs
 will map any url like:
 
 ```
-	http://myhost/cgi-bin/myProg.cgi
+  http://myhost/cgi-bin/myProg.cgi
 ```
 
 To a file called '/usr/share/cgi-progs/myProg.cgi' and run it if it exists.
@@ -604,7 +786,7 @@ alaya -cgi /usr/share/cgi
 Would cause urls of the form
 
 ```
-	http://servername/cgi-bin/myscript.cgi
+  http://servername/cgi-bin/myscript.cgi
 ```
 
 to map to `/usr/share/cgi`
@@ -612,7 +794,7 @@ to map to `/usr/share/cgi`
 Paths can contain multiple directories separated by colons, these directories will be searched till a matching file is found. Thus
 
 ```
-	Path=cgi,/cgi-bin/,/usr/share/cgi:/usr/local/cgi
+  Path=cgi,/cgi-bin/,/usr/share/cgi:/usr/local/cgi
 ```
 
 would cause both /usr/share/cgi and /usr/local/cgi to be searched when trying to map /cgi-bin/ in a url.
@@ -668,11 +850,11 @@ Path=MimeIcons,/mimeicons,/home/app-themes/icons/Free-file-icons-master/32px/$(F
 This creates a URL which alaya internally uses to find icons for filetypes. A comma-separated list of file paths is searched until a match is found. Placeholders in the format '$(variable name)' are substituted to generate a file path. Available variables are:
 
 ```
-$(FileExtn)		gets replaced with the file extension of the file we are seeking a mime icon for. 
-$(MimeType)		gets replaced with the full mime type (e.g. 'image/jpeg'). 
-$(MimeClass)	gets replaced with the mime class of the file we are seeking a mime icon for (so, 'audio', 'video', 'image' or 'application'). 
-$(MimeSub)		gets replaced with the mime subtype of the file we are seeking a mime icon for (so, 'jpeg', 'x-shockwave-flash', 'pdf', 'text', 'html' etc, etc). 
-$(FileType)		currently only used for directories/folders, where it is set to 'folder'
+$(FileExtn)    gets replaced with the file extension of the file we are seeking a mime icon for. 
+$(MimeType)    gets replaced with the full mime type (e.g. 'image/jpeg'). 
+$(MimeClass)  gets replaced with the mime class of the file we are seeking a mime icon for (so, 'audio', 'video', 'image' or 'application'). 
+$(MimeSub)    gets replaced with the mime subtype of the file we are seeking a mime icon for (so, 'jpeg', 'x-shockwave-flash', 'pdf', 'text', 'html' etc, etc). 
+$(FileType)    currently only used for directories/folders, where it is set to 'folder'
 ```
 
 In order to handle unknown file types the last entry should have no variable placeholders, so that it always matches, and is a path to the 'default' icon.
@@ -734,6 +916,23 @@ mimetype=<mimetype>   Mimetype (HTTP Content-Type) for matching files.
 ```
 
 
+TTL LIMITS
+==========
+
+The `TTL` config-file option and `-ttl` command-line options can be used to set a maximum TTL on TCP packets sent by alaya. This will limit hosts that can access alaya to being within a certain number of 'router hops' of the server. A value of '1' or '2' will normally limit connections to the local network. However, connections from beyond this will connect, but they will hang as alaya will be unable to send data back to them. Thus a timeout should be set with the `ActivityTimeout` config option or the `-t` command-line option.
+
+
+
+ALLOWED IPS
+===========
+
+The `AllowIPs` config-file option and `-allow-ips` command-line option can be used to set a list of IP addresses allowed to connect. Their argument is a comma-separated list of shell-style patterns. e.g.:
+
+```
+AllowIPs=192.168.*.*,10.*,127.0.0.1
+-allow-ips '192.168.*.*,10.*,127.0.0.1'
+```
+
 
 
 PROXY SUPPORT
@@ -744,7 +943,7 @@ Alaya has very rudimentary proxy support. The CONNECT method is supported, as ar
 HTTP and SOCKS4a proxy functions are not enabled by default, you'll have to enable them by using the '-m' command line arg or 'HttpMethods' config file entry. 'RGET' and 'RPOST' are the http methods for HTTP proxing. 'CONNECT' is the method for https proxying. 'SOCKS' is the method name for SOCKS4a proxing. For example:
 
 ```
-	alaya -m CONNECT,RGET
+  alaya -m CONNECT,RGET
 ```
 
 This only allows Alaya to work as a proxy, not as a webdav server. 'RGET' stands for 'REMOTE GET', it's the GET method with a full URL. Remote POST is not yet supported, but probably will be in a future release.
@@ -752,7 +951,7 @@ This only allows Alaya to work as a proxy, not as a webdav server. 'RGET' stands
 You could also use
 
 ```
-	alaya -m PROXY
+  alaya -m PROXY
 ```
 
 as 'PROXY' expands to CONNECT,RGET,SOCKS
@@ -760,13 +959,13 @@ as 'PROXY' expands to CONNECT,RGET,SOCKS
 If you want to allow remote GETS but not CONNECT then 
 
 ```
-	alaya -m RGET
+  alaya -m RGET
 ```
 
 If you want to allow proxy server support and webdav, then
 
 ```
-	alaya -m DAV,PROXY
+  alaya -m DAV,PROXY
 ```
 
 'DAV' expands to all the supported HTTP methods except the proxy ones, so these two together is everything active.
@@ -911,14 +1110,15 @@ Event=<type>:<matches>:<action> <args>
 where <type> is one of:
 
 ```
-	Method      Match the HTTP method
-	Path        Match the path of the file asked for
-	User        Match the username supplied in authentication
-	Peer        Match client IP Addresses
-	Header      Match a particular header supplied by the client
-	Response    Match a response code
-	BadURL			Match any URL that breaks alaya's inbuilt 'valid url' rules
-	Upload			Match a URL has just been uploaded
+  Method      Match the HTTP method
+  Path        Match the path of the file asked for
+  User        Match the username supplied in authentication
+  Peer        Match client IP Addresses
+  Header      Match a particular header supplied by the client
+  Response    Match a response code
+  BadURL      Match any URL that breaks alaya's inbuilt 'valid url' rules
+  Auth        Match authentication state, '<matches>' will be either 'okay' or 'fail'
+  Upload      Match a URL has just been uploaded
 ```
 
 and <matches> is a comma-separated list of things that the rule matches. Shell/fnmatch wildcards are allowed in these lists.
@@ -927,8 +1127,8 @@ and <matches> is a comma-separated list of things that the rule matches. Shell/f
 
 ```
   ignore:    ignore this event (used to rule out some things that will match a later event)
-	syslog:    send a message to syslog about this event
-	deny:      refuse access to the requested url
+  syslog:    send a message to syslog about this event
+  deny:      refuse access to the requested url
 ```
 
 any other entry is treated as a script to run. 
@@ -950,7 +1150,7 @@ Please note that these variables are not handled by the shell, alaya subsitutes 
 example:
 
 ```
-	Event=Header:*() {*:deny,/usr/local/sbin/BlockHTTPHacker.sh ShellShock '$(UserName)@$(ClientIP)' '$(URL)'
+  Event=Header:*() {*:deny,/usr/local/sbin/BlockHTTPHacker.sh ShellShock '$(UserName)@$(ClientIP)' '$(URL)'
 ```
 
 This would trigger if any header contains `() {`, which is a string used in shellshock attacks. The request will be denied, and the script `/usr/local/sbin/BlockHTTPHacker.sh` will be run. The script will be passed a static argument 'ShellShock' and two dynamically generated arguments, one specifying the UserName and ClientIP that the request came from, and the other specifying the URL that the request was sent to.

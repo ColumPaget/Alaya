@@ -1,3 +1,8 @@
+v5.2
+  * limit TTL of connections
+  * limit IP addresses allowed to connect
+  * add 'auth:okay' and 'auth:fail' events
+
 v5.1
   * bugfix for 'hang' occuring when connections not correctly cleaned up after disconnect (return STREAM_CLOSED not FALSE in HandleChildProcessRequest)
   * upgrade to latest libuseful

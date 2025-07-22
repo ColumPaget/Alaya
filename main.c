@@ -124,17 +124,23 @@ void AcceptConnection(STREAM *Serv)
     pid_t pid;
 
 
-
     Session=HTTPSessionCreate();
     Session->S=STREAMServerAccept(Serv);
-    STREAMSetFlushType(Session->S, FLUSH_FULL,0,0);
+    if (Session->S)
+    {
+        STREAMSetFlushType(Session->S, FLUSH_FULL,0,0);
 
-    ReopenLogFile("New Connection", FALSE);
+	//some versions of libUseful won't have the feature of setting TTL on a server socket
+        //so we do it here for 'belt and braces'. There should be no problem with doing it twice.
+        if (Settings.TTL > 0) setsockopt(Session->S->out_fd, SOL_IP, IP_TTL, &(Settings.TTL), sizeof(int));
 
-    pid=PipeSpawnFunction(&infd,&outfd,NULL, ChildFunc, Session, "");
-    Tempstr=FormatStr(Tempstr,"%d",pid);
-    S=STREAMFromDualFD(outfd, infd);
-    ListAddNamedItem(Connections,Tempstr,S);
+        ReopenLogFile("New Connection", FALSE);
+
+        pid=PipeSpawnFunction(&infd,&outfd,NULL, ChildFunc, Session, "");
+        Tempstr=FormatStr(Tempstr,"%d",pid);
+        S=STREAMFromDualFD(outfd, infd);
+        ListAddNamedItem(Connections,Tempstr,S);
+    }
 
     //Close the *socket* connection, as this parent app no longer needs to speak to it.
     //however, the pipe connection to the child process stays open in Connections list

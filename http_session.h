@@ -7,23 +7,25 @@
 
 
 //Flag values for Session->Flags
-#define SESSION_ENCODE_GZIP 1
-#define SESSION_ENCODE_XGZIP 2
-#define SESSION_OVERWRITE 8
-#define SESSION_KEEPALIVE 16
-#define SESSION_REUSE 32
-#define SESSION_AUTHENTICATED 64
-#define SESSION_SSL 128
-#define SESSION_ICECAST 256
-#define SESSION_ERR_BADURL 4096
-#define SESSION_ALLOW_UPLOAD 8192
-#define SESSION_UPLOAD_DONE 16384
+#define SESSION_ENCODE_GZIP      1
+#define SESSION_ENCODE_XGZIP     2
+#define SESSION_OVERWRITE        8
+#define SESSION_KEEPALIVE       16
+#define SESSION_REUSE           32
+#define SESSION_SSL            128
+#define SESSION_ICECAST        256
+#define SESSION_AUTHENTICATED 1024
+#define SESSION_AUTH_FAIL     2048
+#define SESSION_ERR_BADURL    4096
+#define SESSION_ALLOW_UPLOAD  8192
+#define SESSION_UPLOAD_DONE  16384
 
 
 typedef struct
 {
     int Flags;
     int AuthFlags;
+    int Shortener;
     char *Protocol;
     char *Method;
     int MethodID;

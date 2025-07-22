@@ -82,7 +82,7 @@ static void ParseDirListType(const char *Data)
 
 static void ParseEventConfig(const char *ConfigLine)
 {
-    const char *EventTypeStrings[]= {"Method","Path","User","ClientIP","BadURL","Header","ResponseCode","Upload",NULL};
+    const char *EventTypeStrings[]= {"Method","Path","User","ClientIP","BadURL","Header","ResponseCode","Upload","Auth",NULL};
     char *Token=NULL;
     const char *ptr;
     ListNode *Node;
@@ -110,34 +110,35 @@ static char *ParsePackFormats(char *RetStr, const char *Config)
     const char *ptr;
     char *tptr;
 
-    RetStr=CopyStr(RetStr,"");
-    ptr=GetNameValuePair(Config, ",",":",&Name,&Value);
+    RetStr=CopyStr(RetStr, "");
+    ptr=GetNameValuePair(Config,  ", ", ":", &Name, &Value);
     while (ptr)
     {
         if (StrLen(Name) && StrLen(Value))
         {
-            if (strcasecmp(Value,"internal")==0) RetStr=MCatStr(RetStr,Name,":",Value,",",NULL);
+            if (strcasecmp(Value, "internal")==0) RetStr=MCatStr(RetStr, Name, ":", Value, ", ", NULL);
             else
             {
-                tptr=strchr(Value,' ');
+                tptr=strchr(Value, ' ');
                 if (tptr)
                 {
-                    StrTrunc(Value, tptr-Value);
+                    StrTrunc(Value,  tptr-Value);
                     tptr++;
                 }
-                //we don't want this to be null if strchr returns a null, otherwise it will
+                //we don't want this to be null if strchr returns a null,  otherwise it will
                 //shorten our sting when we use MCatStr below.
                 else tptr="";
 
-                Path=FindFileInPath(Path,Value,getenv("PATH"));
-                if (StrLen(Path)) RetStr=MCatStr(RetStr,Name,":",Path," ", tptr, ",",NULL);
+                Path=FindFileInPath(Path, Value, getenv("PATH"));
+                if (StrLen(Path)) RetStr=MCatStr(RetStr, Name, ":", Path, " ",  tptr,  ", ", NULL);
             }
         }
-        ptr=GetNameValuePair(ptr, ",",":",&Name,&Value);
+        ptr=GetNameValuePair(ptr, ", ", ":", &Name, &Value);
     }
 
     Destroy(Name);
     Destroy(Value);
+    Destroy(Path);
 
     return(RetStr);
 }
@@ -164,10 +165,10 @@ void ParseConfigItem(const char *ConfigLine)
 {
     const char *ConfTokens[]= {"include","Chroot","Chhome","AllowUsers","DenyUsers","Port","LogFile","PidFilePath","AuthPath","BindAddress","LogPasswords","HttpMethods","AuthMethods","DefaultUser","DefaultGroup","Path","FileType","LogVerbose","AuthRealm","Compression","DirListType","DisplayNameLen","MaxLogSize","ScriptHandler","ScriptHashFile","WebsocketHandler","LookupClientName","SanitizeAllowTags","CustomHeader","UserAgentSettings",
                                "SSLKey","SSLCert","SSLCiphers","SSLDHParams","SSLClientCertificate","SSLVerifyPath", "SSLVersion",
-                               "Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","UrlTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats","Admin","AllowProxy", "DenyProxy", "UseNamespaces", "ReusePort", "TCPFastOpen","ListenQueue","PFS","PerfectForwardSecrecy","AllowSU", "URLShortener","URLShort",
+                               "Event","FileCacheTime","HttpKeepAlive","AccessTokenKey","UrlTokenKey","Timezone","MaxMemory","MaxStack","ActivityTimeout","PackFormats","Admin","AllowProxy", "DenyProxy", "UseNamespaces", "ReusePort", "TCPFastOpen","ListenQueue","PFS","PerfectForwardSecrecy","AllowSU", "URLShortener","URLShort","ServerTTL","AllowIPs",
                                NULL
                               };
-    typedef enum {CT_INCLUDE,CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE, CT_PIDFILE, CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_PATH, CT_FILETYPE, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_SSL_VERSION, CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_URL_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS, CT_ADMIN, CT_ALLOWPROXY, CT_DENYPROXY, CT_USE_NAMESPACES, CT_REUSE_PORT, CT_FAST_OPEN, CT_LISTEN_QUEUE, CT_SSL_PFS, CT_SSL_PERFECT_FORWARD_SECRECY, CT_ALLOW_SU, CT_URL_SHORT, CT_URL_SHORT2} TConfigTokens;
+    typedef enum {CT_INCLUDE,CT_CHROOT, CT_CHHOME, CT_ALLOWUSERS,CT_DENYUSERS,CT_PORT, CT_LOGFILE, CT_PIDFILE, CT_AUTHFILE,CT_BINDADDRESS,CT_LOGPASSWORDS,CT_HTTPMETHODS, CT_AUTHMETHODS,CT_DEFAULTUSER, CT_DEFAULTGROUP, CT_PATH, CT_FILETYPE, CT_LOG_VERBOSE, CT_AUTH_REALM, CT_COMPRESSION, CT_DIRTYPE, CT_DISPLAYNAMELEN, CT_MAXLOGSIZE, CT_SCRIPTHANDLER, CT_SCRIPTHASHFILE, CT_WEBSOCKETHANDLER, CT_LOOKUPCLIENT, CT_SANITIZEALLOW, CT_CUSTOMHEADER, CT_USERAGENTSETTINGS, CT_SSLKEY, CT_SSLCERT, CT_SSLCIPHERS, CT_SSLDHPARAMS, CT_CLIENT_CERTIFICATION, CT_SSLVERIFY_PATH, CT_SSL_VERSION, CT_EVENT, CT_FILE_CACHE_TIME, CT_SESSION_KEEPALIVE, CT_ACCESS_TOKEN_KEY, CT_URL_TOKEN_KEY, CT_TIMEZONE, CT_MAX_MEM, CT_MAX_STACK, CT_ACTIVITY_TIMEOUT, CT_ARCHIVE_FORMATS, CT_ADMIN, CT_ALLOWPROXY, CT_DENYPROXY, CT_USE_NAMESPACES, CT_REUSE_PORT, CT_FAST_OPEN, CT_LISTEN_QUEUE, CT_SSL_PFS, CT_SSL_PERFECT_FORWARD_SECRECY, CT_ALLOW_SU, CT_URL_SHORT, CT_URL_SHORT2, CT_TCP_TTL, CT_ALLOW_IPS} TConfigTokens;
 
     char *Token=NULL;
     const char *ptr;
@@ -209,6 +210,10 @@ void ParseConfigItem(const char *ConfigLine)
 
     case CT_DENYUSERS:
         Settings.DenyUsers=CopyStr(Settings.DenyUsers,ptr);
+        break;
+
+    case CT_ALLOW_IPS:
+        Settings.AllowIPs=CopyStr(Settings.AllowIPs,ptr);
         break;
 
     case CT_AUTHFILE:
@@ -465,6 +470,13 @@ void ParseConfigItem(const char *ConfigLine)
     case CT_URL_SHORT2:
         Settings.URLShortner=CopyStr(Settings.URLShortner, ptr);
         break;
+
+
+    case CT_TCP_TTL:
+        Settings.TTL=atoi(ptr);
+        if (Settings.TTL > 255) Settings.TTL=255;
+        if (Settings.TTL < 0) Settings.TTL=0;
+        break;
     }
 
     Destroy(Token);
@@ -610,6 +622,8 @@ void PrintUsage()
     fprintf(stdout,"  %-15s %s","-accesstokenkey", "Secret key to use with access-tokens.\n");
     fprintf(stdout,"  %-15s %s","-urltokenkey", "Secret key to use with url-tokens.\n");
     fprintf(stdout,"  %-15s %s","-su", "Allow switching to root user if cgi programs are configured suid. NOT RECOMENDED.\n");
+    fprintf(stdout,"  %-15s %s","-ttl <value>", "Set Time To Live value for response packets from this server.\n");
+    fprintf(stdout,"  %-15s %s","-allow-ips <ip list>", "Comma-seperated list of shell-match patterns of allowed client IPs. If unset all IPs are allowed as clients. e.g. `alaya -allow-ips 10.[1-5].*.*,127.0.0.1`.\n");
     fprintf(stdout,"\n\nUser Setup for Alaya Authentication\n");
     fprintf(stdout,"	Alaya can use PAM, /etc/shadow or /etc/passwd to authenticate, but has its own password file that offers extra features, or is useful to create users who can only use Alaya. Users in the Alaya password file are mapped to a 'real' user on the system (usually 'guest' or 'nobody'). The Alaya password file can be setup through the alaya commandline.\n");
     fprintf(stdout,"\nAdd User:\n   alaya -user add [-a <auth path>] [-e <password encryption type>]  [-h <user home directory>] <Username> <Password> <Setting> <Setting> <Setting>\n\n");
@@ -668,6 +682,11 @@ void SettingsParseCommandLine(int argc, char *argv[], TSettings *Settings)
         else if (strcmp(argv[i],"-P")==0) Settings->PidFilePath=CopyStr(Settings->PidFilePath, argv[++i]);
         else if (strcmp(argv[i],"-O")==0) Settings->AuthFlags &= ~FLAG_AUTH_REQUIRED;
         else if (strcmp(argv[i],"-U")==0) Settings->DirListFlags |= DIR_SHOWFILES | DIR_FANCY | DIR_INTERACTIVE | DIR_MEDIA_EXT | DIR_SHOW_VPATHS | DIR_TARBALLS;
+        else if (strcmp(argv[i],"-ttl")==0)
+        {
+            Token=MCopyStr(Token,"ServerTTL=",argv[++i],NULL);
+            ParseConfigItem(Token);
+        }
         else if (strcmp(argv[i],"-compress")==0)
         {
             Token=MCopyStr(Token,"Compression=",argv[++i],NULL);
@@ -740,6 +759,11 @@ void SettingsParseCommandLine(int argc, char *argv[], TSettings *Settings)
         else if (strcmp(argv[i],"-allowed")==0)
         {
             Token=MCopyStr(Token,"AllowUsers=",argv[++i],NULL);
+            ParseConfigItem(Token);
+        }
+        else if ( (strcmp(argv[i],"-allow-ips")==0) || (strcmp(argv[i],"-allow-ip")==0) )
+        {
+            Token=MCopyStr(Token,"AllowIPs=",argv[++i],NULL);
             ParseConfigItem(Token);
         }
         else if (strcmp(argv[i],"-realm")==0)
@@ -849,7 +873,7 @@ void SettingsParseCommandLine(int argc, char *argv[], TSettings *Settings)
         }
     }
 
-
+    Destroy(Token);
 }
 
 
@@ -897,6 +921,7 @@ void InitSettings()
     Settings.AddressSpace=CopyStr(Settings.AddressSpace, "250M");
     Settings.StackSize=CopyStr(Settings.StackSize, "1M");
     Settings.ActivityTimeout=10000;
+    Settings.TTL=-1;
     Settings.PackFormats=CopyStr(Settings.PackFormats,"tar:internal,zip:zip -");
 
     GenerateRandomBytes(&Settings.AccessTokenKey,32,ENCODE_BASE64);

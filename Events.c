@@ -86,20 +86,37 @@ int EventTriggerMatch(ListNode *Node, HTTPSession *Session, char **MatchStr)
             }
             break;
 
+        case EVENT_AUTH:
+            if (Session->AuthFlags & FLAG_AUTH_PRESENT)
+            {
+                if ( (CompareStrNoCase(Token, "fail")==0) && (Session->Flags & SESSION_AUTH_FAIL) )
+                {
+                    *MatchStr=MCatStr(*MatchStr, "Auth Fail: ", NULL);
+                    result=TRUE;
+                }
+
+                if ( (CompareStrNoCase(Token, "okay")==0) && (Session->Flags & SESSION_AUTHENTICATED) )
+                {
+                    *MatchStr=MCatStr(*MatchStr, "Authenticated ", NULL);
+                    result=TRUE;
+                }
+            }
+            break;
+
+
         case EVENT_HEADER:
             if (EventHeadersMatch(Token,Session,MatchStr)) result=TRUE;
             break;
 
         case EVENT_UPLOAD:
-            if ( (Session->Flags & SESSION_UPLOAD_DONE) && (fnmatch(Token,Session->Path,0)==0) )
+            if ( (Session->Flags & SESSION_UPLOAD_DONE) && (fnmatch(Token, Session->Path, 0)==0) )
             {
                 *MatchStr=MCatStr(*MatchStr, "Dest: ",Session->Path,", ",NULL);
                 result=TRUE;
             }
             break;
-
-
         }
+
         ptr=GetToken(ptr,",",&Token,0);
     }
 
@@ -174,13 +191,14 @@ void ProcessEventTrigger(HTTPSession *Session, const char *URL, const char *Trig
     else if (strcasecmp(Type,"syslog")==0)
     {
         if (StrValid(ptr)) LogStr=CopyStr(LogStr, ptr);
-        syslog(LOG_WARNING, "%s",LogStr);
+        syslog(LOG_WARNING, "%s from %s@%s",LogStr, Session->UserName, Session->ClientIP);
     }
     else if (strcasecmp(Type,"deny") ==0)
     {
         if (StrValid(ptr)) LogStr=CopyStr(LogStr, ptr);
         LogToFile(Settings.LogPath,"WARN: 'Deny' Event Rule encountered (%s on %s). Denying Authentication",ExtraInfo,URL);
         Settings.AuthMethods=CopyStr(Settings.AuthMethods, "deny");
+        Session->Flags &= ~SESSION_AUTHENTICATED;
     }
     else ProcessEventScript(Session, URL, Tempstr, ExtraInfo, Vars);
 

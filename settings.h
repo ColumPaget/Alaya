@@ -54,6 +54,7 @@ typedef struct
     int DirListFlags;
     char *AllowUsers;
     char *DenyUsers;
+    char *AllowIPs;
     int AuthFlags;
     char *AuthMethods;
     char *AuthPath;
@@ -71,6 +72,7 @@ typedef struct
     char *AddressSpace;
     char *StackSize;
     int DisplayNameLen;
+    int TTL;
     unsigned long DocumentCacheTime;
     ListNode *SSLKeys;
     ListNode *VPaths;
