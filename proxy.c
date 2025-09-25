@@ -182,7 +182,6 @@ int HTTPProxyConnectAllowed(HTTPSession *ClientHeads)
 {
     ListNode *Curr;
     char *Tempstr=NULL, *Token=NULL;
-    char *Host=NULL;
     const char *ptr;
     int RetVal=HTTP_PROXY_DENY;
 
@@ -293,8 +292,8 @@ void SocksProxyConnect(HTTPSession *Session)
         val=STREAMReadChar(Session->S);
         if (val==1)
         {
-            STREAMReadBytes(Session->S, &port, 2);
-            STREAMReadBytes(Session->S, &ip4, 4);
+            STREAMReadBytes(Session->S, (unsigned char *)&port, 2);
+            STREAMReadBytes(Session->S, (unsigned char *)&ip4, 4);
             ip4=ntohl(ip4);
             port=ntohs(port);
 
@@ -320,13 +319,13 @@ void SocksProxyConnect(HTTPSession *Session)
             if (TargetS)
             {
                 val=0;
-                STREAMWriteBytes(Session->S, &val, 1);
+                STREAMWriteBytes(Session->S, (const unsigned char *)&val, 1);
                 val=0x5a;
-                STREAMWriteBytes(Session->S, &val, 1);
+                STREAMWriteBytes(Session->S, (const unsigned char *)&val, 1);
                 port=0; //these are just padding
-                STREAMWriteBytes(Session->S, &port, 2);
+                STREAMWriteBytes(Session->S, (const unsigned char *)&port, 2);
                 ip4=0; //these are just padding
-                STREAMWriteBytes(Session->S, &ip4, 4);
+                STREAMWriteBytes(Session->S, (const unsigned char *)&ip4, 4);
                 STREAMFlush(Session->S);
 
                 ProxyCopyData(Session->S, TargetS);

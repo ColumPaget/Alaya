@@ -34,6 +34,21 @@ ListNode *Connections=NULL;
 STREAM *ParentProcessPipe=NULL;
 
 
+// Closing streams in a list using the 'ListDestroy' system
+// causes compile failures in some versions of gcc.
+// This function forces the void object held in the list to
+// be a 'STREAM' object which can then be passed to STREAMClose
+// thanks to mshedsilegx@github for reporting this and other
+//compile errors
+void CloseStreamWrapper(void *item) 
+{
+    STREAM *stream = (STREAM *)item;
+    if (stream != NULL) {
+        STREAMClose(stream);
+    }
+}
+
+
 void SigHandler(int sig)
 {
     if (sig==SIGHUP) Settings.Flags |= FLAG_SIGHUP_RECV;
@@ -103,7 +118,7 @@ int ChildFunc(void *Data, int Flags)
     }
     */
 
-    ListDestroy(Connections, STREAMClose);
+    ListDestroy(Connections, CloseStreamWrapper);
 
     ProcessSetTitle("alaya peer=%s", STREAMGetValue(Session->S, "PeerIP"));
     HTTPServerHandleConnection(Session);
