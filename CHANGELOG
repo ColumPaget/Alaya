@@ -1,9 +1,12 @@
-v5.2
+v5.3 (2025-10-25)
+  * compile fixes courtesy of mshedsilegx@github
+
+v5.2 (2025-07-22)
   * limit TTL of connections
   * limit IP addresses allowed to connect
   * add 'auth:okay' and 'auth:fail' events
 
-v5.1
+v5.1 (2025-07-03)
   * bugfix for 'hang' occuring when connections not correctly cleaned up after disconnect (return STREAM_CLOSED not FALSE in HandleChildProcessRequest)
   * upgrade to latest libuseful
 
