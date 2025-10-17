@@ -24,8 +24,8 @@
 #define SORT_RSIZE 8
 #define SELECT_ALL 512
 
-const char *DirActionTypes[]= {"html","csv","m3u","rss","pack","upload","edit","delete","delete-selected","rename","mkdir","saveprops","editaccesstoken",NULL};
-typedef enum {ACTION_HTML,ACTION_CSV,ACTION_M3U,ACTION_RSS,ACTION_PACK,ACTION_UPLOAD,ACTION_EDIT,ACTION_DELETE,ACTION_DELETE_SELECTED,ACTION_RENAME, ACTION_MKDIR, ACTION_SAVEPROPS, ACTION_EDIT_ACCESSTOKEN} TDIRFORMAT;
+const char *DirActionTypes[]= {"reject","html","csv","m3u","rss","pack","upload","edit","delete","delete-selected","rename","mkdir","saveprops","editaccesstoken",NULL};
+typedef enum {ACTION_REJECT, ACTION_HTML, ACTION_CSV, ACTION_M3U, ACTION_RSS, ACTION_PACK, ACTION_UPLOAD, ACTION_EDIT, ACTION_DELETE, ACTION_DELETE_SELECTED, ACTION_RENAME, ACTION_MKDIR, ACTION_SAVEPROPS, ACTION_EDIT_ACCESSTOKEN} TDIRFORMAT;
 
 
 time_t Now;
@@ -924,7 +924,8 @@ int RequestedListingType(HTTPSession *Session, int *Flags)
     int Action=ACTION_HTML;
     const char *ptr;
 
-    if (! (Settings.DirListFlags & DIR_SHOWFILES)) return(DIR_REJECT);
+    if (Settings.DirListFlags & DIR_REJECT) return(ACTION_REJECT);
+    if (! (Settings.DirListFlags & DIR_SHOWFILES)) return(ACTION_REJECT);
 
     ptr=GetNameValuePair(Session->Arguments,"&","=",&Name,&Value);
     while (ptr)

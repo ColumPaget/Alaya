@@ -41,7 +41,8 @@ USAGE
 =====
 
 ```
-alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-sslv <version>] [-key <path>] [-cert <path>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>]
+alaya [-v] [-d] [-O] [-h] [-p <port>] [-i <iface>] [-f <config file>] [-t <seconds>] [-A <auth methods>] [-a <auth file>] [-l <log file>] [-P <pid file>] [-r <path>] [-sslv <version>] [-key <path>] [-cert <path>] [-client-cert <level>] [-verify-path <path>] [-ciphers <cipher list>] [-pfs] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-allowed <users>] -denied <users>] [-allow-ip <iplist>] [-nodir] [-dir <type>] [-compress <yes|no|partial>] [-ttl <ttl>] [-cache <seconds>] [-tz <timezone>] [-accesstokenkey <string>] [-urltokenkey <string>] [-clientnames] [-ttl <pkt ttl>] 
+
 ```
 
 
@@ -64,13 +65,25 @@ COMMAND-LINE OPTIONS
 `-d`
 : No daemon, don't background process.
 
+`-nodemon`
+: No daemon, don't background process.
+
 `-f <path>`
 : Path to config file, defaults to /etc/alaya.conf, but alaya can be configured by command-line args only.
 
 `-O`
 : Open, don't require authentication.
 
+`-r <path>`
+: 'ChRoot mode', chroot into directory and offer services from it
+
+`-chroot <path>`
+: 'ChRoot mode', chroot into directory and offer services from it
+
 `-h`
+: 'ChHome mode', switch to users home dir and chroot.
+
+`-chhome`
 : 'ChHome mode', switch to users home dir and chroot.
 
 `-i <interface>`
@@ -87,9 +100,6 @@ COMMAND-LINE OPTIONS
 
 `-P <path>`
 : Path for pid file.
-
-`-r <path>`
-: 'ChRoot mode', chroot into directory and offer services from it
 
 `-sslv <version>`
 : Lowest SSL Version to use. One of ssl, tls, tls1.2, tls1.2
@@ -151,8 +161,32 @@ COMMAND-LINE OPTIONS
 `-ttl <value>`
 : Max packet TTL for connections
 
+`-allow-ip <pattern>,<pattern>...`
+: Comma-seperated list of shell/fnmatch patterns of IP addresses allowed to connect
+
 `-allow-ips <pattern>,<pattern>...`
 : Comma-seperated list of shell/fnmatch patterns of IP addresses allowed to connect
+
+`-nodir`
+: Do not allow directory listings.
+
+`-dir` 
+: Directory listing type. One of: 'none', 'basic', 'fancy', 'interactive', or 'full'.
+
+`-dirtype` 
+: Directory listing type. One of: 'none', 'basic', 'fancy', 'interactive', or 'full'.
+
+`-U`
+: fancy, interactive dir listings with media, tarballs and other features..
+ 
+`-accesstokenkey <secret>`
+: Secret key to use with access-tokens.
+
+`-urltokenkey <secret>`
+: Secret key to use with url-tokens.
+
+`-su`
+: On linux systems disable the 'no su' feature, so that suid cgi programs can switch user. NOT RECOMENDED.
 
 
 

@@ -1,4 +1,9 @@
-v5.3 (2025-10-25)
+v5.4 (2024-10-17)
+  * change command-line system to libuseful CMDLINE instead of argv[++i]
+  * fix issues with -O command-line flag
+  * add '-nodir' and '-dir <type>' command-line flags
+
+v5.3 (2025-09-25)
   * compile fixes courtesy of mshedsilegx@github
 
 v5.2 (2025-07-22)

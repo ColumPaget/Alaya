@@ -1376,7 +1376,7 @@ static int HTTPServerAuthenticate(HTTPSession *Session)
     }
 
 
-    if (! Settings.AuthFlags & FLAG_AUTH_REQUIRED)
+    if (! (Settings.AuthFlags & FLAG_AUTH_REQUIRED))
     {
         //if we do not need to authenticate the user, then at least look up their
         //details so we know which real user/group they map to

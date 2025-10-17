@@ -53,7 +53,7 @@ static void ParseDirListType(const char *Data)
     char *Token=NULL;
     const char *ptr;
 
-    Settings.DirListFlags=DIR_REJECT;
+    Settings.DirListFlags=0;
 
     ptr=GetToken(Data,",",&Token,0);
     while (ptr)
@@ -507,11 +507,11 @@ void ParseConfigItemList(const char *ConfigItemList)
 
 
 
-void HandleUserSetup(const char *Operation, int argc, char *argv[])
+void HandleUserSetup(const char *Operation, CMDLINE *CMD)
 {
     int i, result;
     char *UserName=NULL, *Password=NULL, *PassType=NULL, *HomeDir=NULL, *RealUser=NULL, *Args=NULL, *Path=NULL;
-    const char *ptr;
+    const char *ptr, *p_arg;
 
     if (strcmp(Operation,"del")==0) PassType=CopyStr(PassType,"delete");
     else PassType=CopyStr(PassType,"sha256");
@@ -520,31 +520,32 @@ void HandleUserSetup(const char *Operation, int argc, char *argv[])
     Password=CopyStr(Password,"");
     Args=CopyStr(Args,"");
 
-    for (i=3; i < argc; i++)
+    p_arg=CommandLineNext(CMD);
+    while (p_arg)
     {
-        if (strcmp(argv[i],"-e")==0)
-        {
-            i++;
-            if (strcmp(Operation,"del") !=0) PassType=CopyStr(PassType,argv[i]);
+        if (strcmp(p_arg,"-e")==0)
+        {   
+            p_arg=CommandLineNext(CMD);
+            if (strcmp(Operation,"del") !=0) PassType=CopyStr(PassType,p_arg);
         }
-        else if (strcmp(argv[i],"-h")==0)
+        else if (strcmp(p_arg,"-h")==0)
         {
-            i++;
-            HomeDir=CopyStr(HomeDir,argv[i]);
+            p_arg=CommandLineNext(CMD);
+            HomeDir=CopyStr(HomeDir,p_arg);
         }
-        else if (strcmp(argv[i],"-u")==0)
+        else if (strcmp(p_arg,"-u")==0)
         {
-            i++;
-            RealUser=CopyStr(RealUser,argv[i]);
+            p_arg=CommandLineNext(CMD);
+            RealUser=CopyStr(RealUser,p_arg);
         }
-        else if (strcmp(argv[i],"-a")==0)
+        else if (strcmp(p_arg,"-a")==0)
         {
-            i++;
-            Settings.AuthPath=CopyStr(Settings.AuthPath,argv[i]);
+            p_arg=CommandLineNext(CMD);
+            Settings.AuthPath=CopyStr(Settings.AuthPath,p_arg);
         }
-        else if (StrLen(UserName)==0) UserName=CopyStr(UserName,argv[i]);
-        else if (StrLen(Password)==0) Password=CopyStr(Password,argv[i]);
-        else Args=MCatStr(Args,argv[i]," ",NULL);
+        else if (StrLen(UserName)==0) UserName=CopyStr(UserName,p_arg);
+        else if (StrLen(Password)==0) Password=CopyStr(Password,p_arg);
+        else Args=MCatStr(Args,p_arg," ",NULL);
     }
 
     if (strcmp(Operation,"list")==0) AuthNativeListUsers(Settings.AuthPath);
@@ -561,6 +562,7 @@ void HandleUserSetup(const char *Operation, int argc, char *argv[])
             else break;
             ptr=GetToken(ptr, ":", &Path, 0);
         }
+    p_arg=CommandLineNext(CMD);
     }
 
     Destroy(UserName);
@@ -585,22 +587,36 @@ void PrintUsage()
     fprintf(stdout,"Credits: Thanks to Gregor Heuer, Helmut Schmid, and Maurice R Volaski for bug reports.\n");
     fprintf(stdout,"\n");
 
-    fprintf(stdout,"Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-A <auth methods>] [-a <auth file>] [-l <path>]  [-r <path>] [-key <path>] [-cert <path>] [-client-cert <level>] [-verify-path <path>] [-ciphers <cipher list>] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-compress <yes|no|partial>] [-cache <seconds>] [-tz <timezone>] [-accesstokenkey <string>] [-urltokenkey <string>]\n\n");
+    fprintf(stdout,"Usage: alaya [-v] [-d] [-O] [-h] [-p <port>] [-i <iface>] [-f <config file>] [-t <seconds>] [-A <auth methods>] [-a <auth file>] [-l <log file>] [-P <pid file>] [-r <path>] [-sslv <version>] [-key <path>] [-cert <path>] [-client-cert <level>] [-verify-path <path>] [-ciphers <cipher list>] [-pfs] [-cgi <path>] [-ep <path>] [-u <default user>] [-g <default group>] [-m <http methods>] [-realm <auth realm>] [-allowed <users>] -denied <users>] [-allow-ip <iplist>] [-nodir] [-dir <type>] [-compress <yes|no|partial>] [-ttl <ttl>] [-cache <seconds>] [-tz <timezone>] [-accesstokenkey <string>] [-urltokenkey <string>] [-clientnames] [-ttl <pkt ttl>] \n\n");
+
+
+
+
+
     fprintf(stdout,"  %-15s %s", "-v","Verbose logging.\n");
     fprintf(stdout,"  %-15s %s", "-v -v", "Even more verbose logging.\n");
     fprintf(stdout,"  %-15s %s", "-a", "Specify the authentication file for 'built in' authentication.\n");
     fprintf(stdout,"  %-15s %s", "-A", "Authentication methods. Comma separated list of pam,passwd,shadow,native,accesstoken,urltoken. For 'Alaya native only' just use 'native' on its own\n");
     fprintf(stdout,"  %-15s %s", "-d", "No daemon, don't background process.\n");
+    fprintf(stdout,"  %-15s %s", "-nodemon", "No daemon, don't background process.\n");
     fprintf(stdout,"  %-15s %s","-f", "Path to config file, defaults to /etc/alaya.conf, but alaya can be configured by command-line args only.\n");
-    fprintf(stdout,"  %-15s %s","-O", "Open, don't require authentication.\n");
-    fprintf(stdout,"  %-15s %s","-h", "'ChHome mode', switch to users home dir and chroot.\n");
-    fprintf(stdout,"  %-15s %s","-i", "Set interface listen on, allows running separate servers on the same port on different interfaces/network cards.\n");
-    fprintf(stdout,"  %-15s %s","-l", "Path to log file, default is to use 'syslog' instead.\n");
-    fprintf(stdout,"  %-15s %s","-m", "HTTP Methods (GET, PUT, DELETE, PROPFIND) that are allowed.\nComma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for readonly DAV.\n'BASE' will set GET,POST,HEAD. 'DAV' will set everything needed for WebDAV. 'RGET' will allow proxy-server gets. 'PROXY' will enable CONNECT and RGET. 'DAV,PROXY' enables everything.\n");
     fprintf(stdout,"  %-15s %s","-p", "Set port to listen on.\n");
+    fprintf(stdout,"  %-15s %s","-O", "Open server, don't require authentication.\n");
+    fprintf(stdout,"  %-15s %s","-m", "HTTP Methods (GET, PUT, DELETE, PROPFIND) that are allowed.\nComma Separated. Set to 'GET' for very basic webserver, 'GET,PROPFIND' for readonly DAV.\n'BASE' will set GET,POST,HEAD. 'DAV' will set everything needed for WebDAV. 'RGET' will allow proxy-server gets. 'PROXY' will enable CONNECT and RGET. 'DAV,PROXY' enables everything.\n");
+    fprintf(stdout,"  %-15s %s","-t", "'activity timeout', connection inactivity timeout in seconds.\n");
+    fprintf(stdout,"  %-15s %s","-r", "'ChRoot mode', chroot into directory and offer services from it.\n");
+    fprintf(stdout,"  %-15s %s","-chroot", "'ChRoot mode', chroot into directory and offer services from it.\n");
+    fprintf(stdout,"  %-15s %s","-h", "'ChHome mode', switch to users home dir and chroot.\n");
+    fprintf(stdout,"  %-15s %s","-chhome", "'ChHome mode', switch to users home dir and chroot.\n");
+    fprintf(stdout,"  %-15s %s","-i", "Set interface/address listen on. Argument is IP address of interface. Allows running separate servers on the same port on different interfaces/network cards.\n");
+    fprintf(stdout,"  %-15s %s","-l", "Path to log file, default is to use 'syslog' instead.\n");
     fprintf(stdout,"  %-15s %s","-P", "Set path to pidfile.\n");
     fprintf(stdout,"  %-15s %s","-tz", "Set server's timezone.\n");
-    fprintf(stdout,"  %-15s %s","-r", "'ChRoot mode', chroot into directory and offer services from it\n");
+    fprintf(stdout,"  %-15s %s","-nodir", "Do not allow directory listings.\n");
+    fprintf(stdout,"  %-15s %s","-dir", "Directory listing type. One of: 'none', 'basic', 'fancy', 'interactive', or 'full'.\n");
+    fprintf(stdout,"  %-15s %s","-dirtype", "Directory listing type. One of: 'none', 'basic', 'fancy', 'interactive', or 'full'.\n");
+    fprintf(stdout,"  %-15s %s","-U", "fancy, interactive dir listings with media, tarballs and other features..\n");
+    fprintf(stdout,"  %-15s %s","-sslv", "Minimum  SSL version for HTTPS.  One of 'ssl', 'tls', 'tls1.2', 'tls1.2'\n");
     fprintf(stdout,"  %-15s %s","-key", "Keyfile for SSL (HTTPS)\n");
     fprintf(stdout,"  %-15s %s","-cert", "Certificate for SSL (HTTPS). This can be a certificate chain bundled in .pem format.\n");
     fprintf(stdout,"  %-15s %s","-ciphers", "List of SSL ciphers to use.\n");
@@ -621,8 +637,9 @@ void PrintUsage()
     fprintf(stdout,"  %-15s %s","-cache", "Takes an argument in seconds which is the max-age recommended for browser caching. Setting this to zero will turn off caching in the browser. Default is 10 secs.\n");
     fprintf(stdout,"  %-15s %s","-accesstokenkey", "Secret key to use with access-tokens.\n");
     fprintf(stdout,"  %-15s %s","-urltokenkey", "Secret key to use with url-tokens.\n");
-    fprintf(stdout,"  %-15s %s","-su", "Allow switching to root user if cgi programs are configured suid. NOT RECOMENDED.\n");
+    fprintf(stdout,"  %-15s %s","-su", "On linux systems disable the 'no su' feature, so that suid cgi programs can switch user. NOT RECOMENDED.\n");
     fprintf(stdout,"  %-15s %s","-ttl <value>", "Set Time To Live value for response packets from this server.\n");
+    fprintf(stdout,"  %-15s %s","-allow-ip <ip list>", "Comma-seperated list of shell-match patterns of allowed client IPs. If unset all IPs are allowed as clients. e.g. `alaya -allow-ips 10.[1-5].*.*,127.0.0.1`.\n");
     fprintf(stdout,"  %-15s %s","-allow-ips <ip list>", "Comma-seperated list of shell-match patterns of allowed client IPs. If unset all IPs are allowed as clients. e.g. `alaya -allow-ips 10.[1-5].*.*,127.0.0.1`.\n");
     fprintf(stdout,"\n\nUser Setup for Alaya Authentication\n");
     fprintf(stdout,"	Alaya can use PAM, /etc/shadow or /etc/passwd to authenticate, but has its own password file that offers extra features, or is useful to create users who can only use Alaya. Users in the Alaya password file are mapped to a 'real' user on the system (usually 'guest' or 'nobody'). The Alaya password file can be setup through the alaya commandline.\n");
@@ -645,172 +662,181 @@ void SettingsParseCommandLine(int argc, char *argv[], TSettings *Settings)
 {
     int i;
     char *Token=NULL;
-
+    const char *p_arg;
+    CMDLINE *CMD; 
 
     if (argc < 2) return;
 
-    if (strcmp(argv[1],"-user")==0)
-    {
+    CMD=CommandLineParserCreate(argc, argv);
+    p_arg=CommandLineNext(CMD);
+    if (! p_arg) return;
 
-        if (strcmp(argv[2],"list")==0) HandleUserSetup("list",argc, argv);
-        else if (strcmp(argv[2],"add")==0) HandleUserSetup("add",argc, argv);
-        else if (strcmp(argv[2],"del")==0) HandleUserSetup("del",argc, argv);
+    if (strcmp(p_arg,"-user")==0)
+    {
+         p_arg=CommandLineNext(CMD);
+
+        if (strcmp(p_arg, "list")==0) HandleUserSetup("list", CMD);
+        else if (strcmp(p_arg, "add")==0) HandleUserSetup("add", CMD);
+        else if (strcmp(p_arg, "del")==0) HandleUserSetup("del", CMD);
         else printf("-user must be followed by one of \"add\", \"del\" or \"list\"\n");
 
+        //if we are doing 'HandleUserSetup' then once it's done we don't need to continue
         exit(1);
     }
 
 
-    for (i=1; i < argc; i++)
+    while (p_arg)
     {
-        if (strcmp(argv[i],"-nodemon")==0) Settings->Flags |= FLAG_NODEMON;
-        else if (strcmp(argv[i],"-d")==0) Settings->Flags |= FLAG_NODEMON;
-        else if (strcmp(argv[i],"-i")==0) Settings->BindAddress=MCatStr(Settings->BindAddress,argv[++i],",",NULL);
-        else if (strcmp(argv[i],"-a")==0) Settings->AuthPath=CopyStr(Settings->AuthPath,argv[++i]);
-        else if (strcmp(argv[i],"-A")==0) Settings->AuthMethods=CopyStr(Settings->AuthMethods,argv[++i]);
-        else if (strcmp(argv[i],"-admin")==0) Settings->AdminUser=CopyStr(Settings->AdminUser, argv[++i]);
-        else if (strcmp(argv[i],"-v")==0)
+        if (strcmp(p_arg,"-v")==0)
         {
             if (Settings->Flags & FLAG_LOG_VERBOSE) Settings->Flags |= FLAG_LOG_MORE_VERBOSE;
             Settings->Flags |= FLAG_LOG_VERBOSE;
         }
-        else if (strcmp(argv[i],"-f")==0) Settings->ConfigPath=CopyStr(Settings->ConfigPath,argv[++i]);
-        else if (strcmp(argv[i],"-l")==0) Settings->LogPath=CopyStr(Settings->LogPath,argv[++i]);
-        else if (strcmp(argv[i],"-m")==0) Settings->HttpMethods=CopyStr(Settings->HttpMethods,argv[++i]);
-        else if (strcmp(argv[i],"-t")==0) Settings->ActivityTimeout=atoi(argv[++i]);
-        else if (strcmp(argv[i],"-p")==0) Settings->Port=atoi(argv[++i]);
-        else if (strcmp(argv[i],"-P")==0) Settings->PidFilePath=CopyStr(Settings->PidFilePath, argv[++i]);
-        else if (strcmp(argv[i],"-O")==0) Settings->AuthFlags &= ~FLAG_AUTH_REQUIRED;
-        else if (strcmp(argv[i],"-U")==0) Settings->DirListFlags |= DIR_SHOWFILES | DIR_FANCY | DIR_INTERACTIVE | DIR_MEDIA_EXT | DIR_SHOW_VPATHS | DIR_TARBALLS;
-        else if (strcmp(argv[i],"-ttl")==0)
+        else if (strcmp(p_arg,"-d")==0) Settings->Flags |= FLAG_NODEMON;
+        else if (strcmp(p_arg,"-nodemon")==0) Settings->Flags |= FLAG_NODEMON;
+        else if (strcmp(p_arg,"-i")==0) Settings->BindAddress=MCatStr(Settings->BindAddress,CommandLineNext(CMD),",",NULL);
+        else if (strcmp(p_arg,"-a")==0) Settings->AuthPath=CopyStr(Settings->AuthPath,CommandLineNext(CMD));
+        else if (strcmp(p_arg,"-A")==0) Settings->AuthMethods=CopyStr(Settings->AuthMethods,CommandLineNext(CMD));
+        else if (strcmp(p_arg,"-admin")==0) Settings->AdminUser=CopyStr(Settings->AdminUser, CommandLineNext(CMD));
+        else if (strcmp(p_arg,"-su")==0) Settings->Flags |= FLAG_ALLOW_SU;
+        else if (strcmp(p_arg,"-f")==0) Settings->ConfigPath=CopyStr(Settings->ConfigPath,CommandLineNext(CMD));
+        else if (strcmp(p_arg,"-l")==0) Settings->LogPath=CopyStr(Settings->LogPath,CommandLineNext(CMD));
+        else if (strcmp(p_arg,"-m")==0) Settings->HttpMethods=CopyStr(Settings->HttpMethods,CommandLineNext(CMD));
+        else if (strcmp(p_arg,"-t")==0) Settings->ActivityTimeout=atoi(CommandLineNext(CMD));
+        else if (strcmp(p_arg,"-p")==0) Settings->Port=atoi(CommandLineNext(CMD));
+        else if (strcmp(p_arg,"-P")==0) Settings->PidFilePath=CopyStr(Settings->PidFilePath, CommandLineNext(CMD));
+        else if (strcmp(p_arg,"-O")==0) Settings->AuthFlags &= ~FLAG_AUTH_REQUIRED;
+        else if (strcmp(p_arg,"-U")==0) Settings->DirListFlags |= DIR_SHOWFILES | DIR_FANCY | DIR_INTERACTIVE | DIR_MEDIA_EXT | DIR_SHOW_VPATHS | DIR_TARBALLS;
+        else if (strcmp(p_arg,"-nodir")==0) Settings->DirListFlags = DIR_REJECT;
+        else if ( (strcmp(p_arg,"-dir")==0) || (strcmp(p_arg,"-dirtype")==0) )
         {
-            Token=MCopyStr(Token,"ServerTTL=",argv[++i],NULL);
+            Token=MCopyStr(Token,"DirListType=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-compress")==0)
+        else if (strcmp(p_arg,"-ttl")==0)
         {
-            Token=MCopyStr(Token,"Compression=",argv[++i],NULL);
+            Token=MCopyStr(Token,"ServerTTL=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-u")==0)
+        else if (strcmp(p_arg,"-compress")==0)
         {
-            Token=MCopyStr(Token,"DefaultUser=",argv[++i],NULL);
+            Token=MCopyStr(Token,"Compression=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-g")==0)
+        else if (strcmp(p_arg,"-u")==0)
         {
-            Token=MCopyStr(Token,"DefaultGroup=",argv[++i],NULL);
+            Token=MCopyStr(Token,"DefaultUser=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-r")==0)
+        else if (strcmp(p_arg,"-g")==0)
         {
-            Token=MCopyStr(Token,"ChRoot=",argv[++i],NULL);
+            Token=MCopyStr(Token,"DefaultGroup=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-chroot")==0)
+        else if (strcmp(p_arg,"-r")==0)
         {
-            Token=MCopyStr(Token,"ChRoot=",argv[++i],NULL);
+            Token=MCopyStr(Token,"ChRoot=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-h")==0) ParseConfigItem("ChHome");
-        else if (strcmp(argv[i],"-chhome")==0) ParseConfigItem("ChHome");
-        else if (strcmp(argv[i],"-sslv")==0)
+        else if (strcmp(p_arg,"-chroot")==0)
         {
-            Token=MCopyStr(Token,"SSLVersion=",argv[++i],NULL);
+            Token=MCopyStr(Token,"ChRoot=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-key")==0)
+        else if (strcmp(p_arg,"-h")==0) ParseConfigItem("ChHome");
+        else if (strcmp(p_arg,"-chhome")==0) ParseConfigItem("ChHome");
+        else if (strcmp(p_arg,"-sslv")==0)
         {
-            Token=MCopyStr(Token,"SSLKey=",argv[++i],NULL);
+            Token=MCopyStr(Token,"SSLVersion=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-cert")==0)
+        else if (strcmp(p_arg,"-key")==0)
         {
-            Token=MCopyStr(Token,"SSLCert=",argv[++i],NULL);
+            Token=MCopyStr(Token,"SSLKey=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-dhparams")==0)
+        else if (strcmp(p_arg,"-cert")==0)
         {
-            Token=MCopyStr(Token,"SSLDHParams=",argv[++i],NULL);
+            Token=MCopyStr(Token,"SSLCert=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-dhgenerate")==0) Settings->Flags |= FLAG_SSL_PFS | FLAG_PFS_GENERATE;
-        else if (strcmp(argv[i],"-pfs")==0) Settings->Flags |= FLAG_SSL_PFS;
-        else if (strcmp(argv[i],"-ciphers")==0)
+        else if (strcmp(p_arg,"-dhparams")==0)
         {
-            Token=MCopyStr(Token,"SSLCiphers=",argv[++i],NULL);
+            Token=MCopyStr(Token,"SSLDHParams=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-cgi")==0)
+        else if (strcmp(p_arg,"-dhgenerate")==0) Settings->Flags |= FLAG_SSL_PFS | FLAG_PFS_GENERATE;
+        else if (strcmp(p_arg,"-pfs")==0) Settings->Flags |= FLAG_SSL_PFS;
+        else if (strcmp(p_arg,"-ciphers")==0)
         {
-            Token=MCopyStr(Token,"Path=cgi,/cgi-bin/,",argv[++i],NULL);
+            Token=MCopyStr(Token,"SSLCiphers=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-ep")==0)
+        else if (strcmp(p_arg,"-cgi")==0)
         {
-            Token=MCopyStr(Token,"Path=files,,",argv[++i],NULL);
+            Token=MCopyStr(Token,"Path=cgi,/cgi-bin/,",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-denied")==0)
+        else if (strcmp(p_arg,"-ep")==0)
         {
-            Token=MCopyStr(Token,"DenyUsers=",argv[++i],NULL);
+            Token=MCopyStr(Token,"Path=files,,",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-allowed")==0)
+        else if (strcmp(p_arg,"-denied")==0)
         {
-            Token=MCopyStr(Token,"AllowUsers=",argv[++i],NULL);
+            Token=MCopyStr(Token,"DenyUsers=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if ( (strcmp(argv[i],"-allow-ips")==0) || (strcmp(argv[i],"-allow-ip")==0) )
+        else if (strcmp(p_arg,"-allowed")==0)
         {
-            Token=MCopyStr(Token,"AllowIPs=",argv[++i],NULL);
+            Token=MCopyStr(Token,"AllowUsers=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-realm")==0)
+        else if ( (strcmp(p_arg,"-allow-ips")==0) || (strcmp(p_arg,"-allow-ip")==0) )
         {
-            Token=MCopyStr(Token,"AuthRealm=",argv[++i],NULL);
+            Token=MCopyStr(Token,"AllowIPs=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-client-cert")==0)
+        else if (strcmp(p_arg,"-realm")==0)
         {
-            Token=MCopyStr(Token,"SSLClientCertificate=",argv[++i],NULL);
+            Token=MCopyStr(Token,"AuthRealm=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-verify-path")==0)
+        else if (strcmp(p_arg,"-client-cert")==0)
         {
-            Token=MCopyStr(Token,"SSLVerifyPath=",argv[++i],NULL);
+            Token=MCopyStr(Token,"SSLClientCertificate=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-dirtype")==0)
+        else if (strcmp(p_arg,"-verify-path")==0)
         {
-            Token=MCopyStr(Token,"DirListType=",argv[++i],NULL);
+            Token=MCopyStr(Token,"SSLVerifyPath=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-hashfile")==0)
+        else if (strcmp(p_arg,"-hashfile")==0)
         {
-            Token=MCopyStr(Token,"ScriptHashFile=",argv[++i],NULL);
+            Token=MCopyStr(Token,"ScriptHashFile=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-accesstokenkey")==0)
+        else if (strcmp(p_arg,"-accesstokenkey")==0)
         {
-            Token=MCopyStr(Token,"AccessTokenKey=",argv[++i],NULL);
+            Token=MCopyStr(Token,"AccessTokenKey=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-urltokenkey")==0)
+        else if (strcmp(p_arg,"-urltokenkey")==0)
         {
-            Token=MCopyStr(Token,"URLTokenKey=",argv[++i],NULL);
+            Token=MCopyStr(Token,"URLTokenKey=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
-        else if (strcmp(argv[i],"-cache")==0) Settings->DocumentCacheTime=strtol(argv[++i],NULL,10);
-        else if (strcmp(argv[i],"-clientnames")==0) Settings->Flags |= FLAG_LOOKUP_CLIENT;
-        else if (strcmp(argv[i],"-tz")==0)
+        else if (strcmp(p_arg,"-cache")==0) Settings->DocumentCacheTime=strtol(CommandLineNext(CMD),NULL,10);
+        else if (strcmp(p_arg,"-clientnames")==0) Settings->Flags |= FLAG_LOOKUP_CLIENT;
+        else if (strcmp(p_arg,"-tz")==0)
         {
-            Token=MCopyStr(Token,"Timezone=",argv[++i],NULL);
+            Token=MCopyStr(Token,"Timezone=",CommandLineNext(CMD),NULL);
             ParseConfigItem(Token);
         }
         else if (
-            (strcmp(argv[i],"-version")==0) ||
-            (strcmp(argv[i],"--version")==0)
+            (strcmp(p_arg,"-version")==0) ||
+            (strcmp(p_arg,"--version")==0)
         )
         {
             fprintf(stdout,"version: %s\n",Version);
@@ -858,9 +884,9 @@ void SettingsParseCommandLine(int argc, char *argv[], TSettings *Settings)
             exit(1);
         }
         else if (
-            (strcmp(argv[i], "-?")==0) ||
-            (strcmp(argv[i], "-help")==0) ||
-            (strcmp(argv[i], "--help")==0)
+            (strcmp(p_arg, "-?")==0) ||
+            (strcmp(p_arg, "-help")==0) ||
+            (strcmp(p_arg, "--help")==0)
         )
         {
             PrintUsage();
@@ -868,9 +894,11 @@ void SettingsParseCommandLine(int argc, char *argv[], TSettings *Settings)
         }
         else
         {
-            printf("UNKNOWN ARGUMENT: [%s]\n",argv[i]);
+            printf("UNKNOWN ARGUMENT: [%s]\n",p_arg);
             exit(1);
         }
+
+         p_arg=CommandLineNext(CMD);
     }
 
     Destroy(Token);

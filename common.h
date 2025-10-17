@@ -30,19 +30,19 @@
 #define LOGIN_CHECK_ALLOWED 16
 
 //Flag Values for Settings->DirListFlags
-#define DIR_REJECT           -1
 #define DIR_SHOWFILES         1
 #define DIR_INDEX_FILES       2
 #define DIR_FANCY             4
 #define DIR_INTERACTIVE       8
 #define DIR_MIMEICONS        16
-#define DIR_CENTER           32 //only used by FormatFancyIem
+#define DIR_CENTER           32 //only used by FormatFancyItem
 #define DIR_MEDIA_EXT      4096
 #define DIR_IMAGE_EXT      8192
 #define DIR_UPLOAD        65536
 #define DIR_HASMEDIA     131072
 #define DIR_SHOW_VPATHS  262144
 #define DIR_TARBALLS     524288
+#define DIR_REJECT   2147483648
 
 
 //Flag values for the DropCapabilities function

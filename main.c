@@ -43,7 +43,8 @@ STREAM *ParentProcessPipe=NULL;
 void CloseStreamWrapper(void *item) 
 {
     STREAM *stream = (STREAM *)item;
-    if (stream != NULL) {
+    if (stream != NULL) 
+    {
         STREAMClose(stream);
     }
 }
