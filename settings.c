@@ -506,6 +506,32 @@ void ParseConfigItemList(const char *ConfigItemList)
 
 
 
+void PostProcessUserSetup(const char *Operation, const char *PassType,  const char *UserName, const char *Password, const char *HomeDir, const char *RealUser, const char *Args)
+{
+char *Path=NULL;
+const char *ptr;
+int result;
+
+
+    if (strcmp(Operation,"list")==0) AuthNativeListUsers(Settings.AuthPath);
+    else if (! StrLen(UserName)) printf("ERROR: NO USERNAME GIVEN\n");
+    else if (strchr(UserName, ':')) printf("ERROR: The ':' character is not allowed in usernames as it is used for various purposes. Sorry.\n");
+    else if ((strcmp(Operation,"add")==0) && (! StrLen(Password))) printf("ERROR: NO PASSWORD GIVEN\n");
+    else
+    {
+        ptr=GetToken(Settings.AuthPath, ":", &Path, 0);
+        while (ptr)
+        {
+            result=AuthNativeChange(Path, UserName, PassType, Password, HomeDir, RealUser, Args);
+            if (result==ERR_FILE) printf("ERROR: Cannot open file '%s'\n", Path);
+            else break;
+            ptr=GetToken(ptr, ":", &Path, 0);
+        }
+    }
+
+Destroy(Path);
+}
+
 
 void HandleUserSetup(const char *Operation, CMDLINE *CMD)
 {
@@ -546,24 +572,12 @@ void HandleUserSetup(const char *Operation, CMDLINE *CMD)
         else if (StrLen(UserName)==0) UserName=CopyStr(UserName,p_arg);
         else if (StrLen(Password)==0) Password=CopyStr(Password,p_arg);
         else Args=MCatStr(Args,p_arg," ",NULL);
-    }
-
-    if (strcmp(Operation,"list")==0) AuthNativeListUsers(Settings.AuthPath);
-    else if (! StrLen(UserName)) printf("ERROR: NO USERNAME GIVEN\n");
-    else if (strchr(UserName, ':')) printf("ERROR: The ':' character is not allowed in usernames as it is used for various purposes. Sorry.\n");
-    else if ((strcmp(Operation,"add")==0) && (! StrLen(Password))) printf("ERROR: NO PASSWORD GIVEN\n");
-    else
-    {
-        ptr=GetToken(Settings.AuthPath, ":", &Path, 0);
-        while (ptr)
-        {
-            result=AuthNativeChange(Path, UserName, PassType, Password, HomeDir,RealUser, Args);
-            if (result==ERR_FILE) printf("ERROR: Cannot open file '%s'\n", Path);
-            else break;
-            ptr=GetToken(ptr, ":", &Path, 0);
-        }
     p_arg=CommandLineNext(CMD);
     }
+
+
+    PostProcessUserSetup(Operation, PassType, UserName, Password, HomeDir, RealUser, Args);
+
 
     Destroy(UserName);
     Destroy(Password);
