@@ -1,4 +1,8 @@
-v5.4 (2024-10-17)
+v5.5 (2025-11-07)
+  * fix for 'endless loop' in 'alaya -user ...' commands
+
+
+v5.4 (2025-10-17)
   * change command-line system to libuseful CMDLINE instead of argv[++i]
   * fix issues with -O command-line flag
   * add '-nodir' and '-dir <type>' command-line flags
